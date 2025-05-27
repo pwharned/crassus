@@ -1,2 +1,2 @@
 package generated
-case class mytablev (id : Integer ,name : String )
+case class user (id : Integer ,name : String )

@@ -2,8 +2,9 @@ package org.pwharned.macros
 
 import scala.deriving.*
 import scala.compiletime.*
+import scala.concurrent.{ExecutionContext, Future}
 
-trait Sql[T] {
+trait SqlSelect[T] {
   def names: List[String]
   def name: String
   def select: String
@@ -12,35 +13,16 @@ trait Sql[T] {
 
 }
 
-transparent inline def summonFieldTypes[A <: Tuple]: List[String] = {
 
-  inline erasedValue[A] match {
-    case _: EmptyTuple => Nil
-    case _: (head *: tail) =>
-      val headType = inline erasedValue[head] match
-        case _: String => "String"
-        case _: Option[String] => "Option[String]"
-        case _: Int => "Int"
-        case _: Integer => "Int"
-        case _: Boolean => "Boolean"
-        case _: Double => "Double"
-        case _: Float => "Float"
-        case _: Long => "Long"
-        case _: Short => "Short"
-        case _: Byte => "Byte"
-        case _ => "Unknown"
-      headType :: summonFieldTypes[tail]
-  }
-}
 
-object Sql:
-  transparent inline given derived[T <: Product](using m: Mirror.ProductOf[T]): Sql[T] = {
-    new Sql[T] {
+object SqlSelect:
+  transparent inline given derived[T <: Product](using m: Mirror.ProductOf[T]): SqlSelect[T] = {
+    new SqlSelect[T] {
       def name: String = constValue[m.MirroredLabel]
       def names: List[String] =
         constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
       def select: String = s"select ${names.mkString(",") } from ${name}"
-
+      def createTable: String = s"create table if not exists $name( "
       def fromResultSet(rs: java.sql.ResultSet):T = {
         val labels = constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
         val zipped = labels.zip(getClassesFieldType)
@@ -76,34 +58,4 @@ object Sql:
 
     }
   }
-
-extension [T<:Product](entity: T)(using sql: Sql[T])
-  def fields: List[String] = summon[Sql[T]].names
-  def select: String = summon[Sql[T]].select
-  def classFieldTypes: List[String] = summon[Sql[T]].getClassesFieldType
-
-extension (rs: java.sql.ResultSet)
-  inline def as[A <: Product](using sql: Sql[A]): A =
-    sql.fromResultSet(rs)
-
-
-extension (con: java.sql.Connection)
-  inline def query[A <: Product](using sql: Sql[A]): Iterator[A] =
-    val stmt = con.prepareStatement(sql.select)
-    val rs = stmt.executeQuery()
-    Iterator.continually(rs.next()).takeWhile(identity).map( x => rs.as[A])
-
-
-
-
-extension (con: java.sql.Connection)
-  inline def streamQuery[A <: Product](batchSize: Int)(using sql: Sql[A]): java.sql.Connection => Iterator[Seq[A]] = con =>
-    val stmt = con.prepareStatement(sql.select)
-    val rs = stmt.executeQuery()
-
-    Iterator.continually(rs.next())
-      .takeWhile(identity)
-      .map( x => rs.as[A]).grouped(batchSize)
-
-
 
