@@ -31,37 +31,29 @@ def test:Unit =
 
   (0 to 100).iterator.foreach {
     x => {
-      val u = summon[RandomGenerator[user]].generate
-      val u2 = summon[RandomGenerator[user]].generate
-      val u3 = user(u.id, u2.name, u2.test)
+      val u = summon[RandomGenerator[user]].generate // generate a random user
+      val u2 = summon[RandomGenerator[user]].generate // generate some random values for update
+      val u3 = user(u.id, u2.name, u2.test) // new user with same id as inserted user, but different random values
 
-      val r: user  = Await.result(conn.insertAsync[user](u), 10.seconds).next()
+      val r: user  = Await.result(conn.insertAsync[user](u), 10.seconds).next() // insert
 
-      println("Created user : " + r.toString)
-
-      println("Updated user : " + u3.toString)
-      println("Update statement: " + u3.update)
-      println("Bind values: " + u3.bindValues )
-      user
-
-      val r2: user = Await.result(conn.updateAsync[user](u3), 10.seconds).next()
-      println(r2)
-      assert(r!=r2)
-      type DebugUserPrimaryKeys = PrimaryKeyFields[user]#Out
-      println(summon[DebugUserPrimaryKeys[user]])
-
-      val userPrimaryKey: PrimaryKeyFields[user]#Out = Tuple1(PrimaryKey(true)) // Example instance
-      val r4: user = Await.result(conn.deleteAsync[user]( userPrimaryKey), 10.seconds).next()
-
-
-      println("Executed insert and update")
+      val r2: user = Await.result(conn.updateAsync[user](u3), 10.seconds).next() // update
+      assert(r!=r2) // assert that the update user is different
 
     }
   }
-  val userStream = conn.streamQuery[user](batchSize = 5000).apply(conn)
+  val userStream = conn.streamQuery[user](batchSize = 5000).apply(conn) // select the updated values
 
   val startTime = System.nanoTime()
   userStream.foreach { batch =>
-    batch.foreach( x=> println(x.seraialize))
+    batch.foreach{ x=> 
+      val userPrimaryKey: PrimaryKeyFields[user]#Out = Tuple1(PrimaryKey(x.id)).asInstanceOf[PrimaryKeyFields[user]#Out] // construct the primary key
+      val r4 = Await.result(conn.deleteAsync[user](userPrimaryKey), 10.seconds) // delete the user
+    }
+
+
   }
 
+  val finalUsers = conn.streamQuery[user](batchSize = 5000).apply(conn)
+  assert(finalUsers.isEmpty) // table should be empty
+  println( (System.nanoTime() - startTime)/ 1000000)

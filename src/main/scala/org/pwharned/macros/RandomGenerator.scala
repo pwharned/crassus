@@ -39,7 +39,6 @@ object RandomGenerator:
       def generate: T = {
         val labels = constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
         val zipped = labels.zip(getClassesFieldType)
-        println(zipped)
         val extractedValues = zipped.map {
           case (label, "String") => Random.alphanumeric.take(10).mkString
           case (label, "Option[String]") => Some(Random.alphanumeric.take(10).mkString)

@@ -11,6 +11,7 @@ given [T](using m: Mirror.ProductOf[T]): PrimaryKeyFields[T] with {
   type Out = Tuple.Filter[m.MirroredElemTypes, [X] =>> X match {
     case PrimaryKey[t] => true
   }]
+  
 }
 
 
@@ -29,7 +30,7 @@ object SqlDelete:
 
         val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T].map( x => s""" $x = ? """).mkString(" AND ")
 
-        s"SELECT * FROM FINAL TABLE( DELETE FROM $tableName WHERE $primaryKey)"
+        s"DELETE FROM $tableName WHERE $primaryKey"
 
       def bindValues(pkValues: PrimaryKeyFields[T]#Out): Seq[Any] =
         pkValues match {

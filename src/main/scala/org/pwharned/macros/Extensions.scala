@@ -83,10 +83,9 @@ extension (con: java.sql.Connection)
       sqlDelete.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
         stmt.setObject(index + 1, value) // Bind each parameter safely
       }
-      val rs = stmt.executeQuery()
-      Iterator.continually(rs.next())
-        .takeWhile(identity)
-        .map(x => rs.as[A])
+      val rs = stmt.executeUpdate()
+      Iterator.empty
+
     }.recover {
       case ex: Exception =>
         println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlDelete.deleteStatement}")
