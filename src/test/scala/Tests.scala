@@ -1,7 +1,8 @@
 package org.pwharned
 
 import generated.user
-import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, RandomGenerator, classFieldTypes, createTable, createTableAsync, insertAsync, query, update,select, updateAsync, bindValues ,seraialize, streamQuery}
+import generated.PrimaryKey
+import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, RandomGenerator, classFieldTypes, createTable, createTableAsync,deleteAsync, insertAsync, query, update,select, PrimaryKeyFields,updateAsync, bindValues ,seraialize, streamQuery}
 
 import scala.concurrent.duration.*
 import scala.compiletime.{erasedValue, summonInline}
@@ -41,10 +42,17 @@ def test:Unit =
       println("Updated user : " + u3.toString)
       println("Update statement: " + u3.update)
       println("Bind values: " + u3.bindValues )
+      user
 
       val r2: user = Await.result(conn.updateAsync[user](u3), 10.seconds).next()
       println(r2)
       assert(r!=r2)
+      type DebugUserPrimaryKeys = PrimaryKeyFields[user]#Out
+      println(summon[DebugUserPrimaryKeys[user]])
+
+      val userPrimaryKey: PrimaryKeyFields[user]#Out = Tuple1(PrimaryKey(true)) // Example instance
+      val r4: user = Await.result(conn.deleteAsync[user]( userPrimaryKey), 10.seconds).next()
+
 
       println("Executed insert and update")
 

@@ -39,15 +39,23 @@ object RandomGenerator:
       def generate: T = {
         val labels = constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
         val zipped = labels.zip(getClassesFieldType)
+        println(zipped)
         val extractedValues = zipped.map {
           case (label, "String") => Random.alphanumeric.take(10).mkString
           case (label, "Option[String]") => Some(Random.alphanumeric.take(10).mkString)
           case (label, "Int") => Random.nextInt(100)
+          case (label, "Option[Int]") => Some(Random.nextInt(100))
+          case (label, "Integer") => Random.nextInt(100)
+          case (label, "Option[Integer]") => Some(Random.nextInt(100))
           case (label, "Boolean") => Random.nextBoolean()
+          case (label, "Option[Boolean]") => Some(Random.nextBoolean())
+          case (label, "Option[Double]") => Some(Random.nextDouble())
           case (label, "Double") => Random.nextDouble()
+          case (label, "Option[Float]") => Some(Random.nextFloat())
           case (label, "Float") => Random.nextFloat()
           case (label, "Long") => Random.nextLong()
-          case _ => throw new IllegalArgumentException(s"Unsupported field type")
+          case (label, "Option[Long]") => Random.nextLong()
+          case (label, _) => throw new IllegalArgumentException(s"Unsupported field type: $label")
         }
 
         // Convert to Tuple for Mirror's apply method
@@ -56,6 +64,8 @@ object RandomGenerator:
         // Use Mirror to instantiate case class
         m.fromProduct(valuesTuple)
       }
+
+
 
       def getClassesFieldType: List[String] = {
         inline m match {

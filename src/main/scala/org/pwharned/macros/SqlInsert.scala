@@ -14,6 +14,11 @@ object SqlInsert:
         val fieldNames = constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString).mkString(",")
         val placeholders = constValueTuple[m.MirroredElemLabels].toIArray.toList.map( x=> "?").mkString(",")
         s"select ${fieldNames}  from final table (INSERT INTO $tableName (${fieldNames }) VALUES ($placeholders));"
+      def insertStatementNoReturn: String =
+        val tableName = constValue[m.MirroredLabel]
+        val fieldNames = constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString).mkString(",")
+        val placeholders = constValueTuple[m.MirroredElemLabels].toIArray.toList.map( x=> "?").mkString(",")
+        s"INSERT INTO $tableName (${fieldNames }) VALUES ($placeholders);"
 
       def bindValues(obj: T): Seq[Any] =
         obj.productIterator.toList.map {

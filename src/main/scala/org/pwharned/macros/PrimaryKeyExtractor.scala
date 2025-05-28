@@ -1,43 +1,27 @@
 package org.pwharned.macros
-
-import scala.annotation.StaticAnnotation
-import scala.quoted.*
-
-class PrimaryKey extends StaticAnnotation
-// Define the annotation
+import scala.compiletime.*
+import scala.deriving.*
+import generated.PrimaryKey
 
 object PrimaryKeyExtractor:
-  inline def getPrimaryKey[T]: Seq[String] = ${ getPrimaryKeyImpl[T] }
+  inline def getPrimaryKey[T <: Product](using m: Mirror.ProductOf[T]): Seq[String] =
+    getPrimaryKeyImpl[m.MirroredElemLabels, m.MirroredElemTypes]
 
-  def getPrimaryKeyImpl[T](using Quotes, Type[T]): Expr[Seq[String]] =
-    import quotes.reflect.*
-    val sym = TypeRepr.of[T].typeSymbol
-    val fields = sym.primaryConstructor.paramSymss.flatten
-    fields.foreach { field =>
-      val fieldAnnotations = field.annotations.map(_.show)
-      println(s"Field: ${field.name}, Annotations: ${fieldAnnotations.mkString(", ")}")
-    }
+  inline def getPrimaryKeyImpl[L <: Tuple, T <: Tuple]: Seq[String] =
+    val labels = tupleToList[L]
+    val primaryKeyLabels = tupleFilterKeys[T](labels)
+    primaryKeyLabels
 
-    val primaryKeys = fields.collect {
-      case f if f.annotations.exists(a => a.tpe.show.contains( "PrimaryKey")) => f.name
-    }
+  inline def tupleToList[T <: Tuple]: List[String] =
+    inline erasedValue[T] match
+      case _: (h *: t) => constValue[h].toString :: tupleToList[t]
+      case _ => Nil
 
-    Expr(primaryKeys)
+  inline def tupleFilterKeys[T <: Tuple](labels: List[String]): Seq[String] =
 
-  inline def getPrimaryKeyTypes[T]: List[Type[?]] = ${ getPrimaryKeyTypesImpl[T] }
-  
-  def getPrimaryKeyTypesImpl[T](using Quotes, Type[T]): Expr[List[Type[?]]] =
-    import quotes.reflect.*
-  
-    val sym = TypeRepr.of[T].typeSymbol
-    val fields = sym.primaryConstructor.paramSymss.flatten
-  
-    val primaryKeyTypes:List[Expr[Type[?]]] = fields.collect {
-      case f if f.annotations.exists(_.tpe =:= TypeRepr.of[PrimaryKey]) =>
-        f.typeRef.asType match
-          case '[t] =>
-            given ToExpr[Type[t]] with { def apply(x: Type[t])(using Quotes): Expr[Type[t]] = '{ x } }
-            Expr(Type.of[t])
-    }
-  
-    Expr.ofList(primaryKeyTypes)
+    inline erasedValue[T] match
+      case _: (PrimaryKey[Int] *: t) => labels.head +: tupleFilterKeys[t](labels.tail)
+      case _: (_ *: t) => tupleFilterKeys[t](labels.tail)
+      case _ => Nil
+
+

@@ -2,7 +2,7 @@ package org.pwharned.macros
 
 import scala.deriving.*
 import scala.compiletime.*
-
+import generated.PrimaryKey
 trait DbTypeMapper:
   def mapType(scalaType: String): String
 
@@ -39,9 +39,8 @@ transparent inline def mapToSqlTypes[A <: Tuple](mapper: DbTypeMapper): List[Str
         case _: Option[Boolean] => "Option[Boolean]"
         case _: Double => "Double"
         case _: Option[Double] => "Option[Double]"
-        case _ => "Unknown"
+        case _ => "Hello"
       mapper.mapType(scalaType) :: mapToSqlTypes[tail](mapper)
-
 
 transparent inline def summonFieldTypes[A <: Tuple]: List[String] = {
 
@@ -49,6 +48,7 @@ transparent inline def summonFieldTypes[A <: Tuple]: List[String] = {
     case _: EmptyTuple => Nil
     case _: (head *: tail) =>
       val headType = inline erasedValue[head] match
+        case _: PrimaryKey[Int] => "Int"
         case _: String => "String"
         case _: Option[String] => "Option[String]"
         case _: Int => "Int"
@@ -59,7 +59,10 @@ transparent inline def summonFieldTypes[A <: Tuple]: List[String] = {
         case _: Long => "Long"
         case _: Short => "Short"
         case _: Byte => "Byte"
-        case _ => "Unknown"
+        case _:PrimaryKey[t] => "PrimaryKey"
+        case _ => {
+          "Unknown"
+        }
       headType :: summonFieldTypes[tail]
   }
 }

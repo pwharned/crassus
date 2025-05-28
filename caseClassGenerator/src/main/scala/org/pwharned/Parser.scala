@@ -1,6 +1,6 @@
 package org.pwharned
 
-object Parse {
+trait Parse {
 
   case class ParseError(position: Int, input: String, message: String)
 
@@ -47,32 +47,6 @@ object Parse {
     case _ => Left(ParseError(0, input, "Expected ',' separator"))
   }
 
-  val columnparser: Parser[Column] =
-    for {
-      _ <- whitespace
-      name <- identifier
-      _ <- whitespace
-      dtype <- identifier
-      _ <-whitespace
-      nullable <- stringInsensitive("NULL").or(stringInsensitive("NOT NULL")) .optional
-      _ <- whitespace
-      primary_key <- stringInsensitive("PRIMARY KEY").optional
-
-      _ <- whitespace
-    } yield Column(name, DataType.fromString(dtype).get, nullable.map {
-      case "NULL" => true
-      case _ => false
-    }, primary_key.map{
-      case "PRIMARY KEY" => true
-      case _ => false
-    } )
-
-
-  val columnListParser: Parser[List[Column]] =
-    for {
-      first <- columnparser
-      rest <- (comma.flatMap(_ => columnparser)).many
-    } yield first :: rest
 
 
   def identifier: Parser[String] = input => {
@@ -81,62 +55,9 @@ object Parse {
   }
 
 
-  sealed trait DataType {
-    def sqlName: String
-  }
-    case object Integer extends DataType{
-     val sqlName =  "INTEGER"
-    }
-    case object String extends DataType {
-     val sqlName =  "TEXT"
-    }
-    case object  Boolean extends DataType{
-      val sqlName = "BOOLEAN"
-    }
-  case object Float extends DataType{
-    val sqlName = "FLOAT"
-  }
-  case object Date extends DataType{
-    val sqlName = "DATE"
-  }
 
 
 
-  object DataType {
-    val values: List[DataType] = List(Integer, String, Boolean, Float)
-    def fromString(s: String): Option[DataType] = values.find(_.sqlName.equalsIgnoreCase(s))
-  }
 
-
-  case class Table(name: String, columns: List[Column])
-
-  case class Column(name: String, dataType: DataType, nullable: Option[Boolean], primary_key: Option[Boolean])
-
-  implicit class ColumnOps(column: Column) {
-    def toField: String = {
-      val typeStr = column.nullable.getOrElse(true) match {
-        case true => s"Option[${column.dataType}]"
-        case false => column.dataType
-      }
-
-      // Add annotation for primary key fields
-      column.primary_key match {
-        case Some(true) => s"@PrimaryKey ${column.name}: $typeStr"
-        case _ => s"${column.name}: $typeStr"
-      }
-    }
-  }
-
-  val createTableParser: Parser[Table] =
-    for {
-      _ <- stringInsensitive("create")
-      _ <- whitespace
-      _ <- stringInsensitive("table")
-      - <- whitespace
-      name <- identifier
-      - <- char('(')
-      columns <- columnListParser
-      - <- char(')')
-    } yield Table(name, columns)
 
 }

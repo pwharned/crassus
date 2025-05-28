@@ -76,6 +76,22 @@ extension (con: java.sql.Connection)
       Iterator.empty[A]
   }
 
+extension (con: java.sql.Connection)
+  def deleteAsync[A <: Product](obj: PrimaryKeyFields[A]#Out)(using sqlDelete: SqlDelete[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
+    Future {
+      val stmt = con.prepareStatement(sqlDelete.deleteStatement)
+      sqlDelete.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
+        stmt.setObject(index + 1, value) // Bind each parameter safely
+      }
+      val rs = stmt.executeQuery()
+      Iterator.continually(rs.next())
+        .takeWhile(identity)
+        .map(x => rs.as[A])
+    }.recover {
+      case ex: Exception =>
+        println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlDelete.deleteStatement}")
+        Iterator.empty[A]
+    }
 
 
 extension (con: java.sql.Connection)
@@ -94,4 +110,5 @@ extension (con: java.sql.Connection)
         println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlInsert.insertStatement}")
         Iterator.empty[A]
     }
+    
     

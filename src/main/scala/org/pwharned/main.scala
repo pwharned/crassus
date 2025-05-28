@@ -1,7 +1,8 @@
 package org.pwharned
 
-import generated.user
+import generated.{user, PrimaryKey}
 import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, RandomGenerator, classFieldTypes, createTable, createTableAsync, insertAsync, query, select, update, seraialize, streamQuery}
+
 
 import scala.concurrent.duration.*
 import scala.compiletime.{erasedValue, summonInline}

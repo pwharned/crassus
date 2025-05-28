@@ -14,24 +14,23 @@ object SqlUpdate:
         val tableName = constValue[m.MirroredLabel]
         val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
 
-        val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T]
-        val nonPrimaryFields = fields.filter(_ != primaryKey).map(name => s"$name = ?").mkString(", ")
+        val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T].map (x=> s" $x = ? ").mkString(" AND ")
+        val nonPrimaryFields = fields.filter( x=>  !primaryKey.contains(x) ).map(name => s"$name = ?").mkString(", ")
 
-        s"SELECT * FROM FINAL TABLE(UPDATE $tableName SET $nonPrimaryFields WHERE $primaryKey = ?)"
+        s"SELECT * FROM FINAL TABLE(UPDATE $tableName SET $nonPrimaryFields WHERE $primaryKey )"
 
       def bindValues(obj: T): Seq[Any] = {
         val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
 
         val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T]
-        val nonPrimaryFields = fields.filter(_ != primaryKey) // Fields used in update
+        val nonPrimaryFields = fields.filter( x=>  !primaryKey.contains(x) ) // Fields used in update
         val fieldValues = fields.zip(obj.productIterator).toMap
-        println(fieldValues)
 
         // Bind update values first (exclude primary key)
         val updateValues = nonPrimaryFields.flatMap(field => fieldValues.get(field))
 
         // Bind primary key value for WHERE clause
-        val primaryKeyValue = fieldValues.get(primaryKey).toSeq
+        val primaryKeyValue = fieldValues.filter(x => primaryKey.contains(x._1)).values.toSeq
 
         (updateValues ++ primaryKeyValue) map {
           case None    => null  // Handle Option[None] correctly

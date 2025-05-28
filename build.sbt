@@ -24,14 +24,19 @@ lazy val root = project.in(file("."))
       val classDir = (caseClassGenerator / Compile / classDirectory).value
       println(s"Compiled classes are in: $classDir")
       val classLoader = new java.net.URLClassLoader(Array(classDir.toURI.toURL))
+      println("Available classes: " + classLoader.getResources(""))
       val generatorClass = classLoader.loadClass("org.pwharned.generator.CaseClassGenerator")
       val method = generatorClass.getMethod("generateCaseClasses")
       val generatedCode = method.invoke(null).toString
       val code  =
         s"""
            |package generated
-           |import scala.annotation.StaticAnnotation
-           |class PrimaryKey extends StaticAnnotation
+           |opaque type PrimaryKey[X] = X
+           |
+           |object PrimaryKey:
+           |  def apply[X](x: X): PrimaryKey[X] = x
+           |
+           |  given [T]: Conversion[T, PrimaryKey[T]] = x => PrimaryKey(x)
            |
            |$generatedCode
            |"""

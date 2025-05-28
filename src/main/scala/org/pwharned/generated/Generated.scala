@@ -1,7 +1,11 @@
 
 package generated
-import scala.annotation.StaticAnnotation
-class PrimaryKey extends StaticAnnotation
+opaque type PrimaryKey[X] = X
+
+object PrimaryKey:
+  def apply[X](x: X): PrimaryKey[X] = x
+
+  given [T]: Conversion[T, PrimaryKey[T]] = x => PrimaryKey(x)
 
 
-case class user (@PrimaryKey id: Integer,name: String,test: Option[String])
+case class user ( id: PrimaryKey[Int],name: String,test: Option[String])

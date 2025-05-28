@@ -1,27 +1,25 @@
 package org.pwharned.macros
 import scala.deriving.*
 import scala.compiletime.*
+import generated.PrimaryKey
 
-
-
-
-trait FilterUnion[T, Exclude] {
+trait PrimaryKeyFields[T] {
   type Out
 }
 
-given [T, Exclude](using m: Mirror.ProductOf[T]): FilterUnion[T, Exclude] with {
+given [T](using m: Mirror.ProductOf[T]): PrimaryKeyFields[T] with {
   type Out = Tuple.Filter[m.MirroredElemTypes, [X] =>> X match {
-    case Exclude => Nothing
-    case _ => X
+    case PrimaryKey[t] => true
   }]
 }
 
 
 
 
+
 trait SqlDelete[T]:
   def deleteStatement: String
-  def bindValues(obj: T): Seq[Any] // Extract values separately
+  def bindValues(pkValues: PrimaryKeyFields[T]#Out): Seq[Any] // Extract values separately
 
 object SqlDelete:
   inline given derive[T <: Product](using m: Mirror.ProductOf[T]): SqlDelete[T] =
@@ -29,16 +27,14 @@ object SqlDelete:
       def deleteStatement: String =
         val tableName = constValue[m.MirroredLabel]
 
-        val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T]
+        val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T].map( x => s""" $x = ? """).mkString(" AND ")
 
-        s"SELECT * FROM FINAL TABLE( DELETE FROM $tableName WHERE $primaryKey = ?)"
+        s"SELECT * FROM FINAL TABLE( DELETE FROM $tableName WHERE $primaryKey)"
 
-      def bindValues[T](primaryKeyData: Map[String, String]): Seq[Any] =
-        val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[T] // Compile-time primary key extraction
-
-        // Ensure values are correctly ordered based on primary key definitions
-        primaryKeys.map { key =>
-          primaryKeyData.getOrElse(key, throw new IllegalArgumentException(s"Missing primary key: $key"))
+      def bindValues(pkValues: PrimaryKeyFields[T]#Out): Seq[Any] =
+        pkValues match {
+          case tuple: Tuple => tuple.toList
+          case singleValue  => Seq(singleValue) // Handles cases where there's only one primary key
         }
 
 

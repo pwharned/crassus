@@ -1,0 +1,1 @@
+sudo podman kill db2;sudo podman rm db2; sudo podman volume remove db2;sudo podman volume create db2; sudo podman run -itd --name db2 --privileged=true -p 50000:50000 --network=host  -e LICENSE=accept -e ARCHIVE_LOGS=false  -e DB2INST1_PASSWORD=password -e DBNAME=BLUDB -v db2:/database icr.io/db2_community/db2 
