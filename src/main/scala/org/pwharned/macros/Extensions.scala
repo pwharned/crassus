@@ -2,16 +2,19 @@ package org.pwharned.macros
 
 import org.pwharned.macros
 
+import scala.collection.Iterator
 import scala.concurrent.{ExecutionContext, Future}
 
 extension [T<:Product](entity: T)(using sql: SqlSelect[T])
   def fields: List[String] = summon[SqlSelect[T]].names
   def select: String = summon[SqlSelect[T]].select
   def classFieldTypes: List[String] = summon[SqlSelect[T]].getClassesFieldType
+extension[T <: Product] (entity: T) (using sql: SqlUpdate[T] )
+  def update: String = summon[SqlUpdate[T]].updateStatement(entity)
+  def bindValues: Seq[Any] = summon[SqlUpdate[T]].bindValues(entity)
 
 
-extension[T <: Product] (entity: T) (using sql: RandomGenerator[T] )
-  def generate: T = summon[RandomGenerator[T]].generate
+
 
 
 extension[T: SqlSchema] (t: T) def createTable(using db:DbTypeMapper): String = summon[SqlSchema[T]].createTable(db)
@@ -41,6 +44,10 @@ extension (con: java.sql.Connection)
       case ex: Exception =>
         println(s"⚠️ Error creating table: ${ex.getMessage} : ${schema.createTable}")
     }
+  def createTable[A <: Product](using schema: SqlSchema[A], ec: ExecutionContext,db: DbTypeMapper): Unit =
+      val stmt = con.prepareStatement(schema.createTable(db))
+      stmt.executeUpdate()
+      println(s"Succesfully created table: ${schema.createTable}")
 
 
 extension (con: java.sql.Connection)
@@ -52,19 +59,39 @@ extension (con: java.sql.Connection)
       .takeWhile(identity)
       .map( x => rs.as[A]).grouped(batchSize)
 
+extension (con: java.sql.Connection)
+  def updateAsync[A <: Product](obj: A)(using sqlUpdate: SqlUpdate[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
+  Future {
+    val stmt = con.prepareStatement(sqlUpdate.updateStatement(obj))
+    sqlUpdate.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
+      stmt.setObject(index + 1, value) // Bind each parameter safely
+    }
+    val rs = stmt.executeQuery()
+    Iterator.continually(rs.next())
+      .takeWhile(identity)
+      .map(x => rs.as[A])
+  }.recover {
+    case ex: Exception =>
+      println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlUpdate.updateStatement(obj)}")
+      Iterator.empty[A]
+  }
 
 
 
 extension (con: java.sql.Connection)
-  def insertAsync[A <: Product](obj: A)(using sql: SqlInsert[A], ec: ExecutionContext): Future[Unit] =
+  def insertAsync[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
     Future {
-      val stmt = con.prepareStatement(sql.insertStatement)
-      sql.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
+      val stmt = con.prepareStatement(sqlInsert.insertStatement)
+      sqlInsert.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
         stmt.setObject(index + 1, value) // Bind each parameter safely
       }
-      stmt.executeUpdate()
-      println(s"Insert succeeeded: ${obj.toString}")
+      val rs = stmt.executeQuery()
+      Iterator.continually(rs.next())
+        .takeWhile(identity)
+        .map( x => rs.as[A])
     }.recover {
       case ex: Exception =>
-        println(s"⚠️ Insert failed: ${ex.getMessage} : ${sql.insertStatement}")
+        println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlInsert.insertStatement}")
+        Iterator.empty[A]
     }
+    

@@ -21,15 +21,25 @@ lazy val root = project.in(file("."))
       // Load the compiled class dynamically
       val classpath = (caseClassGenerator / Compile / dependencyClasspath).value
       //val classLoader = new java.net.URLClassLoader(classpath.map(_.data.toURI.toURL).toArray)
-val classDir = (caseClassGenerator / Compile / classDirectory).value
-println(s"Compiled classes are in: $classDir")
-     val classLoader = new java.net.URLClassLoader(Array(classDir.toURI.toURL)) 
+      val classDir = (caseClassGenerator / Compile / classDirectory).value
+      println(s"Compiled classes are in: $classDir")
+      val classLoader = new java.net.URLClassLoader(Array(classDir.toURI.toURL))
       val generatorClass = classLoader.loadClass("org.pwharned.generator.CaseClassGenerator")
       val method = generatorClass.getMethod("generateCaseClasses")
       val generatedCode = method.invoke(null).toString
+      val code  =
+        s"""
+           |package generated
+           |import scala.annotation.StaticAnnotation
+           |class PrimaryKey extends StaticAnnotation
+           |
+           |$generatedCode
+           |"""
+          .stripMargin
 
       val file = outputDir / "Generated.scala"
-      IO.write(file, generatedCode)
+
+      IO.write(file, code)
 
       println(s"Generated source file: $file")
       Seq(file)
