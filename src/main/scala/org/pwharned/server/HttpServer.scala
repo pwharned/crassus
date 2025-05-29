@@ -1,16 +1,12 @@
+import generated.user
+import org.pwharned.Database
+import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, createTable,streamQuery, seraialize}
 import org.pwharned.server.{HTTPRequest, HTTPResponse, Handler}
 
-import java.net.ServerSocket
+import java.io.{BufferedReader, InputStreamReader, PrintWriter}
+import java.net.{ServerSocket, Socket}
 import java.util.concurrent.Executors
-import java.net.Socket
-import java.io.{BufferedReader, InputStreamReader}
-import java.io.PrintWriter
-import org.pwharned.Database
-import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, createTable}
-import generated.user
-
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 
@@ -85,6 +81,16 @@ object SimpleHTTPServer:
       }
 
       }
+    else if req.path =="/api/users" then {
+      val con = Database.getDbConnection()
+      val stream = con.streamQuery[user](5000).apply(con).map {
+        x => x.flatMap(y => y.map(j =>j.seraialize) ).mkString(",")
+      }
+
+      stream.map(x =>  HTTPResponse.ok(s"""[$x]""" )).recover {
+        case ex: Exception => HTTPResponse.error(ex.toString)
+      }
+    }
     else Future(HTTPResponse.notFound())
 
   SimpleHTTPServer.start(8080, handler)

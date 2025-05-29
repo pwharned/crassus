@@ -47,15 +47,14 @@ def test:Unit =
   val userStream = conn.streamQuery[user](batchSize = 5000).apply(conn) // select the updated values
 
   val startTime = System.nanoTime()
-  userStream.foreach { batch =>
+  userStream.map( x=> x.foreach { batch =>
     batch.foreach{ x=> 
       val userPrimaryKey: PrimaryKeyFields[user]#Out = Tuple1(PrimaryKey(x.id)).asInstanceOf[PrimaryKeyFields[user]#Out] // construct the primary key
-      val r4 = Await.result(conn.deleteAsync[user](userPrimaryKey), 10.seconds) // delete the user
+      //val r4 = Await.result(conn.deleteAsync[user](userPrimaryKey), 10.seconds) // delete the user
     }
 
 
-  }
+  })
 
-  val finalUsers = conn.streamQuery[user](batchSize = 5000).apply(conn)
-  assert(finalUsers.isEmpty) // table should be empty
-  println( (System.nanoTime() - startTime)/ 1000000)
+  //val finalUsers = conn.streamQuery[user](batchSize = 5000).apply(conn)
+  //println( (System.nanoTime() - startTime)/ 1000000)

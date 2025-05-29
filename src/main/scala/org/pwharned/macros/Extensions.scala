@@ -51,13 +51,15 @@ extension (con: java.sql.Connection)
 
 
 extension (con: java.sql.Connection)
-  inline def streamQuery[A <: Product](batchSize: Int)(using sql: SqlSelect[A]): java.sql.Connection => Iterator[Seq[A]] = con =>
+  inline def streamQuery[A <: Product](batchSize: Int)(using sql: SqlSelect[A], ec: ExecutionContext): java.sql.Connection => Future[Iterator[Seq[A]]] = con => Future{
     val stmt = con.prepareStatement(sql.select)
     val rs = stmt.executeQuery()
 
     Iterator.continually(rs.next())
       .takeWhile(identity)
-      .map( x => rs.as[A]).grouped(batchSize)
+      .map(x => rs.as[A]).grouped(batchSize)
+  }
+
 
 extension (con: java.sql.Connection)
   def updateAsync[A <: Product](obj: A)(using sqlUpdate: SqlUpdate[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
