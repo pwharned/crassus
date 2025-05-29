@@ -1,57 +1,90 @@
-package org.pwharned.server
+import org.pwharned.server.{HTTPRequest, HTTPResponse, Handler}
 
-import io.netty.bootstrap.ServerBootstrap
-import io.netty.buffer.PooledByteBufAllocator
-import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter, ChannelInitializer, ChannelOption, ChannelPipeline, EventLoopGroup, SimpleChannelInboundHandler}
-import io.netty.channel.nio.NioEventLoopGroup
-import io.netty.channel.socket.SocketChannel
-import io.netty.channel.socket.nio.NioServerSocketChannel
-import io.netty.handler.codec.http.*
+import java.net.ServerSocket
+import java.util.concurrent.Executors
+import java.net.Socket
+import java.io.{BufferedReader, InputStreamReader}
+import java.io.PrintWriter
+import org.pwharned.Database
+import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, createTable}
+import generated.user
 
-import java.nio.charset.StandardCharsets
-object BasicHttpServer:
-
-  class HttpHandler extends SimpleChannelInboundHandler[FullHttpRequest]:
-    override def channelRead0(ctx: ChannelHandlerContext, request: FullHttpRequest): Unit =
-      println(s"Received request: ${request.uri()}")
-
-      val responseContent = "Hello, Netty HTTP Server!"
-
-      // 🔥 Use Pooled Allocator for ByteBuf
-      val byteBuf = ctx.alloc().buffer(responseContent.length)
-      byteBuf.writeBytes(responseContent.getBytes(StandardCharsets.UTF_8))
-
-      val response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, byteBuf)
-
-      response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain")
-      response.headers().set(HttpHeaderNames.CONTENT_LENGTH, responseContent.length)
-
-      ctx.writeAndFlush(response)
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 
-  def startServer(): Unit =
-    val bossGroup: EventLoopGroup = new NioEventLoopGroup()
-    val workerGroup = new NioEventLoopGroup(Runtime.getRuntime.availableProcessors())
-
-    try
-      val bootstrap = ServerBootstrap()
-      bootstrap.group(bossGroup, workerGroup)
-        .channel(classOf[NioServerSocketChannel])
-        .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT) // 🔥 Enable pooled buffer allocation
-        .childHandler(new ChannelInitializer[SocketChannel] {
-          override def initChannel(ch: SocketChannel): Unit =
-            val pipeline = ch.pipeline()
-            pipeline.addLast(new HttpServerCodec()) // Decodes HTTP requests
-            pipeline.addLast(new HttpObjectAggregator(65536)) // Aggregates full requests
-            pipeline.addLast(new HttpHandler()) // Handles responses
-        })
+def sendResponse(socket: Socket, response: Future[HTTPResponse])(using ec: ExecutionContext): Unit =
+  val out = PrintWriter(socket.getOutputStream, true)
+  response.onComplete{
+    case Failure(exception) =>   out.println(s"HTTP/1.1 500 Bad Request")
+    case Success(response) => {
+      out.println(s"HTTP/1.1 ${response.status} OK")
+      response.headers.foreach { case (key, value) => out.println(s"$key: $value") }
+      out.println()
+      out.println(response.body)
+      socket.close()
+    }
+  }
 
 
-      val channel = bootstrap.bind(8080).sync().channel()
-      println("Basic HTTP Server Running on Port 8080...")
-      channel.closeFuture().sync()
-    finally
-      bossGroup.shutdownGracefully()
-      workerGroup.shutdownGracefully()
 
-@main def runBasicServer(): Unit = BasicHttpServer.startServer()
+
+def parseRequest(socket: Socket): HTTPRequest =
+  val in = BufferedReader(InputStreamReader(socket.getInputStream))
+  val requestLine = in.readLine().split(" ")
+  val method = requestLine(0)
+  val path = requestLine(1)
+
+  var headers = Map.empty[String, String]
+  var line: String = in.readLine()
+
+  while (line != null && line.nonEmpty) do
+    val parts = line.split(": ")
+    headers = headers.updated(parts(0), parts(1))
+    line = in.readLine()
+
+  val body = if headers.contains("Content-Length") then
+    val length = headers("Content-Length").toInt
+    val bodyArray = Array.fill(length)(0.toByte)
+    socket.getInputStream.read(bodyArray, 0, length)
+    String(bodyArray)
+  else ""
+
+  HTTPRequest(method, path, headers, body)
+
+
+object SimpleHTTPServer:
+  private val executor = Executors.newVirtualThreadPerTaskExecutor()
+  given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
+
+  def start(port: Int, handler: Handler): Unit =
+    val serverSocket = ServerSocket(port)
+
+    while true do
+      val clientSocket = serverSocket.accept()
+      executor.execute(() =>
+        val request = parseRequest(clientSocket)
+        val response = handler(request)
+        sendResponse(clientSocket, response)
+      )
+
+
+
+
+@main def runServer() =
+
+  given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
+  given DbTypeMapper = Db2TypeMapper
+  val handler: Handler = req =>
+    if req.path == "/" then  {
+      val con = Database.getDbConnection()
+
+      Future(createTable[user]).map(x => HTTPResponse.ok("Succesfully created")).recover {
+        case ex: Exception => HTTPResponse.error(ex.toString)
+      }
+
+      }
+    else Future(HTTPResponse.notFound())
+
+  SimpleHTTPServer.start(8080, handler)

@@ -9,7 +9,9 @@ import scala.compiletime.{erasedValue, summonInline}
 import scala.concurrent.Await
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
-import scala.concurrent.ExecutionContext.Implicits.global
+private val executor = Executors.newVirtualThreadPerTaskExecutor()
+given ExecutionContext = ExecutionContext.fromExecutor(executor) // Use virtual threads for Scala Futures
+
 
 given db: DbTypeMapper = Db2TypeMapper
 

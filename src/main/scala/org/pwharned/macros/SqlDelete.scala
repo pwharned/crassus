@@ -15,9 +15,6 @@ given [T](using m: Mirror.ProductOf[T]): PrimaryKeyFields[T] with {
 }
 
 
-
-
-
 trait SqlDelete[T]:
   def deleteStatement: String
   def bindValues(pkValues: PrimaryKeyFields[T]#Out): Seq[Any] // Extract values separately

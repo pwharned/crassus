@@ -38,9 +38,7 @@ def logExecutionTime[A](query: java.sql.Connection => Iterator[Seq[A]], conn: ja
 @main
 def main(): Unit =
   val u = user(1, "Aice", None)
-  val conn = getDbConnection()
 
-  Await.result(conn.createTableAsync[user], 10.seconds)
 
 
 
