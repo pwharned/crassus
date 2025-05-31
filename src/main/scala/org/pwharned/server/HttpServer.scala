@@ -9,7 +9,7 @@ import org.pwharned.route.*
 
 import java.io.{BufferedReader, InputStreamReader, PrintWriter}
 import java.net.{ServerSocket, Socket}
-import java.util.concurrent.Executors
+import java.util.concurrent.{ExecutorService, Executors}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
@@ -33,38 +33,49 @@ def sendResponse(socket: Socket, response: HttpResponse): Unit =
         response.headers.foreach { case (key, value) => out.println(s"$key: $value") }
         out.println()
         out.println(response.body)
+        out.flush()
         socket.close()
 
+import java.io.ByteArrayOutputStream
 
-
-def parseRequest(socket: Socket): HttpRequest =
+def parseRequest(socket: Socket): Option[HttpRequest] = {
   val in = BufferedReader(InputStreamReader(socket.getInputStream))
-  val requestLine = in.readLine().split(" ")
-  val method = requestLine(0)
-  val path = requestLine(1)
+  val requestLine = in.readLine()
+
+  if (requestLine == null) {
+    return None
+
+  }
+  val requestLineString = requestLine.split(" ")
+  val method = requestLineString(0)
+  val path = requestLineString(1)
 
   var headers = Map.empty[String, String]
   var line: String = in.readLine()
 
-  while (line != null && line.nonEmpty) do
+  while (line != null && line.nonEmpty) {
     val parts = line.split(": ")
     headers = headers.updated(parts(0), parts(1))
     line = in.readLine()
+  }
 
-  val body = if headers.contains("Content-Length") then
+  val body = if (headers.contains("Content-Length")) {
     val length = headers("Content-Length").toInt
-    val bodyArray = Array.fill(length)(0.toByte)
-    socket.getInputStream.read(bodyArray, 0, length)
-    String(bodyArray)
-  else ""
+    val output = ByteArrayOutputStream()
+    socket.getInputStream.transferTo(output)
+    output.toString
+  } else ""
 
-  HttpRequest(method, path, headers, body)
+  Some(HttpRequest(method, path, headers, body))
+}
+
+
 
 
 object HTTPServer:
   private val executor = Executors.newVirtualThreadPerTaskExecutor()
   given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
-
+  val ex: ExecutorService = Executors.newCachedThreadPool()
   inline def start[T<: HttpMethod](port: Int, inline routingTable: RoutingTable.RoutingTableType): Unit =
     val serverSocket = ServerSocket(port)
 
@@ -74,24 +85,34 @@ object HTTPServer:
         val request = parseRequest(clientSocket)
         // Later, you can handle POST (and other methods) appropriately by pattern matching on 'T'
         // Create key based on the incoming request.
-        val key = RoutingTable.keyFor(request.method, request.path)
-        val response: Future[HttpResponse] =
-          routingTable
-            .get(key)
-            .map(route => route(request))
-            .getOrElse(Future(HttpResponse(404,Map.empty, "Not Found")))
-        response.onComplete {
-          case Failure(exception) => {
-            println("Found Exception")
-            sendResponse(clientSocket, HttpResponse.error(exception.toString))
-            clientSocket.close()
-          }
-          case Success(value) => {
-            sendResponse(clientSocket, value)
-            clientSocket.close()
-          }
+        request match {
+          case Some(req) => {
 
+            val key = RoutingTable.keyFor(req.method, req.path)
+            val response: Future[HttpResponse] =
+              routingTable
+                .get(key)
+                .map(route => route(req))
+                .getOrElse(Future(HttpResponse(404, Map.empty, "Not Found")))
+            response.onComplete {
+              case Failure(exception) => {
+                println("Found Exception")
+                sendResponse(clientSocket, HttpResponse.error(exception.toString))
+                clientSocket.close()
+              }
+              case Success(value) => {
+                sendResponse(clientSocket, value)
+                clientSocket.close()
+              }
+
+            }
+          }
+          case None => {
+            sendResponse(clientSocket, HttpResponse.error("Error reading client request"))
+            clientSocket.close()
+          }
         }
+
 
       )
 
