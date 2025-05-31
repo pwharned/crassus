@@ -1,7 +1,11 @@
+package org.pwharned.server
 import generated.user
-import org.pwharned.Database
-import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, createTable,streamQuery, seraialize}
-import org.pwharned.server.{HTTPRequest, HTTPResponse, Handler}
+import org.pwharned.database.Database
+import org.pwharned.http.{HttpRequest, HttpResponse}
+import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, response}
+import org.pwharned.route.Router.HttpMethod.GET
+import org.pwharned.route.Router.{HttpMethod, Route, route}
+import org.pwharned.route.*
 
 import java.io.{BufferedReader, InputStreamReader, PrintWriter}
 import java.net.{ServerSocket, Socket}
@@ -10,7 +14,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 
-def sendResponse(socket: Socket, response: Future[HTTPResponse])(using ec: ExecutionContext): Unit =
+def sendResponseAsync(socket: Socket, response: Future[HttpResponse])(using ec: ExecutionContext): Unit =
   val out = PrintWriter(socket.getOutputStream, true)
   response.onComplete{
     case Failure(exception) =>   out.println(s"HTTP/1.1 500 Bad Request")
@@ -23,10 +27,17 @@ def sendResponse(socket: Socket, response: Future[HTTPResponse])(using ec: Execu
     }
   }
 
+def sendResponse(socket: Socket, response: HttpResponse): Unit =
+    val out = PrintWriter(socket.getOutputStream, true)
+        out.println(s"HTTP/1.1 ${response.status} OK")
+        response.headers.foreach { case (key, value) => out.println(s"$key: $value") }
+        out.println()
+        out.println(response.body)
+        socket.close()
 
 
 
-def parseRequest(socket: Socket): HTTPRequest =
+def parseRequest(socket: Socket): HttpRequest =
   val in = BufferedReader(InputStreamReader(socket.getInputStream))
   val requestLine = in.readLine().split(" ")
   val method = requestLine(0)
@@ -47,50 +58,68 @@ def parseRequest(socket: Socket): HTTPRequest =
     String(bodyArray)
   else ""
 
-  HTTPRequest(method, path, headers, body)
+  HttpRequest(method, path, headers, body)
 
 
-object SimpleHTTPServer:
+object HTTPServer:
   private val executor = Executors.newVirtualThreadPerTaskExecutor()
   given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
 
-  def start(port: Int, handler: Handler): Unit =
+  inline def start[T<: HttpMethod](port: Int, inline routingTable: RoutingTable.RoutingTableType): Unit =
     val serverSocket = ServerSocket(port)
 
     while true do
       val clientSocket = serverSocket.accept()
       executor.execute(() =>
         val request = parseRequest(clientSocket)
-        val response = handler(request)
-        sendResponse(clientSocket, response)
+        // Later, you can handle POST (and other methods) appropriately by pattern matching on 'T'
+        // Create key based on the incoming request.
+        val key = RoutingTable.keyFor(request.method, request.path)
+        val response: Future[HttpResponse] =
+          routingTable
+            .get(key)
+            .map(route => route(request))
+            .getOrElse(Future(HttpResponse(404,Map.empty, "Not Found")))
+        response.onComplete {
+          case Failure(exception) => {
+            println("Found Exception")
+            sendResponse(clientSocket, HttpResponse.error(exception.toString))
+            clientSocket.close()
+          }
+          case Success(value) => {
+            sendResponse(clientSocket, value)
+            clientSocket.close()
+          }
+
+        }
+
       )
 
 
 
 
 @main def runServer() =
+  // Import the DSL extension.
 
+
+
+  // Compose routes using the '~' operator; note that the result is a tuple.
   given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
   given DbTypeMapper = Db2TypeMapper
-  val handler: Handler = req =>
-    if req.path == "/" then  {
-      val con = Database.getDbConnection()
 
-      Future(createTable[user]).map(x => HTTPResponse.ok("Succesfully created")).recover {
-        case ex: Exception => HTTPResponse.error(ex.toString)
-      }
+  val handler: Route[HttpMethod] = route(GET, "/", (req: HttpRequest) => Future(HttpResponse.ok("Hello")))
 
-      }
-    else if req.path =="/api/users" then {
-      val con = Database.getDbConnection()
-      val stream = con.streamQuery[user](5000).apply(con).map {
-        x => x.flatMap(y => y.map(j =>j.seraialize) ).mkString(",")
-      }
+  val userHandler:  Route[HttpMethod] = route(GET, "/users", (req: HttpRequest) => {
+    Database.response[user]
+  }   )
+  val table = RoutingTable.build(List(handler, userHandler))
 
-      stream.map(x =>  HTTPResponse.ok(s"""[$x]""" )).recover {
-        case ex: Exception => HTTPResponse.error(ex.toString)
-      }
-    }
-    else Future(HTTPResponse.notFound())
+  HTTPServer.start(8080, table)
 
-  SimpleHTTPServer.start(8080, handler)
+
+
+
+    // Use the response...
+
+
+

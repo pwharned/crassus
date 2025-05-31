@@ -1,9 +1,11 @@
 package org.pwharned.macros
 
+import org.pwharned.http.{HttpRequest, HttpResponse}
 import org.pwharned.macros
 
 import scala.collection.Iterator
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 extension [T<:Product](entity: T)(using sql: SqlSelect[T])
   def fields: List[String] = summon[SqlSelect[T]].names
@@ -25,13 +27,25 @@ extension (rs: java.sql.ResultSet)
     sql.fromResultSet(rs)
 
 extension[T<:Product](obj: T) (using json: JsonSerializer[T])
-  def seraialize: String = summon[JsonSerializer[T]].serialize(obj)
+  inline def serialize: String = summon[JsonSerializer[T]].serialize(obj)
+extension[T <: Product] (obj: Iterator[T]) (using json: JsonSerializer[T] )
+  inline def serialize: String = summon[JsonSerializer[T]].serialize(obj)
 
 extension (con: java.sql.Connection)
   inline def query[A <: Product](using sql: SqlSelect[A]): Iterator[A] =
     val stmt = con.prepareStatement(sql.select)
     val rs = stmt.executeQuery()
     Iterator.continually(rs.next()).takeWhile(identity).map( x => rs.as[A])
+
+extension (db: org.pwharned.database.Database.type )
+  inline def response[A <: Product](using sql: SqlSelect[A], json:JsonSerializer[A],  ec: scala.concurrent.ExecutionContext): Future[HttpResponse] =
+    db.pool.withConnection {
+
+      x => HttpResponse.ok(x.query[A].serialize )
+    }.map {
+      case Failure(exception) => HttpResponse.error(exception.toString)
+      case Success(value) => value
+    }
 
 
 extension (con: java.sql.Connection)
@@ -90,7 +104,7 @@ extension (con: java.sql.Connection)
 
     }.recover {
       case ex: Exception =>
-        println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlDelete.deleteStatement}")
+        println(s"⚠️ Delete failed: ${ex.getMessage} : ${sqlDelete.deleteStatement}")
         Iterator.empty[A]
     }
 

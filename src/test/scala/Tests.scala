@@ -2,7 +2,7 @@ package org.pwharned
 
 import generated.user
 import generated.PrimaryKey
-import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, RandomGenerator, classFieldTypes, createTable, createTableAsync,deleteAsync, insertAsync, query, update,select, PrimaryKeyFields,updateAsync, bindValues ,seraialize, streamQuery}
+import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, RandomGenerator, classFieldTypes, createTable, createTableAsync,deleteAsync, insertAsync, query, update,select, PrimaryKeyFields,updateAsync, bindValues , serialize, streamQuery}
 
 import scala.concurrent.duration.*
 import scala.compiletime.{erasedValue, summonInline}
@@ -36,7 +36,7 @@ def test:Unit =
       val u = summon[RandomGenerator[user]].generate // generate a random user
       val u2 = summon[RandomGenerator[user]].generate // generate some random values for update
       val u3 = user(u.id, u2.name, u2.test) // new user with same id as inserted user, but different random values
-
+      println(u3.serialize)
       val r: user  = Await.result(conn.insertAsync[user](u), 10.seconds).next() // insert
 
       val r2: user = Await.result(conn.updateAsync[user](u3), 10.seconds).next() // update
