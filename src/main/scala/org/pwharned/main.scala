@@ -1,13 +1,7 @@
 package org.pwharned
 
-import generated.{user, PrimaryKey}
-import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, RandomGenerator, classFieldTypes, createTable, createTableAsync, insertAsync, query, select, update, streamQuery}
-
-
-import scala.concurrent.duration.*
-import scala.compiletime.{erasedValue, summonInline}
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
+import generated.{PrimaryKey, user}
+import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper}
 def logMemoryUsage(): Unit = {
   val runtime = Runtime.getRuntime
   val usedMemory = (runtime.totalMemory - runtime.freeMemory) / (1024 * 1024) // Convert to MB

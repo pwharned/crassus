@@ -1,25 +1,11 @@
 
 package org.pwharned.route
 
-import org.pwharned.route.Router
-import org.pwharned.http.HttpResponse
-
-import scala.compiletime.{erasedValue, summonInline}
-import scala.quoted.*
-import scala.quoted.*
-import org.pwharned.route.Router
-import org.pwharned.http.HttpResponse
 import org.pwharned.macros.buildRoutingTable
 import org.pwharned.route.Router.{HttpMethod, Route}
 
 // Inline routing table builder: routes must be provided as a literal list.
-import scala.quoted.*
 import org.pwharned.route.Router
-import org.pwharned.http.HttpResponse
-
-import scala.quoted.*
-import org.pwharned.route.Router
-import org.pwharned.http.HttpResponse
 
 
 

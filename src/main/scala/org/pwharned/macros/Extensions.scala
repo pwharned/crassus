@@ -1,7 +1,12 @@
 package org.pwharned.macros
 
+import org.pwharned.http.generated.Headers
 import org.pwharned.http.{HttpRequest, HttpResponse}
 import org.pwharned.macros
+import org.pwharned.parse.ParseError
+import org.pwharned.route.Router
+import org.pwharned.route.Router.{HttpMethod, Route}
+import org.pwharned.route.RoutingTable.RoutingTableType
 
 import scala.collection.Iterator
 import scala.concurrent.{ExecutionContext, Future}
@@ -18,7 +23,6 @@ extension[T <: Product] (entity: T) (using sql: SqlUpdate[T] )
 
 
 
-
 extension[T: SqlSchema] (t: T) def createTable(using db:DbTypeMapper): String = summon[SqlSchema[T]].createTable(db)
 
 
@@ -31,6 +35,8 @@ extension[T<:Product](obj: T) (using json: JsonSerializer[T])
 extension[T <: Product] (obj: Iterator[T]) (using json: JsonSerializer[T] )
   inline def serialize: String = summon[JsonSerializer[T]].serialize(obj)
 
+
+
 extension (con: java.sql.Connection)
   inline def query[A <: Product](using sql: SqlSelect[A]): Iterator[A] =
     val stmt = con.prepareStatement(sql.select)
@@ -38,15 +44,28 @@ extension (con: java.sql.Connection)
     Iterator.continually(rs.next()).takeWhile(identity).map( x => rs.as[A])
 
 extension (db: org.pwharned.database.Database.type )
-  inline def response[A <: Product](using sql: SqlSelect[A], json:JsonSerializer[A],  ec: scala.concurrent.ExecutionContext): Future[HttpResponse] =
+  inline def retrieve[A <: Product](using sql: SqlSelect[A], json:JsonSerializer[A],  ec: scala.concurrent.ExecutionContext): Future[HttpResponse] =
     db.pool.withConnection {
 
-      x => HttpResponse.ok(x.query[A].serialize )
+      x => HttpResponse.ok(x.query[A].serialize ,Headers.apply(Map("content-type" -> "Application/json")) )
+    }.map {
+      case Failure(exception) => HttpResponse.error(exception.toString)
+      case Success(value) => {
+        println(value)
+        value
+      }
+    }
+  inline def create[A <: Product](a: A)(using sql: SqlSelect[A], sqlInsert: SqlInsert[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[HttpResponse] =
+    db.pool.withConnection {
+
+      x => HttpResponse.ok(x.insert[A](a).serialize, headers = Headers.empty.add("content-type", "application/json"))
     }.map {
       case Failure(exception) => HttpResponse.error(exception.toString)
       case Success(value) => value
     }
 
+extension (s: String)
+  def deserialize[A <: Product](using j: JsonDeserializer[A]): Either[ParseError, A] = summon[JsonDeserializer[A]].deserialize(s)
 
 extension (con: java.sql.Connection)
   def createTableAsync[A <: Product](using schema: SqlSchema[A], ec: ExecutionContext,db: DbTypeMapper): Future[Unit] =
@@ -117,6 +136,7 @@ extension (con: java.sql.Connection)
         stmt.setObject(index + 1, value) // Bind each parameter safely
       }
       val rs = stmt.executeQuery()
+
       Iterator.continually(rs.next())
         .takeWhile(identity)
         .map( x => rs.as[A])
@@ -125,5 +145,14 @@ extension (con: java.sql.Connection)
         println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlInsert.insertStatement}")
         Iterator.empty[A]
     }
-    
-    
+
+
+  def insert[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Iterator[A] =
+      val stmt = con.prepareStatement(sqlInsert.insertStatement)
+      sqlInsert.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
+        stmt.setObject(index + 1, value) // Bind each parameter safely
+      }
+      val rs = stmt.executeQuery()
+      Iterator.continually(rs.next())
+        .takeWhile(identity)
+        .map(x => rs.as[A])

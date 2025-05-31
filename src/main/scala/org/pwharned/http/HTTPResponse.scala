@@ -1,11 +1,12 @@
 package org.pwharned.http
 
+import org.pwharned.http.generated.Headers
+import org.pwharned.http.generated.Headers.Headers
 
 
-
-case class HttpResponse(status: Int, headers: Map[String, String], body: String)
+case class HttpResponse(status: Int, headers: Headers, body: String)
 
 object HttpResponse:
-  def ok(body: String): HttpResponse = new HttpResponse (headers = Map.empty, body = body, status = 200 )
-  def error(message: String): HttpResponse = new HttpResponse (headers = Map.empty, body = message, status = 500 )
-  def notFound(): HttpResponse =new HttpResponse (headers = Map.empty, body = "404: Not Found", status = 404 )
+  def ok(body: String, headers: Headers = Headers.empty): HttpResponse = new HttpResponse (headers = headers, body = body, status = 200 )
+  def error(message: String): HttpResponse = new HttpResponse (headers = Headers.empty, body = message, status = 500 )
+  def notFound(): HttpResponse =new HttpResponse (headers = Headers.empty, body = "404: Not Found", status = 404 )
