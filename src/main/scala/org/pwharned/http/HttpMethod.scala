@@ -1,5 +1,7 @@
 package org.pwharned.http
 
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 
 object HttpMethod:
@@ -13,8 +15,8 @@ object HttpMethod:
   val POST: POST = "POST"
   val PUT: PUT = "PUT"
   val PATCH: PATCH = "PATCH"
-  val DELETE: DELETE = "DELETE"
+  val DELETE: DELETE ="DELETE"
 
-  def apply(method: String): HttpMethod = method
+  def apply(method:  ByteBuffer): HttpMethod = method
 
-  extension (m: HttpMethod) def asString: String = m
+  extension (m: HttpMethod) def asString: String =m.toString

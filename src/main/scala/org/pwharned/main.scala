@@ -17,17 +17,12 @@ import scala.concurrent.{ExecutionContext, Future}
 def main(): Unit =
 
   
-  // Compose routes using the '~' operator; note that the result is a tuple.
   given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
   given DbTypeMapper = Db2TypeMapper
 
 
   val r: Route[HttpMethod] = route(GET, "/health/ping".asPath, (req: HttpRequest) => Future(HttpResponse.ok("Ok")))
-  val list: List[Route[HttpMethod]] = RouteRegistry.getRoutes[user] :+ r
-  val table: RoutingTable.RoutingTable = RoutingTable.build(list)
-  val foundHealth = table.find(GET, "/health/ping".asPath)
-  println(table)
-  println(foundHealth)
+  val table: RoutingTable.RoutingTable = Map.empty
 
   HTTPServer.start(8080, table)
 

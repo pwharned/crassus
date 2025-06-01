@@ -101,7 +101,7 @@ object HTTPServer:
 
   given ExecutionContext = ExecutionContext.fromExecutor(ex)
 
-  inline def start(port: Int, inline routingTable: RoutingTable.RoutingTable): Unit =
+  def start(port: Int,  routingTable: RoutingTable.RoutingTable): Unit =
 
     val serverChannel = ServerSocketChannel.open()
     serverChannel.bind(new InetSocketAddress(port))
@@ -111,14 +111,12 @@ object HTTPServer:
       val clientChannel = serverChannel.accept()
 
       ex.execute(() =>
-// Cap at 64KB
 
         val request: HttpRequest.HttpRequest  =  {
 
 
           val clientSocket = clientChannel.socket()
-                  // Allocate a ByteBuffer (adjust size as needed)
-                  val estimatedSize = clientSocket.getReceiveBufferSize
+          val estimatedSize = clientSocket.getReceiveBufferSize
           val buffer = ByteBuffer.allocate(Math.min(estimatedSize, 65536))
 
           readUntilEndMarker(buffer, channel = clientSocket)
@@ -134,7 +132,7 @@ object HTTPServer:
 
             val key = routingTable.find(req.method, req.path.asPath)
             val response: Future[HttpResponse]  = key.flatMap {
-              x => x.route.map( x=> x.apply(req))
+              x => x._1.route.map( x=> x.apply(req))
             }.getOrElse(Future(HttpResponse.notFound()))
             response.onComplete {
               case Failure(exception) => {

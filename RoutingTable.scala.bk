@@ -1,0 +1,134 @@
+package org.pwharned.route
+
+import org.pwharned.http.HttpMethod.{GET, HttpMethod}
+import org.pwharned.http.HttpPath.{HttpPath, IdentifierOrSegment}
+import org.pwharned.http.HttpRequest.HttpRequest
+import org.pwharned.macros.asPath
+import org.pwharned.http.Identifier.Identifier
+import org.pwharned.http.Segment.Segment
+import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse, Identifier, Segment}
+import org.pwharned.route.Router
+import org.pwharned.route.Router.{Route, route}
+
+import scala.annotation.tailrec
+import scala.concurrent.Future
+
+// (Each HTTP method gets its own tree.)
+import scala.annotation.tailrec
+
+object RoutingTable:
+  final case class Node(id: IdentifierOrSegment, route: Option[Route[HttpMethod]] = None, var children: Branch = Map.empty, var identifierParam: Option[String] = None):
+    def insert(id: IdentifierOrSegment, r: Route[HttpMethod]): Unit =
+      children = children.updated(id, Node(id, Some(r)))
+
+  opaque type Branch = Map[IdentifierOrSegment, Node]
+  opaque type RoutingTable = Map[HttpMethod, Branch]
+
+  extension (b: Branch)
+    private def lookup(id: IdentifierOrSegment): Option[Node] = b.get(id)
+
+    @tailrec
+    private def lookPath(path: List[IdentifierOrSegment]): Branch =
+      path match
+        case head :: next => lookup(head) match
+          case Some(node) => node.children.lookPath(next)
+          case None => b
+        case Nil => b
+
+    private def insert(path: List[IdentifierOrSegment], route: Route[HttpMethod]): Branch =
+      path match
+        case head :: next =>
+          val updatedNode = lookup(head) match
+            case Some(existingNode) =>
+              existingNode.children = existingNode.children.insert(next, route)
+              existingNode
+            case None =>
+              val newNode = head match
+                case id: Identifier => Node(id, None, Map.empty, Some(id.value)) // Store identifier param
+                case seg: Segment => Node(seg, None)
+              newNode.children = newNode.children.insert(next, route)
+              newNode
+          b.updated(head, updatedNode)
+        case Nil => b
+
+
+    private def insertFinal(path: List[IdentifierOrSegment], route: Route[HttpMethod]): Branch =
+      path match
+        case head :: Nil => // If this is the last element in the path, assign the route
+          val updatedNode = lookup(head) match
+            case Some(existingNode) => existingNode.copy(route = Some(route))
+            case None => Node(head, Some(route))
+          b.updated(head, updatedNode)
+        case head :: next =>
+          val updatedNode = lookup(head) match
+            case Some(existingNode) =>
+              existingNode.children = existingNode.children.insertFinal(next, route)
+              existingNode
+            case None =>
+              val newNode = Node(head)
+              newNode.children = newNode.children.insertFinal(next, route)
+              newNode
+          b.updated(head, updatedNode)
+        case Nil => b
+
+
+  extension (table: RoutingTable)
+    def find(method: HttpMethod, path: HttpPath): Option[(Node, Map[String, String| Segment])] =
+      table.get(method).flatMap(branch => findNode(branch, path.asList, Map.empty))
+
+    @tailrec
+    private def findNode(branch: Branch, path: List[IdentifierOrSegment], extractedParams: Map[String, String | Segment]): Option[(Node, Map[String, String|Segment])] =
+      path match
+        case head :: next =>
+          branch.find { case (key, node) =>
+            key match
+              case id: Identifier => true  // Allow matching identifiers
+              case seg: Segment if seg == head => true // Match exact segment
+              case _ => false
+          } match
+            case Some((key, node)) =>
+              val updatedParams = key match
+                case id: Identifier => extractedParams.updated(id.value, head.asInstanceOf[Segment]) // Extract value
+                case _ => extractedParams
+              if next.isEmpty then Some(node -> updatedParams) // Final node
+              else findNode(node.children, next, updatedParams)
+            case None => None
+        case Nil => None
+
+
+
+  def build(routes: List[Router.Route[HttpMethod]]): RoutingTable =
+    routes.foldLeft(Map.empty[HttpMethod, Branch]) { (acc, route) =>
+      val currentTree = acc.getOrElse(route.method, Map.empty)
+      val updatedTree = currentTree.insertFinal(route.path.asList, route)
+      acc.updated(route.method, updatedTree)
+    }
+
+
+end RoutingTable
+
+// Our RoutingTable is now indexed by the HttpMethod.
+// (Each HTTP method gets its own tree.)
+
+
+@main def testRoutingTable(): Unit =
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  // Define some example routes
+  val route1: Route[HttpMethod] = route(GET, "/users/profile/{user_id}".asPath, (req: HttpRequest) => Future(HttpResponse.ok("Profiles")))
+  val route2 : Route[HttpMethod]= route(GET, "/users/ids".asPath, (req: HttpRequest) => Future(HttpResponse.ok("Ids")) )
+  val route3 : Route[HttpMethod]= route(GET, "/users/friends".asPath, (req: HttpRequest) => Future(HttpResponse.ok("friends")) )
+
+  // Build the routing table
+  val routes: List[Route[HttpMethod]] = List(route1, route2, route3)
+  val routingTable: RoutingTable.RoutingTable = RoutingTable.build(routes)
+
+  // Test lookup for existing paths
+  val foundUsersProfile = routingTable.find(GET, "/users/profile/4".asPath)
+  val foundUserIds = routingTable.find(GET, "/users/ids".asPath)
+
+  println(s"Lookup users/profile (GET): ${foundUsersProfile}")  // Expected: true
+  println(s"Lookup users/ids (GET): ${foundUserIds.isDefined}") // Expected: true
+
+
+
