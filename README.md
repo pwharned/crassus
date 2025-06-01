@@ -95,4 +95,21 @@ Max response time: 9410.24 ms
 Finished at: 20:31:08
 
 ```
+```
+❯ python test.py --url "http://localhost:8080/api/user" --requests 20000 --concurrency 1000
+Testing http://localhost:8080/api/user with 1000 concurrent connections
+Total requests: 20000
+Started at: 20:43:14
+
+Results:
+Total time: 24.16 seconds
+Successful requests: 20000 (100.0%)
+Failed requests: 0 (0.0%)
+Requests per second: 827.89
+Average response time: 13001.52 ms
+Min response time: 2914.64 ms
+Max response time: 21827.19 ms
+Finished at: 20:43:38
+
+```
 
