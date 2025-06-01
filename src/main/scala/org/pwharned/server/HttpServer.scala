@@ -1,20 +1,14 @@
 package org.pwharned.server
-import generated.user
-import org.pwharned.database.Database
 import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.generated.Headers
-import org.pwharned.http.{HttpParser, HttpPath, HttpRequest, HttpResponse}
-import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, Routable, RouteRegistry}
-import org.pwharned.http.HttpMethod.GET
-import org.pwharned.route.Router.{ Route, RouteDef, route}
+import org.pwharned.http.{HttpParser, HttpResponse}
 import org.pwharned.route.*
+import org.pwharned.route.Router.RouteDef
 
-import java.net.InetSocketAddress
-import java.nio.channels.ServerSocketChannel
-import java.io.{BufferedReader, InputStreamReader, PrintWriter}
-import java.net.{ServerSocket, Socket}
+import java.io.PrintWriter
+import java.net.{InetSocketAddress, Socket}
 import java.nio.ByteBuffer
-import java.nio.channels.SocketChannel
+import java.nio.channels.{ServerSocketChannel, SocketChannel}
 import java.util.concurrent.{ExecutorService, Executors}
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
@@ -59,9 +53,6 @@ def sendResponse(socket: SocketChannel, response: HttpResponse): Unit =
 
   // Close connection
   socket.close()
-
-
-import java.io.ByteArrayOutputStream
 
 // Check if the buffer (up to its current position) contains the end-of-headers marker: CR LF CR LF (i.e. 13,10,13,10)
 def hasEndOfHeaders(buffer: ByteBuffer): Boolean =
@@ -146,22 +137,6 @@ object HTTPServer:
 
       )
 
-
-
-
-@main def runServer() =
-  // Import the DSL extension.
-
-
-
-  // Compose routes using the '~' operator; note that the result is a tuple.
-  given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
-  given DbTypeMapper = Db2TypeMapper
-
-
-  val table: RoutingTable.RoutingTableType = RoutingTable.build(RouteRegistry.getRoutes[user])
-
-  HTTPServer.start(8080, table)
 
 
 
