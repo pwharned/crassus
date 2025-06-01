@@ -1,6 +1,7 @@
 
 ThisBuild / version := "0.1.0-SNAPSHOT"
 libraryDependencies += "com.ibm.db2" % "jcc" % "11.5.8.0"
+ThisBuild / scalacOptions +="-Ystatistics"
 lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
   .settings(
     name := "caseClassGenerator",
@@ -10,7 +11,8 @@ scalacOptions ++= Seq(
   "-deprecation",
   "-encoding", "UTF-8",
   "-feature",
-  "-unchecked"
+  "-unchecked",
+  "-Ystatistics"
 )
 lazy val root = project.in(file("."))
   .settings(

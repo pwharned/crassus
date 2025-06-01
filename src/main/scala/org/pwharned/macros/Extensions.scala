@@ -26,7 +26,7 @@ extension[T <: Product] (entity: T) (using sql: SqlUpdate[T] )
 extension[T: SqlSchema] (t: T) def createTable(using db:DbTypeMapper): String = summon[SqlSchema[T]].createTable(db)
 extension (s: String) def asPath: HttpPath = HttpPath(s)
 
-extension (b: java.nio.ByteBuffer) def asRequest: HttpRequest.HttpRequest = HttpRequest(b)
+extension (b: java.nio.ByteBuffer) def asRequest: Option[HttpRequest.HttpRequest] = HttpRequest.HttpRequest.fromFullBuffer(b)
 
 extension (rs: java.sql.ResultSet)
   inline def as[A <: Product](using sql: SqlSelect[A]): A =

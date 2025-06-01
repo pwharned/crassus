@@ -24,7 +24,7 @@ object HttpPath:
 object Identifier:
   opaque type Identifier = Segment.Segment
   inline def fromString(raw: Segment.Segment): Option[Identifier] =
-    if raw.startsWith("{") && raw.endsWith("}") then Some(Identifier(raw.substring(1, raw.length - 1))) else None
+    if raw.startsWith("{") && raw.endsWith("}") then Some(Identifier(raw)) else None
   inline def apply(raw: Segment.Segment): Identifier = raw
 
 

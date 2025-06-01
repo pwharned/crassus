@@ -1,7 +1,8 @@
 package org.pwharned.server
 import org.pwharned.http.HttpMethod.HttpMethod
+import org.pwharned.http.HttpPath.IdentifierOrSegment
 import org.pwharned.http.generated.Headers
-import org.pwharned.http.{ HttpRequest, HttpResponse}
+import org.pwharned.http.{HttpRequest, HttpResponse}
 import org.pwharned.route.*
 import org.pwharned.route.Router.RouteDef
 import org.pwharned.macros.{asPath, asRequest}
@@ -101,7 +102,7 @@ object HTTPServer:
 
   given ExecutionContext = ExecutionContext.fromExecutor(ex)
 
-  def start(port: Int,  routingTable: RoutingTable.RoutingTable): Unit =
+  def start(port: Int,  routingTable: RoutingTable.RoutingTable[IdentifierOrSegment]): Unit =
 
     val serverChannel = ServerSocketChannel.open()
     serverChannel.bind(new InetSocketAddress(port))
@@ -112,49 +113,47 @@ object HTTPServer:
 
       ex.execute(() =>
 
-        val request: HttpRequest.HttpRequest  =  {
+        
 
+            val clientSocket = clientChannel.socket()
+            val estimatedSize = clientSocket.getReceiveBufferSize
+            val buffer = ByteBuffer.allocate(Math.min(estimatedSize, 65536))
 
-          val clientSocket = clientChannel.socket()
-          val estimatedSize = clientSocket.getReceiveBufferSize
-          val buffer = ByteBuffer.allocate(Math.min(estimatedSize, 65536))
+            readUntilEndMarker(buffer, channel = clientSocket)
+            buffer.flip()
+            val request = buffer.asRequest
+            if (request.isEmpty) then
+              sendResponse(clientChannel, HttpResponse.error("Error reading client request"))
 
-          readUntilEndMarker(buffer, channel = clientSocket)
-                  buffer.flip()
-          buffer.asRequest
+              clientChannel.close()
+            else
+              val req = request.get       
+              val method = req.method
+              val path = req.path.asPath
+              val key = routingTable.find(method,path)
+            
+  
+              val response: Future[HttpResponse]  = key.flatMap {
+                x => x.route.map( x=> x.apply(req))
+              }.getOrElse(Future(HttpResponse.notFound()))
+              response.onComplete {
+                case Failure(exception) => {
+                  println("Found Exception")
+                  sendResponse(clientChannel, HttpResponse.error(exception.toString))
+                  clientChannel.close()
                 }
-
-
-        // Later, you can handle POST (and other methods) appropriately by pattern matching on 'T'
-        // Create key based on the incoming request.
-        request.parse match {
-          case Some(req) => {
-
-            val key = routingTable.find(req.method, req.path.asPath)
-            val response: Future[HttpResponse]  = key.flatMap {
-              x => x._1.route.map( x=> x.apply(req))
-            }.getOrElse(Future(HttpResponse.notFound()))
-            response.onComplete {
-              case Failure(exception) => {
-                println("Found Exception")
-                sendResponse(clientChannel, HttpResponse.error(exception.toString))
-                clientChannel.close()
+                case Success(value) => {
+                  sendResponse(clientChannel, value)
+                  clientChannel.close()
+                }
+  
               }
-              case Success(value) => {
-                sendResponse(clientChannel, value)
-                clientChannel.close()
-              }
-
-            }
-          }
-          case None => {
-            sendResponse(clientChannel, HttpResponse.error("Error reading client request"))
-            clientChannel.close()
-          }
-        }
 
 
       )
+
+
+      
 
 
 

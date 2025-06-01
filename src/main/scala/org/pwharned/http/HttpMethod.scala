@@ -17,6 +17,6 @@ object HttpMethod:
   val PATCH: PATCH = "PATCH"
   val DELETE: DELETE ="DELETE"
 
-  def apply(method:  ByteBuffer): HttpMethod = method
+  def apply(method:  String): HttpMethod = method
 
   extension (m: HttpMethod) def asString: String =m.toString
