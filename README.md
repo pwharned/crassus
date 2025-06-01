@@ -80,7 +80,7 @@ We use a very simple HTTP server that is nonetheless highly concurrent, I am not
 ```
 
 ❯ python test.py --url "http://localhost:8080/api/user" --requests 10000
-Testing http://localhost:8080/api/user with 10 concurrent connections
+Testing http://localhost:8080/api/user with 1000 concurrent connections
 Total requests: 10000
 Started at: 20:30:57
 
