@@ -36,6 +36,63 @@ extension (con: java.sql.Connection)
 ```
 Returning a lazily evaluated stream of instances of our case class.
 
+# Automatic Route Generation, HTTP Server, JSON Serialization/Deserialization
 
-For any other kind of type we would need to retrive from the database, the only thing that is required is to add the ddl for the table. The entire implementation is ~200 lines of code. I hope to expand it
-to a full fledged web server using Netty
+Ultimate goal is to have a no boilerplate HTTP server that automatically generates routes corresponding to all basic CRUD operations on a given table. For example, given the following table:
+
+```
+create table user(id: int not null primary key, name: String)
+```
+
+We automagically generate the following endpoints:
+
+```
+GET /api/user -> returns a list of all users
+POST /api/user -> create a user
+PATCH /api/user/{user_id} updates a user
+DELETE /api/user/{user_id} delete a user
+GET /api/user/{user_id} get a particular user
+```
+
+
+Currently this is achievable with the following:
+
+
+```
+@main def runServer() =
+  // Import the DSL extension.
+
+
+
+  // Compose routes using the '~' operator; note that the result is a tuple.
+  given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
+  given DbTypeMapper = Db2TypeMapper
+
+
+  val table: RoutingTable.RoutingTableType = RoutingTable.build(RouteRegistry.getRoutes[user])
+
+  HTTPServer.start(8080, table)
+
+```
+
+We use a very simple HTTP server that is nonetheless highly concurrent, I am not an expert at evaluating these things but at the moment it is outperforming my rust server by a significant margin, finishing 10k GET Requests to a table with 100 users in around ten seconds, which corresponds to almost 1k requests per seconds runing on my laptop.
+
+```
+
+❯ python test.py --url "http://localhost:8080/api/user" --requests 10000
+Testing http://localhost:8080/api/user with 10 concurrent connections
+Total requests: 10000
+Started at: 20:30:57
+
+Results:
+Total time: 10.50 seconds
+Successful requests: 10000 (100.0%)
+Failed requests: 0 (0.0%)
+Requests per second: 952.45
+Average response time: 5747.30 ms
+Min response time: 1596.13 ms
+Max response time: 9410.24 ms
+Finished at: 20:31:08
+
+```
+
