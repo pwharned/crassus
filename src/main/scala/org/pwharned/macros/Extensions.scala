@@ -1,12 +1,11 @@
 package org.pwharned.macros
 
 import org.pwharned.http.generated.Headers
-import org.pwharned.http.{HttpRequest, HttpResponse}
+import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse}
 import org.pwharned.macros
 import org.pwharned.parse.ParseError
 import org.pwharned.route.Router
-import org.pwharned.route.Router.{HttpMethod, Route}
-import org.pwharned.route.RoutingTable.RoutingTableType
+import org.pwharned.route.Router.{ Route}
 
 import scala.collection.Iterator
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,6 +23,7 @@ extension[T <: Product] (entity: T) (using sql: SqlUpdate[T] )
 
 
 extension[T: SqlSchema] (t: T) def createTable(using db:DbTypeMapper): String = summon[SqlSchema[T]].createTable(db)
+extension (s: String) def asPath: HttpPath = HttpPath(s)
 
 
 extension (rs: java.sql.ResultSet)
@@ -34,7 +34,6 @@ extension[T<:Product](obj: T) (using json: JsonSerializer[T])
   inline def serialize: String = summon[JsonSerializer[T]].serialize(obj)
 extension[T <: Product] (obj: Iterator[T]) (using json: JsonSerializer[T] )
   inline def serialize: String = summon[JsonSerializer[T]].serialize(obj)
-
 
 
 extension (con: java.sql.Connection)
@@ -51,7 +50,6 @@ extension (db: org.pwharned.database.Database.type )
     }.map {
       case Failure(exception) => HttpResponse.error(exception.toString)
       case Success(value) => {
-        println(value)
         value
       }
     }

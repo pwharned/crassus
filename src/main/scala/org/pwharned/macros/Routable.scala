@@ -2,9 +2,9 @@ package org.pwharned.macros
 
 import generated.user
 import org.pwharned.database.Database
+import org.pwharned.http.HttpMethod.{GET, HttpMethod, POST}
 import org.pwharned.http.{HttpRequest, HttpResponse}
-import org.pwharned.route.Router.HttpMethod.*
-import org.pwharned.route.Router.{HttpMethod, Route, route}
+import org.pwharned.route.Router.{Route, route}
 
 import java.nio.charset.StandardCharsets
 import scala.compiletime.constValue
@@ -31,13 +31,13 @@ object Routable:
     new Routable[T]:
       def get(using ec: ExecutionContext): Route[HttpMethod]  =
         val tableName = constValue[m.MirroredLabel]
-        route(GET, s"/api/$tableName",(req: HttpRequest) => {
+        route(GET, s"/api/$tableName".asPath,(req: HttpRequest) => {
           Database.retrieve[T]
         }   )
 
       def post(using ec: ExecutionContext): Route[HttpMethod] =
         val tableName = constValue[m.MirroredLabel]
-        route(POST, s"/api/$tableName", (req: HttpRequest) => {
+        route(POST, s"/api/$tableName".asPath, (req: HttpRequest) => {
 
 
           val bytes = new Array[Byte](req.body.remaining())
@@ -48,6 +48,21 @@ object Routable:
             case Left(value) =>  Future(HttpResponse.error(value.message))
             case Right(value) => Database.create[T](value)
          
+        })
+
+      def getBY(using ec: ExecutionContext): Route[HttpMethod] =
+        val tableName = constValue[m.MirroredLabel]
+        route(POST, s"/api/$tableName".asPath, (req: HttpRequest) => {
+
+
+          val bytes = new Array[Byte](req.body.remaining())
+          req.body.get(bytes)
+          // Decode the bytes using the desired charset.
+          val s = new String(bytes, StandardCharsets.UTF_8)
+          s.deserialize[T] match
+            case Left(value) => Future(HttpResponse.error(value.message))
+            case Right(value) => Database.create[T](value)
+
         })
 
 

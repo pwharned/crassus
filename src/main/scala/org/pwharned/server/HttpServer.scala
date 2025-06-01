@@ -1,11 +1,12 @@
 package org.pwharned.server
 import generated.user
 import org.pwharned.database.Database
+import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.generated.Headers
-import org.pwharned.http.{HttpParser, HttpRequest, HttpResponse}
+import org.pwharned.http.{HttpParser, HttpPath, HttpRequest, HttpResponse}
 import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, Routable, RouteRegistry}
-import org.pwharned.route.Router.HttpMethod.GET
-import org.pwharned.route.Router.{HttpMethod, Route, route}
+import org.pwharned.http.HttpMethod.GET
+import org.pwharned.route.Router.{ Route, RouteDef, route}
 import org.pwharned.route.*
 
 import java.net.InetSocketAddress
@@ -47,7 +48,6 @@ def sendResponse(socket: SocketChannel, response: HttpResponse): Unit =
   val headers = response.headers.asMap.map { case (key, value) => s"$key: $value\r\n" }.mkString
   val body = s"\r\n${response.body}"
   val httpResponse = statusLine + headers + body
-  println(httpResponse)
   // Convert string to bytes and wrap in ByteBuffer
   val buffer = ByteBuffer.wrap(httpResponse.getBytes("UTF-8"))
 
@@ -94,7 +94,7 @@ object HTTPServer:
   private val executor = Executors.newVirtualThreadPerTaskExecutor()
   given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
   val ex: ExecutorService = Executors.newCachedThreadPool()
-  inline def start[T<: HttpMethod](port: Int, inline routingTable: RoutingTable.RoutingTableType): Unit =
+  inline def start(port: Int, inline routingTable: RoutingTable.RoutingTableType): Unit =
 
     val serverChannel = ServerSocketChannel.open()
     serverChannel.bind(new InetSocketAddress(port))
@@ -120,12 +120,10 @@ object HTTPServer:
         request match {
           case Some(req) => {
 
-            val key = RoutingTable.keyFor(req.method.toString, req.path)
-            val response: Future[HttpResponse] =
-              routingTable
-                .get(key)
-                .map(route => route(req))
-                .getOrElse(Future(HttpResponse(404, Headers.empty, "Not Found")))
+            val key = RoutingTable.lookup(routingTable, req.method, req.path)
+            val response: Future[HttpResponse]  = key.map{
+              x => x._1.asInstanceOf[RouteDef[HttpMethod]].handler.apply(req)
+            }.getOrElse(Future(HttpResponse.notFound()))
             response.onComplete {
               case Failure(exception) => {
                 println("Found Exception")
@@ -161,7 +159,7 @@ object HTTPServer:
   given DbTypeMapper = Db2TypeMapper
 
 
-  val table = RoutingTable.build(RouteRegistry.getRoutes[user])
+  val table: RoutingTable.RoutingTableType = RoutingTable.build(RouteRegistry.getRoutes[user])
 
   HTTPServer.start(8080, table)
 

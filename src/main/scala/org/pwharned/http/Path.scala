@@ -1,16 +1,18 @@
-package org.pwharned
+package org.pwharned.http
+
+import scala.annotation.tailrec
 
 
-  // Define HttpPath as an opaque type with String as its underlying representation.
+// Define HttpPath as an opaque type with String as its underlying representation.
 opaque type Segment = String
 final case class Identifier(value: Segment)
 type IdentifierOrSegment = Identifier | Segment
-opaque type HttpPath[A<:IdentifierOrSegment] = List[A]
+opaque type HttpPath = List[IdentifierOrSegment]
 
 
 object HttpPath:
 
-  inline def apply(p: String): HttpPath[IdentifierOrSegment] =
+  inline def apply(p: String): HttpPath =
     p.stripPrefix("/").split('/').filter(_.nonEmpty).toList.map { s =>
 
       Identifier.fromString(s) match
@@ -18,6 +20,12 @@ object HttpPath:
         case None => Segment(s)
 
     }
+
+  extension (id: HttpPath)
+    // Extract the value inside the brackets.
+    
+    def asList: List[IdentifierOrSegment] = id
+
 
 extension (id: Identifier)
   // Extract the value inside the brackets.

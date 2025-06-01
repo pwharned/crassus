@@ -11,8 +11,6 @@ async def make_request(session, url, request_id):
         async with session.get(url) as response:
             await response.read()
             status = response.status
-            js = await response.json()
-            print(js)
             end_time = time.time()
             return {
                 "id": request_id,
