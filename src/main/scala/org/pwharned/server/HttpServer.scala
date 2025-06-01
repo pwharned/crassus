@@ -1,9 +1,10 @@
 package org.pwharned.server
 import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.generated.Headers
-import org.pwharned.http.{HttpParser, HttpResponse}
+import org.pwharned.http.{ HttpRequest, HttpResponse}
 import org.pwharned.route.*
 import org.pwharned.route.Router.RouteDef
+import org.pwharned.macros.{asPath, asRequest}
 
 import java.io.PrintWriter
 import java.net.{InetSocketAddress, Socket}
@@ -79,13 +80,28 @@ def readUntilEndMarker(buffer: ByteBuffer, channel: SocketChannel): Unit =
       // Continue reading if the marker has not yet been found.
       readUntilEndMarker(buffer, channel)
 // If bytesRead is negative, then the channel has reached EOF. In that case simply return.
+@tailrec
+def readUntilEndMarker(buffer: ByteBuffer, channel: Socket): Unit =
+  val inputStream = channel.getInputStream
+  val tempArray = new Array[Byte](1024) // Temporary buffer for reads
+  val bytesRead = inputStream.read(tempArray)
+
+  // If bytes were read, write them into ByteBuffer
+  if bytesRead > 0 then
+    buffer.put(tempArray, 0, bytesRead) // Correctly write into ByteBuffer
+
+    // Continue reading if headers haven't ended
+    if !hasEndOfHeaders(buffer) then
+      readUntilEndMarker(buffer, channel)
+// If bytesRead is negative, then the channel has reached EOF. In that case simply return.
 
 
 object HTTPServer:
-  private val executor = Executors.newVirtualThreadPerTaskExecutor()
-  given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
   val ex: ExecutorService = Executors.newCachedThreadPool()
-  inline def start(port: Int, inline routingTable: RoutingTable.RoutingTableType): Unit =
+
+  given ExecutionContext = ExecutionContext.fromExecutor(ex)
+
+  inline def start(port: Int, inline routingTable: RoutingTable.RoutingTable): Unit =
 
     val serverChannel = ServerSocketChannel.open()
     serverChannel.bind(new InetSocketAddress(port))
@@ -94,26 +110,31 @@ object HTTPServer:
     while true do
       val clientChannel = serverChannel.accept()
 
-      executor.execute(() =>
+      ex.execute(() =>
+// Cap at 64KB
 
-        // Allocate a ByteBuffer (adjust size as needed)
-        val estimatedSize = clientChannel.socket().getReceiveBufferSize
-        val buffer = ByteBuffer.allocate(Math.min(estimatedSize, 65536)) // Limit max size
-        readUntilEndMarker(buffer,channel = clientChannel)
-        buffer.flip()
+        val request: HttpRequest.HttpRequest  =  {
 
 
+          val clientSocket = clientChannel.socket()
+                  // Allocate a ByteBuffer (adjust size as needed)
+                  val estimatedSize = clientSocket.getReceiveBufferSize
+          val buffer = ByteBuffer.allocate(Math.min(estimatedSize, 65536))
+
+          readUntilEndMarker(buffer, channel = clientSocket)
+                  buffer.flip()
+          buffer.asRequest
+                }
 
 
-        val request = HttpParser.parseRequest(buffer)
         // Later, you can handle POST (and other methods) appropriately by pattern matching on 'T'
         // Create key based on the incoming request.
-        request match {
+        request.parse match {
           case Some(req) => {
 
-            val key = RoutingTable.lookup(routingTable, req.method, req.path)
-            val response: Future[HttpResponse]  = key.map{
-              x => x._1.asInstanceOf[RouteDef[HttpMethod]].handler.apply(req)
+            val key = routingTable.find(req.method, req.path.asPath)
+            val response: Future[HttpResponse]  = key.flatMap {
+              x => x.route.map( x=> x.apply(req))
             }.getOrElse(Future(HttpResponse.notFound()))
             response.onComplete {
               case Failure(exception) => {

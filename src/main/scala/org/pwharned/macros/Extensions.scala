@@ -1,11 +1,12 @@
 package org.pwharned.macros
 
+import org.pwharned.http.HttpPath.HttpPath
 import org.pwharned.http.generated.Headers
 import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse}
 import org.pwharned.macros
 import org.pwharned.parse.ParseError
 import org.pwharned.route.Router
-import org.pwharned.route.Router.{ Route}
+import org.pwharned.route.Router.Route
 
 import scala.collection.Iterator
 import scala.concurrent.{ExecutionContext, Future}
@@ -25,6 +26,7 @@ extension[T <: Product] (entity: T) (using sql: SqlUpdate[T] )
 extension[T: SqlSchema] (t: T) def createTable(using db:DbTypeMapper): String = summon[SqlSchema[T]].createTable(db)
 extension (s: String) def asPath: HttpPath = HttpPath(s)
 
+extension (b: java.nio.ByteBuffer) def asRequest: HttpRequest.HttpRequest = HttpRequest(b)
 
 extension (rs: java.sql.ResultSet)
   inline def as[A <: Product](using sql: SqlSelect[A]): A =

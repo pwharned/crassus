@@ -7,7 +7,12 @@ lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
     name := "caseClassGenerator",
     scalaVersion := "2.13.16"
   )
-
+scalacOptions ++= Seq(
+  "-deprecation",
+  "-encoding", "UTF-8",
+  "-feature",
+  "-unchecked"
+)
 lazy val root = project.in(file("."))
   .settings(
     name := "crassus",

@@ -1,32 +1,39 @@
 package org.pwharned.http
-import org.pwharned.http.HttpMethod.HttpMethod
-
+import org.pwharned.http.HttpMethod
 import java.nio.ByteBuffer
 
-case class HttpRequest(method: HttpMethod, path: String, headers: Map[String, String], body: ByteBuffer)
+object HttpRequest:
+  opaque type HttpRequest = ByteBuffer
 
+  def apply(buffer: ByteBuffer): HttpRequest = buffer
 
+  extension (req: HttpRequest)
+    def method: HttpMethod.HttpMethod =
+      extractMethod(req)
 
+    def path: String =
+      extractPath(req)
 
+    def headers: Map[String, String] =
+      extractHeaders(req)
 
-object HttpParser:
-  def parseRequest(buffer: ByteBuffer): Option[HttpRequest] =
-    scala.util.Try{val method = extractMethod(buffer)
-    val path = extractPath(buffer)
-    val headers = extractHeaders(buffer)
-    val body = extractBody(buffer)
-    HttpRequest(HttpMethod(method), path, headers, body)}.toOption
+    def body: ByteBuffer =
+      extractBody(req)
 
-  private def extractMethod(buffer: ByteBuffer): String =
+    def parse: Option[HttpRequest] =
+      scala.util.Try(HttpRequest(req)).toOption
+
+  private def extractMethod(buffer: ByteBuffer): HttpMethod.HttpMethod =
     val start = buffer.position()
     while buffer.hasRemaining && buffer.get() != ' ' do ()
-    val end = buffer.position() - 1
-    new String(buffer.array(), start, end - start)
+    val end = if buffer.position() >0 then buffer.position()- 1 else buffer.position()
+
+    HttpMethod(new String(buffer.array(), start, end - start))
 
   private def extractPath(buffer: ByteBuffer): String =
     val start = buffer.position()
     while buffer.hasRemaining && buffer.get() != ' ' do ()
-    val end = buffer.position() - 1
+    val end = if buffer.position() >0 then buffer.position()- 1 else buffer.position()
     new String(buffer.array(), start, end - start)
 
   private def extractHeaders(buffer: ByteBuffer): Map[String, String] =

@@ -16,5 +16,5 @@ object HttpMethod:
   val DELETE: DELETE = "DELETE"
 
   def apply(method: String): HttpMethod = method
-  
+
   extension (m: HttpMethod) def asString: String = m

@@ -31,13 +31,13 @@ object Routable:
     new Routable[T]:
       def get(using ec: ExecutionContext): Route[HttpMethod]  =
         val tableName = constValue[m.MirroredLabel]
-        route(GET, s"/api/$tableName".asPath,(req: HttpRequest) => {
+        route(GET, s"/api/$tableName".asPath,(req: HttpRequest.HttpRequest) => {
           Database.retrieve[T]
         }   )
 
       def post(using ec: ExecutionContext): Route[HttpMethod] =
         val tableName = constValue[m.MirroredLabel]
-        route(POST, s"/api/$tableName".asPath, (req: HttpRequest) => {
+        route(POST, s"/api/$tableName".asPath, (req: HttpRequest.HttpRequest) => {
 
 
           val bytes = new Array[Byte](req.body.remaining())
@@ -52,7 +52,7 @@ object Routable:
 
       def getBY(using ec: ExecutionContext): Route[HttpMethod] =
         val tableName = constValue[m.MirroredLabel]
-        route(POST, s"/api/$tableName".asPath, (req: HttpRequest) => {
+        route(POST, s"/api/$tableName".asPath, (req: HttpRequest.HttpRequest) => {
 
 
           val bytes = new Array[Byte](req.body.remaining())

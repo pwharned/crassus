@@ -1,9 +1,11 @@
 package org.pwharned.route
 
-import org.pwharned.http.HttpMethod.HttpMethod
+import org.pwharned.http.HttpMethod.{GET, HttpMethod}
+import org.pwharned.http.HttpPath.HttpPath
+import org.pwharned.http.HttpRequest.HttpRequest
 import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object Router:
 
@@ -15,9 +17,8 @@ object Router:
   opaque type Route[T <: HttpMethod] = RouteDef[T]
 
 
-
   // DSL for creating a route.
-  inline def route[T <: HttpMethod](method: T, path: HttpPath, f: HttpRequest => Future[HttpResponse]): Route[T] =
+  inline def route[T <: HttpMethod](method: T, path: HttpPath, f: HttpRequest => Future[HttpResponse])(using ec: ExecutionContext): Route[T] =
     RouteDef(method, path, f)
 
   // Extensions to "unwrap" our opaque type so we can use it as a function and also access its metadata.
@@ -30,6 +31,8 @@ object Router:
 
     extension [T <: HttpMethod](r: Route[T])
       def path: HttpPath = r.path
+      
+    
 
 // --- Usage ---
 //inline def labels[Labels <: Tuple](using ev: Tuple.Union[Labels] <:< String): List[String] = ev.substituteCo(constValueTuple[Labels].toList)
