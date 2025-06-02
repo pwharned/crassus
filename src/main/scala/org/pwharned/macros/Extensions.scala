@@ -14,9 +14,10 @@ extension [T<:Product](entity: T)(using sql: SqlSelect[T])
   def fields: List[String] = summon[SqlSelect[T]].names
   def select: String = summon[SqlSelect[T]].select
   def classFieldTypes: List[String] = summon[SqlSelect[T]].getClassesFieldType
-extension[T <: Product] (entity: T) (using sql: SqlUpdate[T] )
+extension[T <: Product] (entity: T) (using sql: SqlUpdate[T], sqlDelete: SqlDelete[T] )
   def update: String = summon[SqlUpdate[T]].updateStatement(entity)
   def bindValues: Seq[Any] = summon[SqlUpdate[T]].bindValues(entity)
+  def values(l:List[String]): PrimaryKeyFields[T]#Out = summon[SqlDelete[T]].values(l)
 
 
 

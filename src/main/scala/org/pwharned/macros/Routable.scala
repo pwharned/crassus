@@ -18,6 +18,7 @@ import org.pwharned.http.PathSegment.PathSegment
 import scala.compiletime.{erasedValue, summonInline}
 import scala.util.Try
 
+
 trait FromString[A]:
   def parse(s: String): A
 
@@ -28,17 +29,42 @@ object FromString:
   given FromString[String] with
     def parse(s: String): String = s
 
-inline def listToTuple[T <: Tuple](list: List[String]): T =
+inline def listToTuple[T <: Tuple](list: List[String]): T = {
   inline erasedValue[T] match
     case _: EmptyTuple =>
+      println(list)
       EmptyTuple.asInstanceOf[T]
     case _: (h *: t) =>
+      println("hello from " + list.head)
       // Convert the head string to type h
       val head: h = summonInline[FromString[h]].parse(list.head)
+      
       // Recursively convert the remainder of the list to type t
       val tail: t = listToTuple[t](list.tail)
       (head *: tail).asInstanceOf[T]
-      
+}
+
+def toTuple(list: List[String]): Tuple = list match {
+  case head :: tail =>
+    // Try to parse the head element into an Int,
+    // using summonInline to obtain the given FromString[Int]
+    val maybeInt: Option[Int] =
+      Try { summonInline[FromString[Int]].parse(head) }.toOption
+
+    maybeInt match {
+      case Some(value) =>
+        // Prepend the parsed Int to the tuple produced by the tail.
+        value *: toTuple(tail)
+      case None =>
+        // If the head cannot be parsed, throw an exception.
+        summonInline[FromString[Int]].parse(head) *: toTuple(tail)
+    }
+  case Nil =>
+    // Base case: an empty list corresponds to an empty tuple.
+    EmptyTuple
+}
+
+
 object RouteRegistry:
   def getRoutes[T <: Product](using Routable[T], ExecutionContext): List[Route[HttpMethod]] =
     summon[Routable[T]].allRoutes
@@ -83,24 +109,23 @@ object Routable:
       def delete(using ec: ExecutionContext): Route[HttpMethod] =
         val tableName = constValue[m.MirroredLabel]
         val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[T].map(x => s"{$x}").mkString("/")
-        
-        route(DELETE, s"/api/$tableName/$primaryKeys".toPath, (req: HttpRequest.HttpRequest) => {
+        val path = s"/api/$tableName/$primaryKeys".toPath
+        val dynamicIndexes = path.segments.zipWithIndex.collect {
+          case (dynamic: Segment.Dynamic, index) => index
+        }
+
+        route(DELETE, path, (req: HttpRequest.HttpRequest) => {
+          val expectedSize = PrimaryKeyExtractor.getPrimaryKey[T].size
+
+
+          val keyStrings:List[String] = dynamicIndexes.map(req.path.toPath.segments.collect {
+            case dynamic: Segment.Static => dynamic.segment.toString
+          })
+
+          val b: PrimaryKeyFields[T]#Out = toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[T]#Out]
           
-          val segments= req.path.toPath.segments
-          println(segments)
-            val keyStrings = segments.collect {
-            case dynamic: Segment.Dynamic => dynamic.segment.toString
-          }
-          println(keyStrings)
-          // Use the recursive type class to build the expected tuple.
-          val pkeys: PrimaryKeyFields[T]#Out = listToTuple(keyStrings) match
-            case Some(tuple) => tuple
-            case None =>
-              throw new IllegalArgumentException(
-                s"Expected ${PrimaryKeyExtractor.getPrimaryKey[T].size} key(s), but found ${keyStrings.size}"
-              )
-              
-            Database.delete[T](pkeys)
+
+          Database.delete[T](b)
 
 
         })

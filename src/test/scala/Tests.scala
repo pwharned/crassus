@@ -2,7 +2,7 @@ package org.pwharned
 
 import generated.user
 import generated.PrimaryKey
-import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, RandomGenerator, classFieldTypes, createTable, createTableAsync,deleteAsync, insertAsync,insert, query, update,select, PrimaryKeyFields,updateAsync, bindValues , serialize, streamQuery}
+import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, PrimaryKeyFields, RandomGenerator, values, bindValues, classFieldTypes, createTable, createTableAsync, deleteAsync, insert, insertAsync, listToTuple, query, select, serialize, streamQuery, update, updateAsync}
 
 import scala.concurrent.duration.*
 import scala.compiletime.{erasedValue, summonInline}
@@ -11,6 +11,9 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 private val executor = Executors.newVirtualThreadPerTaskExecutor()
 given ExecutionContext = ExecutionContext.fromExecutor(executor) // Use virtual threads for Scala Futures
+
+import scala.compiletime.{erasedValue, summonInline}
+
 
 
 given db: DbTypeMapper = Db2TypeMapper
@@ -44,18 +47,20 @@ def test:Unit =
 
     }
   }
-  val userStream = conn.streamQuery[user](batchSize = 5000).apply(conn) // select the updated values
+  val userStream = conn.query[user]// select the updated values
 
   val startTime = System.nanoTime()
-  userStream.map( x=> x.foreach { batch =>
-    batch.foreach{ x=> 
-      val userPrimaryKey: PrimaryKeyFields[user]#Out = Tuple1(PrimaryKey(x.id)).asInstanceOf[PrimaryKeyFields[user]#Out] // construct the primary key
+  userStream.foreach( x =>
+{     
+      val userPrimaryKey: PrimaryKeyFields[user]#Out = Tuple1(PrimaryKey(x.id.toString)).asInstanceOf[PrimaryKeyFields[user]#Out]
       println(x.serialize)
-      //val r4 = Await.result(conn.deleteAsync[user](userPrimaryKey), 10.seconds) // delete the user
+  val myt = listToTuple[Tuple1[Int]](List("1"))
+  //val r4 = Await.result(conn.deleteAsync[user](userPrimaryKey), 10.seconds) // delete the user
     }
+)
 
 
-  })
+  
 
   val finalUsers = conn.streamQuery[user](batchSize = 5000).apply(conn)
   //println( (System.nanoTime() - startTime)/ 1000000)
