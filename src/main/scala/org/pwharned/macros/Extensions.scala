@@ -5,8 +5,6 @@ import org.pwharned.http.generated.Headers
 import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse}
 import org.pwharned.macros
 import org.pwharned.parse.ParseError
-import org.pwharned.route.Router
-import org.pwharned.route.Router.Route
 
 import scala.collection.Iterator
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,7 +22,8 @@ extension[T <: Product] (entity: T) (using sql: SqlUpdate[T] )
 
 
 extension[T: SqlSchema] (t: T) def createTable(using db:DbTypeMapper): String = summon[SqlSchema[T]].createTable(db)
-extension (s: String) def asPath: HttpPath = HttpPath(s)
+extension (inline s: String) inline def asPath: HttpPath = HttpPath.literal(s)
+extension ( s: String)  def toPath: HttpPath = HttpPath(s)
 
 extension (b: java.nio.ByteBuffer) def asRequest: Option[HttpRequest.HttpRequest] = HttpRequest.HttpRequest.fromFullBuffer(b)
 
@@ -38,11 +37,6 @@ extension[T <: Product] (obj: Iterator[T]) (using json: JsonSerializer[T] )
   inline def serialize: String = summon[JsonSerializer[T]].serialize(obj)
 
 
-extension (con: java.sql.Connection)
-  inline def query[A <: Product](using sql: SqlSelect[A]): Iterator[A] =
-    val stmt = con.prepareStatement(sql.select)
-    val rs = stmt.executeQuery()
-    Iterator.continually(rs.next()).takeWhile(identity).map( x => rs.as[A])
 
 extension (db: org.pwharned.database.Database.type )
   inline def retrieve[A <: Product](using sql: SqlSelect[A], json:JsonSerializer[A],  ec: scala.concurrent.ExecutionContext): Future[HttpResponse] =
@@ -63,24 +57,19 @@ extension (db: org.pwharned.database.Database.type )
       case Failure(exception) => HttpResponse.error(exception.toString)
       case Success(value) => value
     }
+  inline def delete[A <: Product](a: PrimaryKeyFields[A]#Out)(using sql: SqlSelect[A], sqlDelete: SqlDelete[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[HttpResponse] =
+    db.pool.withConnection {
+
+      x => HttpResponse.ok(x.delete[A](a).serialize, headers = Headers.empty.add("content-type", "application/json"))
+    }.map {
+      case Failure(exception) => HttpResponse.error(exception.toString)
+      case Success(value) => value
+    }    
 
 extension (s: String)
   def deserialize[A <: Product](using j: JsonDeserializer[A]): Either[ParseError, A] = summon[JsonDeserializer[A]].deserialize(s)
 
-extension (con: java.sql.Connection)
-  def createTableAsync[A <: Product](using schema: SqlSchema[A], ec: ExecutionContext,db: DbTypeMapper): Future[Unit] =
-    Future {
-      val stmt = con.prepareStatement(schema.createTable(db))
-      stmt.executeUpdate()
-      println(s"Succesfully created table: ${schema.createTable}")
-    }.recover {
-      case ex: Exception =>
-        println(s"⚠️ Error creating table: ${ex.getMessage} : ${schema.createTable}")
-    }
-  def createTable[A <: Product](using schema: SqlSchema[A], ec: ExecutionContext,db: DbTypeMapper): Unit =
-      val stmt = con.prepareStatement(schema.createTable(db))
-      stmt.executeUpdate()
-      println(s"Succesfully created table: ${schema.createTable}")
+
 
 
 extension (con: java.sql.Connection)
@@ -92,9 +81,7 @@ extension (con: java.sql.Connection)
       .takeWhile(identity)
       .map(x => rs.as[A]).grouped(batchSize)
   }
-
-
-extension (con: java.sql.Connection)
+  
   def updateAsync[A <: Product](obj: A)(using sqlUpdate: SqlUpdate[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
   Future {
     val stmt = con.prepareStatement(sqlUpdate.updateStatement(obj))
@@ -110,26 +97,8 @@ extension (con: java.sql.Connection)
       println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlUpdate.updateStatement(obj)}")
       Iterator.empty[A]
   }
-
-extension (con: java.sql.Connection)
-  def deleteAsync[A <: Product](obj: PrimaryKeyFields[A]#Out)(using sqlDelete: SqlDelete[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
-    Future {
-      val stmt = con.prepareStatement(sqlDelete.deleteStatement)
-      sqlDelete.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
-        stmt.setObject(index + 1, value) // Bind each parameter safely
-      }
-      val rs = stmt.executeUpdate()
-      Iterator.empty
-
-    }.recover {
-      case ex: Exception =>
-        println(s"⚠️ Delete failed: ${ex.getMessage} : ${sqlDelete.deleteStatement}")
-        Iterator.empty[A]
-    }
-
-
-extension (con: java.sql.Connection)
-  def insertAsync[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
+  
+  inline def insertAsync[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
     Future {
       val stmt = con.prepareStatement(sqlInsert.insertStatement)
       sqlInsert.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
@@ -145,9 +114,31 @@ extension (con: java.sql.Connection)
         println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlInsert.insertStatement}")
         Iterator.empty[A]
     }
+  inline def delete[A <: Product](obj: PrimaryKeyFields[A]#Out)(using sqlDelete: SqlDelete[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Iterator[A] =
+      val stmt = con.prepareStatement(sqlDelete.deleteStatement)
+      sqlDelete.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
+        stmt.setObject(index + 1, value) // Bind each parameter safely
+      }
+      val rs = stmt.executeUpdate()
+      Iterator.empty
+
+  inline def deleteAsync[A <: Product](obj: PrimaryKeyFields[A]#Out)(using sqlDelete: SqlDelete[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
+    Future {
+      val stmt = con.prepareStatement(sqlDelete.deleteStatement)
+      sqlDelete.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
+        stmt.setObject(index + 1, value) // Bind each parameter safely
+      }
+      val rs = stmt.executeUpdate()
+      Iterator.empty
+
+    }.recover {
+      case ex: Exception =>
+        println(s"⚠️ Delete failed: ${ex.getMessage} : ${sqlDelete.deleteStatement}")
+        Iterator.empty[A]
+    }
 
 
-  def insert[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Iterator[A] =
+  inline def insert[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Iterator[A] =
       val stmt = con.prepareStatement(sqlInsert.insertStatement)
       sqlInsert.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
         stmt.setObject(index + 1, value) // Bind each parameter safely
@@ -156,3 +147,21 @@ extension (con: java.sql.Connection)
       Iterator.continually(rs.next())
         .takeWhile(identity)
         .map(x => rs.as[A])
+  inline def query[A <: Product](using sql: SqlSelect[A]): Iterator[A] =
+    val stmt = con.prepareStatement(sql.select)
+    val rs = stmt.executeQuery()
+    Iterator.continually(rs.next()).takeWhile(identity).map(x => rs.as[A])
+
+  inline def createTableAsync[A <: Product](using schema: SqlSchema[A], ec: ExecutionContext, db: DbTypeMapper): Future[Unit] =
+    Future {
+      val stmt = con.prepareStatement(schema.createTable(db))
+      stmt.executeUpdate()
+      println(s"Succesfully created table: ${schema.createTable}")
+    }.recover {
+      case ex: Exception =>
+        println(s"⚠️ Error creating table: ${ex.getMessage} : ${schema.createTable}")
+    }
+  inline def createTable[A <: Product](using schema: SqlSchema[A], ec: ExecutionContext, db: DbTypeMapper): Unit =
+    val stmt = con.prepareStatement(schema.createTable(db))
+    stmt.executeUpdate()
+    println(s"Succesfully created table: ${schema.createTable}")

@@ -1,11 +1,11 @@
 package org.pwharned.server
 import org.pwharned.http.HttpMethod.HttpMethod
-import org.pwharned.http.HttpPath.IdentifierOrSegment
+import org.pwharned.http.HttpPath
 import org.pwharned.http.generated.Headers
 import org.pwharned.http.{HttpRequest, HttpResponse}
 import org.pwharned.route.*
 import org.pwharned.route.Router.RouteDef
-import org.pwharned.macros.{asPath, asRequest}
+import org.pwharned.macros.{toPath, asRequest}
 
 import java.io.PrintWriter
 import java.net.{InetSocketAddress, Socket}
@@ -102,7 +102,7 @@ object HTTPServer:
 
   given ExecutionContext = ExecutionContext.fromExecutor(ex)
 
-  def start(port: Int,  routingTable: RoutingTable.RoutingTable[IdentifierOrSegment]): Unit =
+  inline def start(inline port: Int, inline routingTable: RoutingTable.RoutingTable): Unit =
 
     val serverChannel = ServerSocketChannel.open()
     serverChannel.bind(new InetSocketAddress(port))
@@ -129,7 +129,7 @@ object HTTPServer:
             else
               val req = request.get       
               val method = req.method
-              val path = req.path.asPath
+              val path = req.path.toPath
               val key = routingTable.find(method,path)
             
   

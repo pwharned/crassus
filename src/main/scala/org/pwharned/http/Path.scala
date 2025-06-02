@@ -1,49 +1,78 @@
 package org.pwharned.http
 import scala.language.implicitConversions
 
-// Define HttpPath as an opaque type with String as its underlying representation.
+import scala.quoted.*
 
-object HttpPath:
-  opaque type HttpPath = List[IdentifierOrSegment]
-  opaque type IdentifierOrSegment = Identifier.Identifier | Segment.Segment
-  inline def apply(p: String): HttpPath =
-    p.stripPrefix("/").split('/').filter(_.nonEmpty).toList.map { s =>
+object PathSegment:
+  opaque type PathSegment = String
 
-      Identifier.fromString(Segment(s)) match
-        case Some(value) => value
-        case None => Segment(s)
-
-    }
-
-  extension (id: HttpPath)
-  // Extract the value inside the brackets.
-
-    def asList: List[IdentifierOrSegment] = id
-
+  def apply(s: String): PathSegment = s
+  extension (ps: PathSegment)
+    def value: String = ps
 
 object Identifier:
-  opaque type Identifier = Segment.Segment
-  inline def fromString(raw: Segment.Segment): Option[Identifier] =
-    if raw.startsWith("{") && raw.endsWith("}") then Some(Identifier(raw)) else None
-  inline def apply(raw: Segment.Segment): Identifier = raw
+  opaque type Identifier[X] = X
 
+  def apply[X](x: X): Identifier[X] = x
+  given [T]: Conversion[T, Identifier[T]] = x => Identifier(x)
 
-  extension (id: Identifier)
-    // Extract the value inside the brackets.
-    inline def value: String = id.value.substring(1, id.value.length - 1)
-
+sealed trait Segment
 object Segment:
-  opaque type Segment = String
+  final case class Static(segment: PathSegment.PathSegment) extends Segment
+  final case class Dynamic(segment: Identifier.Identifier[PathSegment.PathSegment]) extends Segment
 
-  inline def apply(raw: String): Segment = raw
+// The HttpPath is simply a List of Segments.
+object HttpPath:
+  opaque type HttpPath = List[Segment]
 
-  extension (seg: Segment)
-    inline def startsWith(str: String) = seg.startsWith(str)
-    inline def endsWith(str: String) = seg.endsWith(str)
-    inline def substring(a: Int, b: Int): Segment = seg.substring(a,b)
-    inline def length = seg.length
+  def apply(segments: List[Segment]): HttpPath = segments
 
+  inline def apply(pathString: String): HttpPath =
+    val parts: List[Segment] = pathString
+      .split("/")
+      .filter(_.nonEmpty)
+      .map { segment =>
+        if segment.startsWith("{") && segment.endsWith("}") then
+          val id = segment.substring(1, segment.length - 1)
+          Segment.Dynamic(Identifier(toPathSegment(id)))
+        else
+          Segment.Static(toPathSegment(segment))
+      }
+      .toList
 
+    HttpPath(parts)
+  extension (hp: HttpPath)
+    def segments: List[Segment] = hp
+
+  // Helper function to safely convert a String into a PathSegment.
+  private def toPathSegment(s: String): PathSegment.PathSegment = PathSegment(s)
+
+  // Inline method that lifts a compile-time literal into an HttpPath.
+  inline def literal(inline s: String): HttpPath = ${ httpPathImpl('s) }
+
+  private def httpPathImpl(s: Expr[String])(using Quotes): Expr[HttpPath] =
+    import quotes.reflect.*
+    s.value match
+      case Some(pathString) =>
+        // Split the path string by '/' and filter out empty segments.
+        val parts: List[Expr[Segment]] = pathString
+          .split("/")
+          .filter(_.nonEmpty)
+          .toList
+          .map { segment =>
+            if segment.startsWith("{") && segment.endsWith("}") then
+              // Extract the identifier without the braces.
+              val id = segment.substring(1, segment.length - 1)
+              // Now use our helper `toPathSegment` which is in scope.
+              '{ Segment.Dynamic(Identifier(toPathSegment(${ Expr(id) }))) }
+            else
+              '{ Segment.Static(toPathSegment(${ Expr(segment) })) }
+          }
+        Expr.ofList(parts)
+      case None =>
+        quotes.reflect.report.error("HTTP path must be a compile-time constant.")
+        '{ Nil }
+// At compile time, the literal will be converted to our HttpPath type.
 
 
 
