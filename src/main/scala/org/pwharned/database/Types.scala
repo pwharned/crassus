@@ -8,6 +8,7 @@ import scala.deriving.*
 trait DbTypeMapper:
   def mapType(scalaType: String): String
 
+/// this code is used for mapping the types of a case class into their sql representation for the purpose of generating CREATE TABLE and other ddl statements - dont confuse with lower code.
 object PostgresTypeMapper extends DbTypeMapper:
   def mapType(scalaType: String): String = scalaType match
     case "String" => "TEXT"
@@ -21,6 +22,7 @@ object PostgresTypeMapper extends DbTypeMapper:
 object Db2TypeMapper extends DbTypeMapper:
   def mapType(scalaType: String): String = scalaType match
     case "String" => "VARCHAR(255)"
+    case "PrimaryKey[Int]" => "INT NOT NULL PRIMARY KEY GENERATED ALWAYS AS IDENTITY"
     case "Int" => "INTEGER"
     case "Option[Int]" => "INTEGER NULL"
     case "Boolean" => "SMALLINT" // DB2 uses SMALLINT for boolean
@@ -32,8 +34,10 @@ transparent inline def mapToSqlTypes[A <: Tuple](mapper: DbTypeMapper): List[Str
   inline erasedValue[A] match
     case _: EmptyTuple => Nil
     case _: (head *: tail) =>
-      val scalaType = inline unwrappedType[head] match
-        case _: String => "String"
+      val scalaType = inline erasedValue[head] match
+        case _: PrimaryKey[Int] => "PrimaryKey[Int]"
+        case _: Id[String] => "String"
+        case _: Nullable[String] => "String"
         case _: Option[String] => "Option[String]"
         case _: Int => "Int"
         case _: Option[Int] => "Option[Int]"
@@ -43,36 +47,17 @@ transparent inline def mapToSqlTypes[A <: Tuple](mapper: DbTypeMapper): List[Str
         case _: Option[Double] => "Option[Double]"
       mapper.mapType(scalaType) :: mapToSqlTypes[tail](mapper)
 
-transparent inline def unwrappedTypeOld[T]: String =
-  inline erasedValue[T] match {
-    // If the type is an Option, preserve it by unwrapping its inner type:
-
-    case _: String => "String"
-    case _: Int => "Int"
-    case _: Integer => "Int"
-    case _: Boolean => "Boolean"
-    case _: Double => "Double"
-    case _: Float => "Float"
-    case _: Long => "Long"
-    case _: Short => "Short"
-    case _: Byte => "Byte"
-    case _: Option[t] => s"Option[${unwrappedType[t]}]"
-    case _: PrimaryKey[t] => unwrappedType[t]
-    case _: Nullable[t] => unwrappedType[t]
-    // Recognize allowed base types:
-    // If nothing matches, fail at compile time:
-    case _ => error("Unsupported field type: " + typeName[T])
-  }
-
-
 
 transparent inline def summonFieldTypes[A <: Tuple]: List[String] =
     inline erasedValue[A] match {
       case _: EmptyTuple => Nil
       case _: (head *: tail) => unwrappedType[head] :: summonFieldTypes[tail]
     }
+//
+//
+//
 
-
+/// this code is used for mapping the type of a case class into the appopriate method on a result set.
 transparent inline def unwrappedType[T]: String = ${ unwrappedTypeImpl[T] }
 
 def unwrappedTypeImpl[T: Type](using Quotes): Expr[String] = {
@@ -81,6 +66,7 @@ def unwrappedTypeImpl[T: Type](using Quotes): Expr[String] = {
   def loop(tpe: TypeRepr): String = tpe.dealias match {
     // Base types: match directly against their dealiased representations.
     case t if t =:= TypeRepr.of[String]  => "String"
+    case t if t =:= TypeRepr.of[Id[PrimaryKey[Int]]]  => "Int"
     case t if t =:= TypeRepr.of[Int]     => "Int"
     case t if t =:= TypeRepr.of[Integer] => "Int"
     case t if t =:= TypeRepr.of[Boolean] => "Boolean"

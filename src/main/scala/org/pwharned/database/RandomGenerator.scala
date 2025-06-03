@@ -6,7 +6,7 @@ import scala.compiletime.*
 import scala.deriving.*
 import scala.reflect.ClassTag
 import scala.util.Random
-
+import scala.language.implicitConversions
 transparent inline def generateRandomValue[T]: T =
   inline erasedValue[T] match
     case _: String => Random.alphanumeric.take(10).mkString.asInstanceOf[T]
@@ -25,7 +25,7 @@ transparent inline def generateRandomValue[T]: T =
     case _: Option[Long] => Some(Random.nextLong()).asInstanceOf[T]
     case _ =>
       val typeName = summonInline[scala.reflect.ClassTag[T]].runtimeClass.getSimpleName
-      println(s"⚠️ Unsupported type: $typeName")
+      error(s"⚠️ Unsupported type: $typeName")
       throw new UnsupportedOperationException(s"Cannot generate random value for type $typeName")
 
 trait RandomGenerator[T<:Product]:
@@ -38,7 +38,7 @@ object RandomGenerator:
      
 
       def generate: T = {
-        val labels = constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
+        val labels = constValueTuple[m.MirroredElemLabels].productIterator.toList.map(_.toString)
         val zipped = labels.zip(getClassesFieldType)
         val extractedValues = zipped.map {
           case (label, "String") => Random.alphanumeric.take(10).mkString
@@ -60,6 +60,7 @@ object RandomGenerator:
 
         // Convert to Tuple for Mirror's apply method
         val valuesTuple = Tuple.fromArray(extractedValues.toArray)
+        println(valuesTuple)
 
         // Use Mirror to instantiate case class
         m.fromProduct(valuesTuple)

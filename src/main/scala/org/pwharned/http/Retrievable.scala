@@ -19,8 +19,8 @@ trait Retrievable[T]:
 
 
 object Retrievable:
-  inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[Persisted[T]], sqlSelect: SqlSelect[T[Id]], serializer: JsonSerializer[Persisted[T]]): Retrievable[Persisted[T]] =
-    new Retrievable[Persisted[T]]:
+  inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[Persisted[T]], sqlSelect: SqlSelect[T[Id]], serializer: JsonSerializer[Persisted[T]]): Retrievable[T[Id]] =
+    new Retrievable[T[Id]]:
       def get(using ec: ExecutionContext): Route[HttpMethod]  =
         val tableName = constValue[m.MirroredLabel]
         route(GET, s"/api/$tableName".toPath,(req: HttpRequest.HttpRequest) => {

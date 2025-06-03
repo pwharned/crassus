@@ -1,6 +1,6 @@
 package org.pwharned.json
 
-import org.pwharned.database.HKD._
+import org.pwharned.database.HKD.{PrimaryKey, Nullable}
 import org.pwharned.parse.{Parse, ParseError}
 
 import scala.compiletime.*

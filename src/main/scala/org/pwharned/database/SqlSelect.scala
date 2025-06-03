@@ -2,7 +2,7 @@ package org.pwharned.database
 
 import org.pwharned.database.summonFieldTypes
 import HKD.*
-
+import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.*
@@ -22,12 +22,15 @@ object SqlSelect:
   transparent inline given derived[T <: Product](using m: Mirror.ProductOf[T]): SqlSelect[T] = {
     new SqlSelect[T] {
       def name: String = constValue[m.MirroredLabel]
+
       def names: List[String] =
-        constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
-      def select: String = s"select ${names.mkString(",") } from ${name}"
-      def createTable: String = s"create table if not exists $name( "
+        constValueTuple[m.MirroredElemLabels].productIterator.toList.map(_.toString)
+
+      def select: String = {
+        s"select ${names.mkString(",") } from ${name}"
+      }
       def fromResultSet(rs: java.sql.ResultSet):T = {
-        val labels = constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
+        val labels = constValueTuple[m.MirroredElemLabels].productIterator.toList.map(_.toString)
         val zipped = labels.zip(getClassesFieldType)
         val extractedValues = zipped.map {
           case (label, "String") => rs.getString(label)

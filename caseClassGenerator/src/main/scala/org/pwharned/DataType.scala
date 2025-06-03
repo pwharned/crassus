@@ -4,7 +4,10 @@ sealed trait DataType {
   def sqlName: String
 }
 case object Int extends DataType{
-  val sqlName =  "INTEGER"
+  val sqlName =  "Int"
+}
+case object Integer extends DataType{
+  val sqlName =  "Integer"
 }
 case object String extends DataType {
   val sqlName =  "TEXT"

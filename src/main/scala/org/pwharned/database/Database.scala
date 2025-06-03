@@ -149,6 +149,7 @@ extension (con: java.sql.Connection)
       .map(x => rs.as[A])
   inline def query[A <: Product](using sql: SqlSelect[A]): Iterator[A] =
     val stmt = con.prepareStatement(sql.select)
+    
     val rs = stmt.executeQuery()
     Iterator.continually(rs.next()).takeWhile(identity).map(x => rs.as[A])
 
