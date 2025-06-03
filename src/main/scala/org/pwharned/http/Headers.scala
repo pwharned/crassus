@@ -1,6 +1,5 @@
 package org.pwharned.http
 
-package generated
 
 object Headers:
   // Opaque type alias: headers are represented as a Map[String, String]

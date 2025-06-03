@@ -1,7 +1,6 @@
 package org.pwharned.http
 
-import org.pwharned.http.generated.Headers
-import org.pwharned.http.generated.Headers.Headers
+import org.pwharned.http.Headers.Headers
 
 
 case class HttpResponse(status: Int, headers: Headers, body: String)

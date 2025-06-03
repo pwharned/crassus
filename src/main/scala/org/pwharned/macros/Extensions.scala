@@ -1,14 +1,15 @@
 package org.pwharned.macros
 
 import org.pwharned.http.HttpPath.HttpPath
-import org.pwharned.http.generated.Headers
+import org.pwharned.http.Headers
 import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse}
 import org.pwharned.macros
+import org.pwharned.macros.HKD.*
 import org.pwharned.parse.ParseError
 
 import scala.collection.Iterator
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 extension [T<:Product](entity: T)(using sql: SqlSelect[T])
   def fields: List[String] = summon[SqlSelect[T]].names
@@ -40,15 +41,11 @@ extension[T <: Product] (obj: Iterator[T]) (using json: JsonSerializer[T] )
 
 
 extension (db: org.pwharned.database.Database.type )
-  inline def retrieve[A <: Product](using sql: SqlSelect[A], json:JsonSerializer[A],  ec: scala.concurrent.ExecutionContext): Future[HttpResponse] =
+  inline def retrieve[T[F[_]] <: Product](using sql: SqlSelect[Persisted[T]], json:JsonSerializer[Persisted[T]],  ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[Persisted[T]]]] =
     db.pool.withConnection {
 
-      x => HttpResponse.ok(x.query[A].serialize ,Headers.apply(Map("content-type" -> "Application/json")) )
-    }.map {
-      case Failure(exception) => HttpResponse.error(exception.toString)
-      case Success(value) => {
-        value
-      }
+      x => x.query[Persisted[T]]
+        //HttpResponse.ok(x.query[A].serialize ,Headers.apply(Map("content-type" -> "Application/json")) )
     }
   inline def create[A <: Product](a: A)(using sql: SqlSelect[A], sqlInsert: SqlInsert[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[HttpResponse] =
     db.pool.withConnection {
@@ -65,7 +62,15 @@ extension (db: org.pwharned.database.Database.type )
     }.map {
       case Failure(exception) => HttpResponse.error(exception.toString)
       case Success(value) => value
-    }    
+    }
+  inline def update[A <: Product](a: A)(using sql: SqlSelect[A], sqlUpdate: SqlUpdate[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[HttpResponse] =
+    db.pool.withConnection {
+
+      x => HttpResponse.ok(x.update[A](a).serialize, headers = Headers.empty.add("content-type", "application/json"))
+    }.map {
+      case Failure(exception) => HttpResponse.error(exception.toString)
+      case Success(value) => value
+    }
 
 extension (s: String)
   def deserialize[A <: Product](using j: JsonDeserializer[A]): Either[ParseError, A] = summon[JsonDeserializer[A]].deserialize(s)
@@ -82,6 +87,16 @@ extension (con: java.sql.Connection)
       .takeWhile(identity)
       .map(x => rs.as[A]).grouped(batchSize)
   }
+  def update[A <: Product](obj: A)(using sqlUpdate: SqlUpdate[A], sqlSelect: SqlSelect[A]): Iterator[A] =
+      val stmt = con.prepareStatement(sqlUpdate.updateStatement(obj))
+      sqlUpdate.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
+        stmt.setObject(index + 1, value) // Bind each parameter safely
+      }
+      val rs = stmt.executeQuery()
+      Iterator.continually(rs.next())
+        .takeWhile(identity)
+        .map(x => rs.as[A])
+
   
   def updateAsync[A <: Product](obj: A)(using sqlUpdate: SqlUpdate[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
   Future {
@@ -115,7 +130,7 @@ extension (con: java.sql.Connection)
         println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlInsert.insertStatement}")
         Iterator.empty[A]
     }
-  inline def delete[A <: Product](obj: PrimaryKeyFields[A]#Out)(using sqlDelete: SqlDelete[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Iterator[A] =
+  inline def delete[A <: Product](obj: PrimaryKeyFields[A]#Out)(using sqlDelete: SqlDelete[A], sqlSelect: SqlSelect[A]): Iterator[A] =
       val stmt = con.prepareStatement(sqlDelete.deleteStatement)
       sqlDelete.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
         stmt.setObject(index + 1, value) // Bind each parameter safely
@@ -139,7 +154,7 @@ extension (con: java.sql.Connection)
     }
 
 
-  inline def insert[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Iterator[A] =
+  inline def insert[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A]): Iterator[A] =
       val stmt = con.prepareStatement(sqlInsert.insertStatement)
       sqlInsert.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
         stmt.setObject(index + 1, value) // Bind each parameter safely

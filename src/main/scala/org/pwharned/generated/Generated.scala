@@ -8,4 +8,4 @@ object PrimaryKey:
   given [T]: Conversion[T, PrimaryKey[T]] = x => PrimaryKey(x)
 
 
-case class user ( id: PrimaryKey[Int],name: String,test: Option[String])
+case class user[F[_]] ( id: F[PrimaryKey[Int]],name: F[String],test: F[Option[String]])

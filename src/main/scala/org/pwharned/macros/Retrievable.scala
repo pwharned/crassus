@@ -1,0 +1,30 @@
+package org.pwharned.macros
+
+import org.pwharned.database.Database
+import org.pwharned.http.{Headers, HttpRequest, HttpResponse}
+import org.pwharned.http.HttpMethod.{GET, HttpMethod}
+import org.pwharned.macros.HKD.{Id, Persisted}
+import org.pwharned.route.Router.{Route, route}
+
+import scala.concurrent.ExecutionContext
+import scala.deriving.Mirror
+import scala.compiletime.constValue
+import scala.util.{Failure, Success}
+
+
+trait Retrievable[T]:
+  def get(using ec: ExecutionContext): Route[HttpMethod]
+
+
+
+object Retrievable:
+  inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[Persisted[T]], sqlSelect: SqlSelect[T[Id]], serializer: JsonSerializer[Persisted[T]]): Retrievable[Persisted[T]] =
+    new Retrievable[Persisted[T]]:
+      def get(using ec: ExecutionContext): Route[HttpMethod]  =
+        val tableName = constValue[m.MirroredLabel]
+        route(GET, s"/api/$tableName".toPath,(req: HttpRequest.HttpRequest) => {
+          Database.retrieve[T].map( x => x.map(y => y.serialize) match {
+            case Failure(exception) => HttpResponse.error(exception.toString)
+            case Success(value) => HttpResponse.ok(value,Headers.apply(Map("content-type" -> "Application/json")))
+          }      )
+        }   )

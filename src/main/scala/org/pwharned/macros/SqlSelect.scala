@@ -3,6 +3,7 @@ package org.pwharned.macros
 import scala.deriving.*
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
+import org.pwharned.macros.HKD.*
 
 trait SqlSelect[T] {
   def names: List[String]

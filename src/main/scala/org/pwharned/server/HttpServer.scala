@@ -1,7 +1,6 @@
 package org.pwharned.server
 import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.HttpPath
-import org.pwharned.http.generated.Headers
 import org.pwharned.http.{HttpRequest, HttpResponse}
 import org.pwharned.route.*
 import org.pwharned.route.Router.RouteDef
@@ -16,6 +15,7 @@ import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
+import org.pwharned.macros.HKD.~>.idToId
 
 def sendResponseAsync(socket: Socket, response: Future[HttpResponse])(using ec: ExecutionContext): Unit =
   val out = PrintWriter(socket.getOutputStream, true)
