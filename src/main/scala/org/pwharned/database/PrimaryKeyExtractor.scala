@@ -23,6 +23,8 @@ object PrimaryKeyExtractor:
 
     inline erasedValue[T] match
       case _: (PrimaryKey[Int] *: t) => labels.head +: tupleFilterKeys[t](labels.tail)
+      case _: (Option[PrimaryKey[Int]] *: t) => labels.head +: tupleFilterKeys[t](labels.tail)
+
       case _: (_ *: t) => tupleFilterKeys[t](labels.tail)
       case _ => Nil
 

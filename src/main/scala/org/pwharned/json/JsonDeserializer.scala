@@ -125,7 +125,8 @@ object JsonDeserializer extends Parse:
               val nextInputEither: Either[ParseError, String] =
                 hValue match {
                   // If the field is optional and missing, do NOT try to match a comma.
-                  case opt: Option[?] if opt.isEmpty => Right(r)
+                  //case opt: Option[?] if opt.isEmpty => Right(r)
+                  case None => Right(r)
                   case _ =>
                     if tailNames.isEmpty then Right(r)
                     else comma(r).map { case (_, afterComma) => afterComma }

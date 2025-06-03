@@ -35,8 +35,9 @@ object Creatable:
           s.deserialize[New[T]] match
             case Left(value) => Future(HttpResponse.error(value.message))
             case Right(value) => {
-              println(value)
-              Database.create[New[T]](value)
+              handleTransaction{
+                Database.create[New[T]](value)
+              }
             }
 
         })

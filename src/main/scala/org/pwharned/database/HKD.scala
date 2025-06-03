@@ -106,10 +106,10 @@ object HKD:
   type NewField[A] = A match
     case PrimaryKey[t] => Option[PrimaryKey[t]]
     case Nullable[t] => Option[t]
-    case _ => Option[A]
+    case _ => A
 
   type UpdatedField[A] = A match
-    case PrimaryKey[t] => t
+    case PrimaryKey[t] => Option[PrimaryKey[t]]
     case Nullable[t] => Option[t]
     case _ => Option[A]
   type PersistedField[A] = A match
@@ -139,7 +139,7 @@ given [A]: Conversion[A, Option[A]] = (a: A) => Some(a)
   // Create a "persisted" user that might be fetched from the database.
   // The id is present as PrimaryKey(123) and the name is a plain String.
   val newUser: New[User] = User(None, "Alice", "Hello")
-  val updatedUser: Updated[User] = User(1, "Alice", "Hello")
+  val updatedUser: Updated[User] = User(None, "Alice", "Hello")
   val persistedUser: Persisted[User] = User(1, "Alice", "Hello")
 
 

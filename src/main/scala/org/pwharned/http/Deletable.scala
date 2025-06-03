@@ -42,7 +42,9 @@ object Deletable:
         val b: PrimaryKeyFields[T[Id]]#Out =
           toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[T[Id]]#Out]
 
-        Database.delete[T[Id]](b)
+        handleTransaction{
+          Database.delete[T[Id]](b)
+        }
       })
 
 

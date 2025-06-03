@@ -8,6 +8,7 @@ trait SqlUpdate[T]:
   def updateStatement(obj: T): String
 
   def bindValues(obj: T): Seq[Any]
+  def bindValues(obj: T, b: PrimaryKeyFields[T]#Out): Seq[Any]
 
 object SqlUpdate:
   inline given derive[T <: Product](using m: Mirror.ProductOf[T]): SqlUpdate[T] =
@@ -39,7 +40,25 @@ object SqlUpdate:
           case Some(v) => v     // Extract value from Option[T]
           case other   => other // Use raw value for primitives
         }
-        // Concatenating the sequences in the right order
+
+      }
+
+      def bindValues(obj: T,a: PrimaryKeyFields[T]#Out): Seq[Any] = {
+         val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
+
+         val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T]
+        val  nonPrimaryFields = fields.filter(x => !primaryKey.contains(x)) // Fields used in update
+        val fieldValues = fields.zip(obj.productIterator).toMap
+
+        val updateValues = nonPrimaryFields.flatMap(field => fieldValues.get(field))
+
+        val primaryKeyValue = a.productIterator
+
+        (updateValues ++ primaryKeyValue) map {
+          case None => null // Handle Option[None] correctly
+          case Some(v) => v // Extract value from Option[T]
+          case other => other // Use raw value for primitives
+        }
 
       }
 
