@@ -1,15 +1,16 @@
-package org.pwharned.macros
+package org.pwharned.http
 
-import org.pwharned.database.Database
-import org.pwharned.http.{Headers, HttpRequest, HttpResponse}
+import org.pwharned.database.HKD.{Id, New, Persisted}
+import org.pwharned.database.{Database, SqlSelect, create}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod, POST}
-import org.pwharned.macros.HKD.{Id, New, Persisted}
+import org.pwharned.http.{Headers, HttpRequest, HttpResponse}
+import org.pwharned.json.{JsonSerializer,deserialize}
 import org.pwharned.route.Router.{Route, route}
 
 import java.nio.charset.StandardCharsets
+import scala.compiletime.constValue
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.Mirror
-import scala.compiletime.constValue
 import scala.util.{Failure, Success}
 
 
@@ -30,8 +31,12 @@ object Creatable:
           req.body.get(bytes)
           // Decode the bytes using the desired charset.
           val s = new String(bytes, StandardCharsets.UTF_8)
+          println(s)
           s.deserialize[New[T]] match
             case Left(value) => Future(HttpResponse.error(value.message))
-            case Right(value) => Database.create[New[T]](value)
+            case Right(value) => {
+              println(value)
+              Database.create[New[T]](value)
+            }
 
         })

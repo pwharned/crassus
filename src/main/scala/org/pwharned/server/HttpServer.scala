@@ -4,7 +4,7 @@ import org.pwharned.http.HttpPath
 import org.pwharned.http.{HttpRequest, HttpResponse}
 import org.pwharned.route.*
 import org.pwharned.route.Router.RouteDef
-import org.pwharned.macros.{toPath, asRequest}
+import org.pwharned.http.{toPath, asRequest}
 
 import java.io.PrintWriter
 import java.net.{InetSocketAddress, Socket}
@@ -14,8 +14,8 @@ import java.util.concurrent.{ExecutorService, Executors}
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
+import org.pwharned.database.HKD.~>.idToId
 
-import org.pwharned.macros.HKD.~>.idToId
 
 def sendResponseAsync(socket: Socket, response: Future[HttpResponse])(using ec: ExecutionContext): Unit =
   val out = PrintWriter(socket.getOutputStream, true)

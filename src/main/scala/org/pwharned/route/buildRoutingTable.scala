@@ -1,11 +1,10 @@
-package org.pwharned.macros
-
+package org.pwharned.route
 
 // Inline routing table builder: routes must be provided as a literal List.
 import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.route.Router
 import org.pwharned.route.Router.Route
-
+import scala.compiletime.error
 import scala.quoted.*
 
 inline def buildRoutingTable(l: List[Route[HttpMethod]]): Map[String, Router.Route[HttpMethod]] =
@@ -17,7 +16,6 @@ inline def buildRoutingTable(l: List[Route[HttpMethod]]): Map[String, Router.Rou
 def buildRoutingTableImpl(
                            routesExpr: Expr[List[Router.Route[HttpMethod]]]
                          )(using Quotes): Expr[Map[String, Router.Route[HttpMethod]]] = {
-  import quotes.reflect.*
 
   // Match on the structure of the List expression
   routesExpr match {
@@ -43,7 +41,7 @@ def buildRoutingTableImpl(
       '{ Map.from($entriesListExpr) }
 
     case _ =>
-      report.error("Routes must be a literal list", routesExpr)
+      
       '{ Map.empty[String, Router.Route[HttpMethod]] }
   }
 }

@@ -1,10 +1,11 @@
-package org.pwharned.macros
+package org.pwharned.database
 
-import scala.deriving.Mirror
-import scala.util.Random
-import scala.deriving.*
+import org.pwharned.database.summonFieldTypes
+
 import scala.compiletime.*
+import scala.deriving.*
 import scala.reflect.ClassTag
+import scala.util.Random
 
 transparent inline def generateRandomValue[T]: T =
   inline erasedValue[T] match

@@ -1,8 +1,11 @@
-package org.pwharned.macros
-import scala.deriving.*
-import scala.compiletime.*
-import generated.{PrimaryKey, user}
+package org.pwharned.database
 
+import generated.{ user}
+import org.pwharned.database.HKD._
+import org.pwharned.macros.{listToTuple}
+
+import scala.compiletime.*
+import scala.deriving.*
 import scala.util.Try
 
 trait PrimaryKeyFields[T] {

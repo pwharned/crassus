@@ -1,7 +1,9 @@
-package org.pwharned.macros
+package org.pwharned.database
 
-import scala.deriving.Mirror
+import org.pwharned.database.{DbTypeMapper, mapToSqlTypes}
+
 import scala.compiletime.*
+import scala.deriving.Mirror
 
 trait SqlSchema[T]:
   def createTable(mapper: DbTypeMapper): String
@@ -16,3 +18,4 @@ object SqlSchema:
 
         val columns = fieldNames.zip(fieldTypes).map { case (name, sqlType) => s"$name $sqlType" }
         s"CREATE TABLE IF NOT EXISTS $tableName (\n  ${columns.mkString(",\n  ")}\n);"
+extension[T: SqlSchema] (t: T) def createTableStatement(using db:DbTypeMapper): String = summon[SqlSchema[T]].createTable(db)

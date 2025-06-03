@@ -1,8 +1,8 @@
-package org.pwharned.macros
+package org.pwharned.json
 
-import scala.deriving.Mirror
-import scala.deriving.*
+
 import scala.compiletime.*
+import scala.deriving.*
 
 trait JsonSerializer[T]:
   def serialize(obj: T): String
@@ -36,3 +36,11 @@ object JsonSerializer:
       )
       fields.mkString("{", ",", "}")
     case _ => s""""${value.toString}""""
+
+
+extension[T<:Product](obj: T) (using json: JsonSerializer[T])
+  inline def serialize: String = summon[JsonSerializer[T]].serialize(obj)
+extension[T <: Product] (obj: Iterator[T]) (using json: JsonSerializer[T] )
+  inline def serialize: String = summon[JsonSerializer[T]].serialize(obj)
+
+

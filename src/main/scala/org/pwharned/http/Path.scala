@@ -1,6 +1,7 @@
 package org.pwharned.http
-import scala.language.implicitConversions
+import org.pwharned.http.HttpPath.HttpPath
 
+import scala.language.implicitConversions
 import scala.quoted.*
 
 object PathSegment:
@@ -75,6 +76,8 @@ object HttpPath:
 // At compile time, the literal will be converted to our HttpPath type.
 
 
+extension (inline s: String) inline def asPath: HttpPath = HttpPath.literal(s)
 
+extension ( s: String)  def toPath: HttpPath = HttpPath(s)
 
 // Use the runtime classifier on each segment:

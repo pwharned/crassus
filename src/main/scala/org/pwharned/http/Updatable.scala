@@ -1,23 +1,19 @@
-package org.pwharned.macros
+package org.pwharned.http
 
-import generated.user
-import org.pwharned.database.Database
+import org.pwharned.database.HKD._
+import org.pwharned.database.{Database, update, PrimaryKeyExtractor, PrimaryKeyFields, SqlDelete}
 import org.pwharned.http.HttpMethod.{DELETE, GET, HttpMethod, PATCH, POST}
-import org.pwharned.http.{HttpRequest, HttpResponse, Segment}
-import org.pwharned.route.Router.{Route, route}
-import org.pwharned.http.Headers
-
-import scala.compiletime.summonInline
-import java.nio.charset.StandardCharsets
-import scala.compiletime.constValue
-import scala.concurrent.{ExecutionContext, Future}
-import scala.deriving.Mirror
-import generated.PrimaryKey
 import org.pwharned.http.Identifier.Identifier
 import org.pwharned.http.PathSegment.PathSegment
-import org.pwharned.macros.HKD.{Id, Persisted}
-
-import scala.compiletime.{erasedValue, summonInline}
+import org.pwharned.http.{Headers, HttpRequest, HttpResponse, Segment}
+import org.pwharned.json.JsonSerializer
+import org.pwharned.route.Router.{Route, route}
+import org.pwharned.json.deserialize
+import org.pwharned.macros.toTuple
+import java.nio.charset.StandardCharsets
+import scala.compiletime.{constValue, erasedValue, summonInline}
+import scala.concurrent.{ExecutionContext, Future}
+import scala.deriving.Mirror
 import scala.util.{Failure, Success, Try}
 
 

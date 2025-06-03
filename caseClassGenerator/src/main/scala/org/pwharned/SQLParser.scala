@@ -5,7 +5,7 @@ object SQLParser extends Parse {
   implicit class ColumnOps(column: Column) {
     def toField: String = {
       val typeStr = column.nullable.getOrElse(true) match {
-        case true => s"Option[${column.dataType}]"
+        case true => s"Nullable[${column.dataType}]"
         case false => column.dataType
       }
 
@@ -39,7 +39,8 @@ object SQLParser extends Parse {
       nullable <- stringInsensitive("NULL").or(stringInsensitive("NOT NULL")) .optional
       _ <- whitespace
       primary_key <- stringInsensitive("PRIMARY KEY").optional
-
+      _ <- whitespace
+      identity <- stringInsensitive("GENERATED ALWAYS AS IDENTITY").optional
       _ <- whitespace
     } yield Column(name, DataType.fromString(dtype).get, nullable.map {
       case "NULL" => true
@@ -47,7 +48,13 @@ object SQLParser extends Parse {
     }, primary_key.map{
       case "PRIMARY KEY" => true
       case _ => false
-    } )
+    },
+      identity.map{
+      case "GENERATED ALWAYS AS IDENTITY" => true
+      case _ => false
+    }
+    
+    )
 
 
   val columnListParser: Parser[List[Column]] =

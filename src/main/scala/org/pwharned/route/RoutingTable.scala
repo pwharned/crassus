@@ -3,7 +3,7 @@ package org.pwharned.route
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
 import org.pwharned.http.HttpPath.{HttpPath}
 import org.pwharned.http.HttpRequest.HttpRequest
-import org.pwharned.macros.asPath
+import org.pwharned.http.asPath
 import org.pwharned.http.Identifier.Identifier
 import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse, Identifier, Segment}
 import org.pwharned.route.Router

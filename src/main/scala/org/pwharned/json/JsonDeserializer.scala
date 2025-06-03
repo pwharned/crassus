@@ -1,9 +1,10 @@
-package org.pwharned.macros
+package org.pwharned.json
 
-import generated.PrimaryKey
+import org.pwharned.database.HKD._
 import org.pwharned.parse.{Parse, ParseError}
-import scala.deriving.*
+
 import scala.compiletime.*
+import scala.deriving.*
 
 trait JsonDeserializer[T]:
   def deserialize(s: String): Either[ParseError, T]
@@ -14,14 +15,14 @@ object JsonDeserializer extends Parse:
   // Module: Primitives
   // ──────────────────────────────────────────────
   object Primitives:
-    def quotedString: Parser[String] =
+    inline def quotedString: Parser[String] =
       for {
         _ <- char('"')
-        s <- identifier
+        s <- stringInline
         _ <- char('"')
       } yield s
 
-    def intParser: Parser[Int] =
+    inline def intParser: Parser[Int] =
       input =>
         val neg = if input.startsWith("-") then "-" else ""
         val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
@@ -35,7 +36,7 @@ object JsonDeserializer extends Parse:
             case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
           }
 
-    def boolParser: Parser[Boolean] =
+    inline def boolParser: Parser[Boolean] =
       input =>
         if input.startsWith("true") then Right((true, input.drop("true".length)))
         else if input.startsWith("false") then Right((false, input.drop("false".length)))
@@ -61,6 +62,9 @@ object JsonDeserializer extends Parse:
     given [T](using underlying: JsonFieldParser[T]): JsonFieldParser[PrimaryKey[T]] with
       def parser: Parser[PrimaryKey[T]] =
         underlying.parser.map(PrimaryKey(_))
+    given [T](using underlying: JsonFieldParser[T]): JsonFieldParser[Nullable[T]] with
+      def parser: Parser[Nullable[T]] =
+        underlying.parser.map(Nullable(_))
 
     // For Option[T], first check for "null"; otherwise delegate.
     given [T](using underlying: JsonFieldParser[T]): JsonFieldParser[Option[T]] with
@@ -165,3 +169,8 @@ object JsonDeserializer extends Parse:
                 Left(ParseError(0, s, s"Error constructing instance: ${e.getMessage}"))
           case Left(err) => Left(err)
         }
+        
+extension (s: String)
+  def deserialize[A <: Product](using j: JsonDeserializer[A]): Either[ParseError, A] = summon[JsonDeserializer[A]].deserialize(s)
+
+

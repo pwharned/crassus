@@ -6,7 +6,7 @@ import org.pwharned.SQLParser.ColumnOps
 object CaseClassGenerator  {
   def generateCaseClasses(): String = {
     // val lines = Source.fromFile(inputFile).getLines().toList
-    SQLParser.createTableParser("create table user(id integer not null primary key, name text not null, test text)") match {
+    SQLParser.createTableParser("create table user(id integer not null primary key generated always as identity, name text not null, test text)") match {
       case Left(value) => throw new Exception(value.message)
       case Right(value) =>
         s"""

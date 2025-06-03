@@ -1,7 +1,9 @@
-package org.pwharned.macros
+package org.pwharned.database
+
+import org.pwharned.database.HKD.PrimaryKey
+
 import scala.compiletime.*
 import scala.deriving.*
-import generated.PrimaryKey
 
 object PrimaryKeyExtractor:
   inline def getPrimaryKey[T <: Product](using m: Mirror.ProductOf[T]): Seq[String] =

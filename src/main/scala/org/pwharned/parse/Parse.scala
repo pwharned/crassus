@@ -58,6 +58,10 @@ trait Parse:
     val id = input.takeWhile(c => c.isLetterOrDigit || c == '_')
     Right((id, input.drop(id.length)))
 
+  def stringInline: Parser[String] = input =>
+    val id = input.takeWhile(c => c!= '"')
+    Right((id, input.drop(id.length)))
+
 
 
 trait ParseBuffer:

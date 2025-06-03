@@ -115,3 +115,4 @@ object HttpRequest:
     def body: ByteBuffer = bodyBuffer
 
     def parse: Option[HttpRequest] = Some(req)
+extension (b: java.nio.ByteBuffer) def asRequest: Option[HttpRequest.HttpRequest] = HttpRequest.HttpRequest.fromFullBuffer(b)

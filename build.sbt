@@ -1,18 +1,17 @@
 
 ThisBuild / version := "0.1.0-SNAPSHOT"
 libraryDependencies += "com.ibm.db2" % "jcc" % "11.5.8.0"
-ThisBuild / scalacOptions +="-Ystatistics"
 lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
   .settings(
     name := "caseClassGenerator",
     scalaVersion := "2.13.16"
   )
-scalacOptions ++= Seq(
+ThisBuild/ scalacOptions ++= Seq(
   "-deprecation",
   "-encoding", "UTF-8",
   "-feature",
   "-unchecked",
-  "-Ystatistics"
+  "-Ystatistics",
 )
 lazy val root = project.in(file("."))
   .settings(
@@ -37,12 +36,7 @@ lazy val root = project.in(file("."))
       val code  =
         s"""
            |package generated
-           |opaque type PrimaryKey[X] = X
-           |
-           |object PrimaryKey:
-           |  def apply[X](x: X): PrimaryKey[X] = x
-           |
-           |  given [T]: Conversion[T, PrimaryKey[T]] = x => PrimaryKey(x)
+           |import org.pwharned.database.HKD._
            |
            |$generatedCode
            |"""

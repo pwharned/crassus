@@ -1,8 +1,11 @@
 package org.pwharned
 
 import generated.user
-import generated.PrimaryKey
-import org.pwharned.macros.{Db2TypeMapper, DbTypeMapper, PrimaryKeyFields, RandomGenerator, values, bindValues, classFieldTypes, createTable, createTableAsync, deleteAsync, insert, insertAsync, listToTuple, query, select, serialize, streamQuery, update, updateAsync}
+import org.pwharned.database.{Db2TypeMapper, DbTypeMapper, PrimaryKeyFields, RandomGenerator}
+import org.pwharned.database.HKD.*
+import org.pwharned.json.serialize
+import org.pwharned.database.{createTable, insert, query, deleteAsync, streamQuery, updateAsync}
+import org.pwharned.macros.listToTuple
 
 import scala.concurrent.duration.*
 import scala.compiletime.{erasedValue, summonInline}
@@ -15,7 +18,13 @@ given ExecutionContext = ExecutionContext.fromExecutor(executor) // Use virtual 
 import scala.compiletime.{erasedValue, summonInline}
 
 
-
+def timed[A](block: => A): A =
+  val start = System.nanoTime
+  val result = block
+  val end = System.nanoTime
+  val elapsedMs = (end - start) / 1000000.0
+  println(f"Elapsed time: $elapsedMs%.3f ms")
+  result
 given db: DbTypeMapper = Db2TypeMapper
 
 def getDbConnection(): java.sql.Connection = {
@@ -32,35 +41,35 @@ def test:Unit =
 
 
   // Ensure table exists (for testing)
-  conn.createTable[user]
+  conn.createTable[user[Id]]
   
 
   (0 to 100).iterator.foreach {
     x => {
-      val u = summon[RandomGenerator[user]].generate // generate a random user
-      val u2 = summon[RandomGenerator[user]].generate // generate some random values for update
-      val u3 = user(u.id, u2.name, u2.test) // new user with same id as inserted user, but different random values
-      val r: user  = conn.insert[user](u).next() // insert
+      val u = summon[RandomGenerator[user[Id]]].generate // generate a random user
+      val u2 = summon[RandomGenerator[user[Id]]].generate // generate some random values for update
+      val r: user[Id]  = conn.insert[user[Id]](u).next() // insert
+      val u3 = user(r.id, u2.name, u2.test) // new user with same id as inserted user, but different random values
 
-      val r2: user = Await.result(conn.updateAsync[user](u3), 10.seconds).next() // update
+      val r2: user[Id] = Await.result(conn.updateAsync[user[Id]](u3), 10.seconds).next() // update
       assert(r!=r2) // assert that the update user is different
 
     }
   }
-  val userStream = conn.query[user]// select the updated values
+  val userStream = conn.query[user[Id]]// select the updated values
 
   val startTime = System.nanoTime()
   userStream.foreach( x =>
 {     
-      val userPrimaryKey: PrimaryKeyFields[user]#Out = Tuple1(PrimaryKey(x.id.toString)).asInstanceOf[PrimaryKeyFields[user]#Out]
+      val userPrimaryKey: PrimaryKeyFields[user[Id]]#Out = Tuple1(PrimaryKey(x.id.toString)).asInstanceOf[PrimaryKeyFields[user[Id]]#Out]
       println(x.serialize)
-  val myt = listToTuple[Tuple1[Int]](List("1"))
-  //val r4 = Await.result(conn.deleteAsync[user](userPrimaryKey), 10.seconds) // delete the user
+  
+  //val r4 = Await.result(conn.deleteAsync[user[Id]](userPrimaryKey), 10.seconds) // delete the user
     }
 )
 
 
   
 
-  val finalUsers = conn.streamQuery[user](batchSize = 5000).apply(conn)
+  val finalUsers = conn.streamQuery[user[Id]](batchSize = 5000).apply(conn)
   //println( (System.nanoTime() - startTime)/ 1000000)

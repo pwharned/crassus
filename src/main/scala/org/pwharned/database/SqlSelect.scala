@@ -1,9 +1,11 @@
-package org.pwharned.macros
+package org.pwharned.database
 
-import scala.deriving.*
+import org.pwharned.database.summonFieldTypes
+import HKD.*
+
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
-import org.pwharned.macros.HKD.*
+import scala.deriving.*
 
 trait SqlSelect[T] {
   def names: List[String]
@@ -31,13 +33,20 @@ object SqlSelect:
           case (label, "String") => rs.getString(label)
           case (label, "Option[String]") => Option(rs.getString(label))
           case (label, "Int") => rs.getInt(label)
+          case (label, "Option[Int]") => Option(rs.getInt(label))
+          case (label, "Option[Boolean]") => Option(rs.getBoolean(label))
           case (label, "Boolean") => rs.getBoolean(label)
+          case (label, "Option[Double]") => Option(rs.getDouble(label))
           case (label, "Double") => rs.getDouble(label)
           case (label, "Float") => rs.getFloat(label)
+          case (label, "Option[Float]") => Option(rs.getFloat(label))
+          case (label, "Option[Long]") => Option(rs.getLong(label))
           case (label, "Long") => rs.getLong(label)
+          case (label, "Option[Short]") => Option(rs.getShort(label))
           case (label, "Short") => rs.getShort(label)
+          case (label, "Option[Byte]") => Option(rs.getByte(label))
           case (label, "Byte") => rs.getByte(label)
-          case _ => throw new IllegalArgumentException(s"Unsupported field type")
+          case (label, x: String) => throw new IllegalArgumentException(s"Unsupported field type $x")
         }
 
         // Convert to Tuple for Mirror's apply method
@@ -59,4 +68,9 @@ object SqlSelect:
 
     }
   }
+
+extension [T<:Product](entity: T)(using sql: SqlSelect[T])
+  def fields: List[String] = summon[SqlSelect[T]].names
+  def select: String = summon[SqlSelect[T]].select
+  def classFieldTypes: List[String] = summon[SqlSelect[T]].getClassesFieldType
 

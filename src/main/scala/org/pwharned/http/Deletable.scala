@@ -1,15 +1,16 @@
-package org.pwharned.macros
+package org.pwharned.http
 
-import org.pwharned.database.Database
-import org.pwharned.http.{Headers, HttpRequest, HttpResponse, Segment}
+import org.pwharned.database.HKD.{Id, New, Persisted}
+import org.pwharned.database.{Database, PrimaryKeyExtractor, delete, PrimaryKeyFields, SqlDelete}
 import org.pwharned.http.HttpMethod.{DELETE, GET, HttpMethod, POST}
-import org.pwharned.macros.HKD.{Id, New, Persisted}
+import org.pwharned.http.{Headers, HttpRequest, HttpResponse, Segment}
+import org.pwharned.json.JsonSerializer
 import org.pwharned.route.Router.{Route, route}
-
+import org.pwharned.macros.toTuple
 import java.nio.charset.StandardCharsets
+import scala.compiletime.constValue
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.Mirror
-import scala.compiletime.constValue
 import scala.util.{Failure, Success}
 
 

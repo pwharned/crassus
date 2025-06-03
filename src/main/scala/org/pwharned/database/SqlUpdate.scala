@@ -1,6 +1,8 @@
-package org.pwharned.macros
-import scala.deriving.*
+package org.pwharned.database
+
+
 import scala.compiletime.*
+import scala.deriving.*
 
 trait SqlUpdate[T]:
   def updateStatement(obj: T): String
@@ -40,5 +42,10 @@ object SqlUpdate:
         // Concatenating the sequences in the right order
 
       }
+
+
+extension[T <: Product] (entity: T) (using sql: SqlUpdate[T], sqlDelete: SqlDelete[T] )
+  def updateStatement(): String = summon[SqlUpdate[T]].updateStatement(entity)
+  def bindValues: Seq[Any] = summon[SqlUpdate[T]].bindValues(entity)
 
 
