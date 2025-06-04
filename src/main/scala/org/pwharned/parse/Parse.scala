@@ -29,6 +29,7 @@ trait Parse:
         case Right((value, rest)) =>
           many(rest).map { case (values, remaining) => (value :: values, remaining) }
         case Left(_) => Right((Nil, input))
+        
 
     inline def optional: Parser[Option[A]] = input =>
       p(input) match
@@ -62,6 +63,12 @@ trait Parse:
     val id = input.takeWhile(c => c!= '"')
     Right((id, input.drop(id.length)))
 
+  def token[A](p: Parser[A]): Parser[A] =
+    for {
+      _ <- whitespace
+      a <- p
+      _ <- whitespace
+    } yield a
 
 
 trait ParseBuffer:

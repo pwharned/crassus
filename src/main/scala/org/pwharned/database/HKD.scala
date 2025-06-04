@@ -1,6 +1,7 @@
 package org.pwharned.database
 
 import org.pwharned.database.HKD.PrimaryKey
+import org.pwharned.json.{JsonDeserializer, deserialize}
 
 import scala.language.postfixOps
 import scala.language.implicitConversions
@@ -121,30 +122,9 @@ object HKD:
   type Persisted[T[_[_]]] = T[PersistedField]
 
 
+  object Conversions:
+    given [A]: Conversion[A, Option[A]] = (a: A) => Some(a)
+
 end HKD
 
-given [A]: Conversion[A, Option[A]] = (a: A) => Some(a)
 
-@main def demoHKD() = {
-  import HKD.*
-  case class User[F[_]](
-                         id: F[PrimaryKey[Int]],
-                         name: F[Nullable[String]], test: F[String]
-                       )
-
-
-  // Create a "new" user when receiving a request.
-  // The primary key is absent (None) and the name is wrapped in Some.
-
-  // Create a "persisted" user that might be fetched from the database.
-  // The id is present as PrimaryKey(123) and the name is a plain String.
-  val newUser: New[User] = User(None, "Alice", "Hello")
-  val updatedUser: Updated[User] = User(None, "Alice", "Hello")
-  val persistedUser: Persisted[User] = User(1, "Alice", "Hello")
-
-
-  println(s"Persisted user (from DB): $persistedUser")
-
-
-
-}

@@ -5,6 +5,14 @@ import org.pwharned.parse.{Parse, ParseError}
 
 import scala.compiletime.*
 import scala.deriving.*
+import scala.quoted._
+import org.pwharned.database.HKD.~>.idToId
+
+inline def showTypeMacro[T]: String = ${ showTypeMacroImpl[T] }
+
+def showTypeMacroImpl[T: Type](using Quotes): Expr[String] =
+  import quotes.reflect._
+  Expr(TypeRepr.of[T].show)
 
 trait JsonDeserializer[T]:
   def deserialize(s: String): Either[ParseError, T]
@@ -87,6 +95,8 @@ object JsonDeserializer extends Parse:
       _     <- char(':')
       _     <- whitespace
       value <- valueParser
+      _ <- comma.optional
+      _ <- whitespace
     } yield value
 
   // If a key is missing, return None without consuming input.
@@ -98,13 +108,16 @@ object JsonDeserializer extends Parse:
         Right((None, input))
 
   // Selects the correct parser based on field type.
-  inline def fieldParser[h](key: String): Parser[h] =
+  inline def fieldParser[h](key: String): Parser[h] = {
     inline erasedValue[h] match {
       case _: Option[t] =>
+
         optKeyValuePair(key, summonInline[JsonFieldParser[t]].parser).asInstanceOf[Parser[h]]
       case _ =>
         keyValuePair(key, summonInline[JsonFieldParser[h]].parser)
     }
+  }
+  
 
   // ──────────────────────────────────────────────
   // Module: Case-Class Derivation via Tuple Recursion
@@ -119,25 +132,12 @@ object JsonDeserializer extends Parse:
         val tailNames = fieldNames.tail
         input =>
           headParser(input) match {
-            case Left(err) => Left(err)
-            case Right((hValue, r)) =>
-              // Conditionally consume comma:
-              val nextInputEither: Either[ParseError, String] =
-                hValue match {
-                  // If the field is optional and missing, do NOT try to match a comma.
-                  //case opt: Option[?] if opt.isEmpty => Right(r)
-                  case None => Right(r)
-                  case _ =>
-                    if tailNames.isEmpty then Right(r)
-                    else comma(r).map { case (_, afterComma) => afterComma }
-                }
-              nextInputEither.flatMap { rAfter =>
-                deriveParsers[t](tailNames)(rAfter) match {
-                  case Left(err) => Left(err)
-                  case Right((tValues, rFinal)) =>
-                    Right((hValue *: tValues).asInstanceOf[T], rFinal)
-                }
-              }
+            case Left(err) =>Left(err)
+            case Right((hValue, r)) =>             deriveParsers[t](tailNames)(r) match {
+              case Left(err) => Left(err)
+              case Right((tValues, rFinal)) => Right((hValue *: tValues).asInstanceOf[T], rFinal)
+            }
+
           }
 
   // ──────────────────────────────────────────────
