@@ -22,9 +22,9 @@ def main(): Unit =
   given DbTypeMapper = Db2TypeMapper
 
 
-  inline def r: Route[HttpMethod] = route(GET, "/health/ping/{ping_id}/details/{details_id}".asPath, (req: HttpRequest) => Future(HttpResponse.ok("Ok")))
-  inline def userRoutes =RouteRegistry.getRoutes[user]
-  inline def table: RoutingTable.RoutingTable = RoutingTable.build(userRoutes)
+  inline def r: Route[HttpMethod] = route(GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
+  inline def userRoutes =RouteRegistry.getRoutes[user] :+ r
+  inline def table: RoutingTable.RoutingTable = RoutingTable.build(userRoutes )
   println(table)
   HTTPServer.start(8080, table)
 
