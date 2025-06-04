@@ -2,6 +2,7 @@
 package org.pwharned
 import org.pwharned.parse.ParseBuffer
 import org.pwharned.parse.ParseBuffer.{flatMap, map}
+import scala.language.implicitConversions
 import java.nio.ByteBuffer
 @main
 def testParse(): Unit =
@@ -75,4 +76,14 @@ def testParse(): Unit =
   completeUser match {
     case Left(value) => throw Exception("This should not have failed, user is complete " + value.message + " " + value.input)
     case Right(value) => println("Succesful parsing")
+  }
+  
+  val test =    """ {"name":"myname"} """
+  case class User2[F[_]](
+                         name: F[Nullable[String]]
+                       )
+  timed{
+    (0 to 10000000).foreach{
+      x => test.deserialize[Persisted[User2]]
+    }
   }

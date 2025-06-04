@@ -13,7 +13,7 @@ fn main() {
     // Start the timer.
     let start = Instant::now();
 
-    for i in 0..10000000 {
+    for i in 0..10000000    {
     // Parse the JSON string into our Person struct.
     let person: Person =
         serde_json::from_str(json_str).expect("Failed to parse JSON");

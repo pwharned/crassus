@@ -16,11 +16,19 @@ object SqlUpdate:
       def updateStatement(obj: T): String =
         val tableName = constValue[m.MirroredLabel]
         val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
+        // Extract values using productIterator
+        val values = obj.productIterator.toList
 
+        // Filter out fields with None or null values
+        val nonPrimaryFields = fields.zip(values).collect {
+          case (name, value) if value != None => s"$name = ?"
+        }.mkString(", ")
+        
         val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T].map (x=> s" $x = ? ").mkString(" AND ")
-        val nonPrimaryFields = fields.filter( x=>  !primaryKey.contains(x) ).map(name => s"$name = ?").mkString(", ")
 
-        s"SELECT * FROM FINAL TABLE(UPDATE $tableName SET $nonPrimaryFields WHERE $primaryKey )"
+        val sql = s"SELECT * FROM FINAL TABLE(UPDATE $tableName SET $nonPrimaryFields WHERE $primaryKey )"
+        println(sql)
+        sql
 
       def bindValues(obj: T): Seq[Any] = {
         val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
@@ -54,11 +62,11 @@ object SqlUpdate:
 
         val primaryKeyValue = a.productIterator
 
-        (updateValues ++ primaryKeyValue) map {
-          case None => null // Handle Option[None] correctly
+        (updateValues ++ primaryKeyValue) collect {
+          //case None => null // Handle Option[None] correctly
           case Some(v) => v // Extract value from Option[T]
-          case other => other // Use raw value for primitives
-        }
+          case other if other != None => other // Use raw value for primitives, excluding nulls
+                }
 
       }
 
