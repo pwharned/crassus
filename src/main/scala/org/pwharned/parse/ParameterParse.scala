@@ -1,4 +1,4 @@
-package org.pwharned.json
+package org.pwharned.parse
 
 import org.pwharned.database.HKD.{Nullable, PrimaryKey}
 import org.pwharned.parse.{Parse, ParseError, Primitives}
@@ -6,47 +6,38 @@ import org.pwharned.parse.{Parse, ParseError, Primitives}
 import scala.compiletime.*
 import scala.deriving.*
 import scala.quoted.*
-import org.pwharned.database.HKD.~>.idToId
 
-inline def showTypeMacro[T]: String = ${ showTypeMacroImpl[T] }
 
-def showTypeMacroImpl[T: Type](using Quotes): Expr[String] =
-  import quotes.reflect._
-  Expr(TypeRepr.of[T].show)
-
-trait JsonDeserializer[T]:
+trait QueryDeserializer[T]:
   def deserialize(s: String): Either[ParseError, T]
 
-object JsonDeserializer extends Parse:
+object QueryDeserializer extends Parse:
 
-  trait JsonFieldParser[A]:
+  trait QueryFieldDeserializer[A]:
     def parser: Parser[A]
 
-  object JsonFieldParser:
-    given JsonFieldParser[String] with
-      def parser: Parser[String] = Primitives.quotedString
+  object QueryFieldDeserializer:
+    given QueryFieldDeserializer[String] with
+      def parser: Parser[String] = Primitives.stringNoAmpersand
 
-    given JsonFieldParser[Int] with
+    given QueryFieldDeserializer[Int] with
       def parser: Parser[Int] = Primitives.intParser
 
-    given JsonFieldParser[Boolean] with
+    given QueryFieldDeserializer[Boolean] with
       def parser: Parser[Boolean] = Primitives.boolParser
 
     // Wrap a parsed T into PrimaryKey[T]
-    given [T](using underlying: JsonFieldParser[T]): JsonFieldParser[PrimaryKey[T]] with
+    given [T](using underlying: QueryFieldDeserializer[T]): QueryFieldDeserializer[PrimaryKey[T]] with
       def parser: Parser[PrimaryKey[T]] =
         underlying.parser.map(PrimaryKey(_))
-    given [T](using underlying: JsonFieldParser[T]): JsonFieldParser[Nullable[T]] with
+    given [T](using underlying: QueryFieldDeserializer[T]): QueryFieldDeserializer[Nullable[T]] with
       def parser: Parser[Nullable[T]] =
         underlying.parser.map(Nullable(_))
 
     // For Option[T], first check for "null"; otherwise delegate.
-    given [T](using underlying: JsonFieldParser[T]): JsonFieldParser[Option[T]] with
+    given [T](using underlying: QueryFieldDeserializer[T]): QueryFieldDeserializer[Option[T]] with
       def parser: Parser[Option[T]] = input =>
         val trimmed = input.trim
-        if trimmed.startsWith("null") then
-          Right((Some(null.asInstanceOf[T]), trimmed.drop("null".length)))
-        else
           underlying.parser(input) match {
             case Right((value, rest)) => Right((Some(value), rest))
             case Left(err)            => Left(err)
@@ -55,35 +46,35 @@ object JsonDeserializer extends Parse:
   // A helper that parses a key/value pair.
   def keyValuePair[A](key: String, valueParser: Parser[A]): Parser[A] =
     for {
-      _     <- char('"')
       _     <- string(key)
-      _     <- char('"')
-      _     <- char(':')
-      _     <- whitespace
+      _     <- char('=')
       value <-valueParser
-      _ <- comma.optional
-      _ <- whitespace
+      _ <- char('&').optional
     } yield value
 
   // If a key is missing, return None without consuming input.
   def optKeyValuePair[A](key: String, valueParser: Parser[A]): Parser[Option[A]] =
     input =>
-      if input.trim.startsWith("\"" + key + "\"") then
+      // Check if the input starts with the expected key followed by '='.
+      if (input.trim.startsWith(key + "=")) {
+        // Parse the key-value pair and wrap the result in Some.
         keyValuePair(key, valueParser)(input).map { case (v, rest) => (Some(v), rest) }
-      else
+      } else {
+        // The key is not present, so return None and don't consume input.
         Right((None, input))
+      }
 
   // Selects the correct parser based on field type.
   inline def fieldParser[h](key: String): Parser[h] = {
     inline erasedValue[h] match {
       case _: Option[t] =>
 
-        optKeyValuePair(key, summonInline[JsonFieldParser[t]].parser).asInstanceOf[Parser[h]]
+        optKeyValuePair(key, summonInline[QueryFieldDeserializer[t]].parser).asInstanceOf[Parser[h]]
       case _ =>
-        keyValuePair(key, summonInline[JsonFieldParser[h]].parser)
+        keyValuePair(key, summonInline[QueryFieldDeserializer[h]].parser)
     }
   }
-  
+
 
   inline def deriveParsers[T <: Tuple](fieldNames: List[String]): Parser[T] =
     inline erasedValue[T] match
@@ -103,8 +94,8 @@ object JsonDeserializer extends Parse:
 
           }
 
-  inline given derived[T <: Product](using m: Mirror.ProductOf[T]): JsonDeserializer[T] =
-    new JsonDeserializer[T]:
+  inline given derived[T <: Product](using m: Mirror.ProductOf[T]): QueryDeserializer[T] =
+    new QueryDeserializer[T]:
       def deserialize(s: String): Either[ParseError, T] =
         // Get names from the case class at compile time.
         val fieldNames: List[String] =
@@ -112,26 +103,22 @@ object JsonDeserializer extends Parse:
         // Build a JSON object parser:
         val parser: Parser[m.MirroredElemTypes] =
           for {
-            _      <- whitespace
-            _      <- char('{')
-            _      <- whitespace
+            _      <- char('?').optional
             values <- deriveParsers[m.MirroredElemTypes](fieldNames)
-            _      <- whitespace
-            _      <- char('}')
           } yield values
 
         parser(s) match {
           case Right((tuple, remaining)) =>
             if remaining.trim.nonEmpty then
-              Left(ParseError(0, remaining, "Extra input after JSON"))
+              Left(ParseError(0, remaining, "Extra input in Query String"))
             else
               try Right(m.fromTuple(tuple))
               catch case e: Exception =>
                 Left(ParseError(0, s, s"Error constructing instance: ${e.getMessage}"))
           case Left(err) => Left(err)
         }
-        
+
 extension (s: String)
-  def deserialize[A <: Product](using j: JsonDeserializer[A]): Either[ParseError, A] = summon[JsonDeserializer[A]].deserialize(s)
+  def fromQuery[A <: Product](using j: QueryDeserializer[A]): Either[ParseError, A] = summon[QueryDeserializer[A]].deserialize(s)
 
 

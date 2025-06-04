@@ -13,6 +13,8 @@ trait SqlSelect[T] {
   def name: String
   def select: String
   def selectWhere: String
+  def selectWhere(ob:T): String
+  def bindValuesOb(ob: T): Seq[Any]
   def getClassesFieldType: List[String]
   def fromResultSet(rs: java.sql.ResultSet): T
   def bindValues(a: PrimaryKeyFields[T]#Out): Seq[Any]

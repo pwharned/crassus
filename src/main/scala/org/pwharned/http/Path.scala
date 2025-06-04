@@ -1,6 +1,7 @@
 package org.pwharned.http
 import org.pwharned.http.HttpPath.HttpPath
 
+import scala.annotation.tailrec
 import scala.language.implicitConversions
 import scala.quoted.*
 
@@ -42,6 +43,8 @@ object HttpPath:
       .toList
 
     HttpPath(parts)
+  @tailrec
+  def filter(f: HttpPath => HttpPath): HttpPath = HttpPath.filter(f)
   extension (hp: HttpPath)
     def segments: List[Segment] = hp
 

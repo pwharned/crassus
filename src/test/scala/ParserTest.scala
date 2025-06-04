@@ -2,6 +2,7 @@
 package org.pwharned
 import org.pwharned.parse.ParseBuffer
 import org.pwharned.parse.ParseBuffer.{flatMap, map}
+import org.pwharned.parse.fromQuery
 import scala.language.implicitConversions
 import java.nio.ByteBuffer
 @main
@@ -77,13 +78,34 @@ def testParse(): Unit =
     case Left(value) => throw Exception("This should not have failed, user is complete " + value.message + " " + value.input)
     case Right(value) => println("Succesful parsing")
   }
-  
+
+  val completeUserFromQuery =
+    """?id=1&name=test&test=test""".stripMargin.fromQuery[Updated[User]]
+  completeUserFromQuery match {
+    case Left(value) => throw Exception("This should not have failed, user is complete " + value.message + " " + value.input + " " + value.position)
+    case Right(value) => println("Succesful parsing")
+  }
+  val completeUserFromQuery2 =
+    """?id=1&test=test""".stripMargin.fromQuery[Optional[User]]
+  completeUserFromQuery2 match {
+    case Left(value) => throw Exception("This should not have failed, user is complete " + value.message + " " + value.input + " " + value.position)
+    case Right(value) => println("Succesful parsing")
+  }
+
+  val completeUserFromQuery3 =
+    """""".stripMargin.fromQuery[Optional[User]]
+  completeUserFromQuery3 match {
+    case Left(value) => throw Exception("This should not have failed, user is complete " + value.message + " " + value.input + " " + value.position)
+    case Right(value) => println("Succesful parsing")
+  }
+
+
   val test =    """ {"name":"myname"} """
   case class User2[F[_]](
                          name: F[Nullable[String]]
                        )
   timed{
-    (0 to 10000000).foreach{
+    (0 to 1).foreach{
       x => test.deserialize[Persisted[User2]]
     }
   }

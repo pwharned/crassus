@@ -39,6 +39,11 @@ extension (db: org.pwharned.database.Database.type )
 
       x => x.query[A](a)
     }
+  inline def retrieveParameterized[A <: Product](a: A)(using sql: SqlSelect[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[A]]] =
+    db.pool.withConnection {
+
+      x => x.queryParameterized[A](a)
+    }
   inline def create[A<:Product](a: A)(using sql: SqlSelect[A], sqlInsert: SqlInsert[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[A]]] =
     db.pool.withConnection {
 
@@ -163,6 +168,14 @@ extension (con: java.sql.Connection)
   inline def query[A <: Product](a:PrimaryKeyFields[A]#Out)(using sql: SqlSelect[A]): Iterator[A] =
     val stmt = con.prepareStatement(sql.selectWhere)
     val bindValues = sql.bindValues(a)
+    bindValues.zipWithIndex.foreach { case (value, index) =>
+      stmt.setObject(index + 1, value) // Bind each parameter safely
+    }
+    val rs = stmt.executeQuery()
+    Iterator.continually(rs.next()).takeWhile(identity).map(x => rs.as[A])
+  inline def queryParameterized[A <: Product](a:A )(using sql: SqlSelect[A]): Iterator[A] =
+    val stmt = con.prepareStatement(sql.selectWhere (a) )
+    val bindValues = sql.bindValuesOb(a)
     bindValues.zipWithIndex.foreach { case (value, index) =>
       stmt.setObject(index + 1, value) // Bind each parameter safely
     }

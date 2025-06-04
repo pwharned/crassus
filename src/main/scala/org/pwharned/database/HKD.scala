@@ -108,7 +108,11 @@ object HKD:
     case PrimaryKey[t] => Option[PrimaryKey[t]]
     case Nullable[t] => Option[t]
     case _ => A
-
+  type OptionalField[A] = A match
+    case PrimaryKey[t] => Option[PrimaryKey[t]]
+    case Nullable[t] => Option[t]
+    case Option[t] => Option[t]
+    case _ => Option[A]
   type UpdatedField[A] = A match
     case PrimaryKey[t] => Option[PrimaryKey[t]]
     case Nullable[t] => Option[t]
@@ -120,6 +124,7 @@ object HKD:
   type New[T[_[_]]] = T[NewField]
   type Updated[T[_[_]]] = T[UpdatedField]
   type Persisted[T[_[_]]] = T[PersistedField]
+  type Optional[T[_[_]]] = T[OptionalField]
 
 
   object Conversions:

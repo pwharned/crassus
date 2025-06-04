@@ -1,12 +1,13 @@
 package org.pwharned.http
 
-import org.pwharned.database.HKD._
-import org.pwharned.database.{Database, PrimaryKeyExtractor, PrimaryKeyFields, SqlSelect, retrieve}
+import org.pwharned.database.HKD.*
+import org.pwharned.database.{Database, PrimaryKeyExtractor, PrimaryKeyFields, SqlSelect, retrieve, retrieveParameterized}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
 import org.pwharned.http.{Headers, HttpRequest, HttpResponse}
 import org.pwharned.json.{JsonSerializer, serialize}
 import org.pwharned.macros.toTuple
 import org.pwharned.route.Router.{Route, route}
+import org.pwharned.parse.{QueryDeserializer, fromQuery}
 
 import scala.compiletime.constValue
 import scala.concurrent.ExecutionContext
@@ -21,20 +22,34 @@ trait Retrievable[T]:
 
 
 object Retrievable:
-  inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[Persisted[T]], m2: Mirror.ProductOf[T[Id]], sqlSelect: SqlSelect[T[Id]], serializer: JsonSerializer[T[Id]]): Retrievable[T[Id]] =
+  inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[Persisted[T]], m2: Mirror.ProductOf[T[Id]], sqlSelect: SqlSelect[T[Id]], queryDeserializer: QueryDeserializer[Optional[T]], serializer: JsonSerializer[T[Id]]): Retrievable[T[Id]] =
     new Retrievable[T[Id]]:
       def get(using ec: ExecutionContext): Route[HttpMethod]  =
         val tableName = constValue[m.MirroredLabel]
         route(GET, s"/api/$tableName".toPath,(req: HttpRequest.HttpRequest) => {
+
+          val p = req.path
+          val idx = p.indexOf('?')
+          val queryString = if idx >= 0 && idx < p.length - 1 then p.substring(idx + 1) else ""
+          queryString.stripMargin.fromQuery[Optional[T]] match {
+            case Left(value)  =>
+              Database.retrieve[T].map( x => x.map(y => y.serialize) match {
+                case Failure(exception) => HttpResponse.error(exception.toString)
+                case Success(value) => HttpResponse.ok(value,Headers.apply(Map("content-type" -> "Application/json")))
+              }      )
+            case Right(value) =>
+              Database.retrieveParameterized[T[Id]](value.asInstanceOf[T[Id]]).map( x => x.map(y => y.serialize) match {
+                case Failure(exception) => HttpResponse.error(exception.toString)
+                case Success(value) => HttpResponse.ok(value,Headers.apply(Map("content-type" -> "Application/json")))
+              }      )
           
           
-          
-          
-          Database.retrieve[T].map( x => x.map(y => y.serialize) match {
-            case Failure(exception) => HttpResponse.error(exception.toString)
-            case Success(value) => HttpResponse.ok(value,Headers.apply(Map("content-type" -> "Application/json")))
-          }      )
-        }   )
+          }
+
+        }
+
+
+        )
 
       def getWhere(using ec: ExecutionContext): Route[HttpMethod] =
         val tableName = constValue[m.MirroredLabel]
@@ -59,5 +74,4 @@ object Retrievable:
             Database.retrieve[T[Id]](b)
           }
         })
-        
-        
+

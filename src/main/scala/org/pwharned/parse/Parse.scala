@@ -99,3 +99,43 @@ trait ParseBuffer:
 
 
 object ParseBuffer extends  ParseBuffer
+
+
+// ──────────────────────────────────────────────
+object Primitives extends Parse:
+  inline def quotedString: Parser[String] =
+    for {
+      _ <- char('"')
+      s <- stringInline
+      _ <- char('"')
+    } yield s
+  inline def stringNoAmpersand: Parser[String] = input =>
+    val id = input.takeWhile(c => c!= '&')
+    Right((id, input.drop(id.length)))
+
+  inline def nullParser[T]: Parser[Option[T]] =
+    for {
+      s <- string("null")
+    } yield Some(null).asInstanceOf[Option[T]]
+
+  inline def intParser: Parser[Int] =
+    input =>
+      val neg = if input.startsWith("-") then "-" else ""
+      val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
+      val digits = inputAfterNeg.takeWhile(_.isDigit)
+      if digits.isEmpty then Left(ParseError(0, input, "Expected integer"))
+      else
+        try {
+          val value = (neg + digits).toInt
+          Right((value, inputAfterNeg.drop(digits.length)))
+        } catch {
+          case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
+        }
+
+  inline def boolParser: Parser[Boolean] =
+    input =>
+      if input.startsWith("true") then Right((true, input.drop("true".length)))
+      else if input.startsWith("false") then Right((false, input.drop("false".length)))
+      else Left(ParseError(0, input, "Expected boolean"))
+      
+    
