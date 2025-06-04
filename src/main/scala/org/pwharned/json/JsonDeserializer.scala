@@ -29,7 +29,10 @@ object JsonDeserializer extends Parse:
         s <- stringInline
         _ <- char('"')
       } yield s
-
+    inline def nullParser[T]: Parser[Option[T]] =
+      for {
+        s <- string("null")
+      } yield Some(null).asInstanceOf[Option[T]]
     inline def intParser: Parser[Int] =
       input =>
         val neg = if input.startsWith("-") then "-" else ""
@@ -79,7 +82,7 @@ object JsonDeserializer extends Parse:
       def parser: Parser[Option[T]] = input =>
         val trimmed = input.trim
         if trimmed.startsWith("null") then
-          Right((None, trimmed.drop("null".length)))
+          Right((Some(null.asInstanceOf[T]), trimmed.drop("null".length)))
         else
           underlying.parser(input) match {
             case Right((value, rest)) => Right((Some(value), rest))
@@ -94,7 +97,7 @@ object JsonDeserializer extends Parse:
       _     <- char('"')
       _     <- char(':')
       _     <- whitespace
-      value <- valueParser
+      value <-valueParser
       _ <- comma.optional
       _ <- whitespace
     } yield value
