@@ -77,7 +77,7 @@ def sqlInsertImpl[T: Type](mExpr: Expr[Mirror.ProductOf[T]])(using q: Quotes): E
   '{
     new SqlInsert[T]:
       def insertStatement: String =
-      { println(${Expr(stmt)}); ${Expr(stmt)} }
+      {  ${Expr(stmt)} }
       def insertStatementNoReturn: String = ${Expr(stmtNoReturn)}
       def bindValues(obj: T): Seq[Any] =
       { $bindValuesExpr(obj) }

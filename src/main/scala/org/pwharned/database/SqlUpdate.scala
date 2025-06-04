@@ -27,7 +27,6 @@ object SqlUpdate:
         val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T].map (x=> s" $x = ? ").mkString(" AND ")
 
         val sql = s"SELECT * FROM FINAL TABLE(UPDATE $tableName SET $nonPrimaryFields WHERE $primaryKey )"
-        println(sql)
         sql
 
       def bindValues(obj: T): Seq[Any] = {

@@ -17,10 +17,8 @@ object FromString:
 inline def listToTuple[T <: Tuple](list: List[String]): T = {
   inline erasedValue[T] match
     case _: EmptyTuple =>
-      println(list)
       EmptyTuple.asInstanceOf[T]
     case _: (h *: t) =>
-      println("hello from " + list.head)
       // Convert the head string to type h
       val head: h = summonInline[FromString[h]].parse(list.head)
 

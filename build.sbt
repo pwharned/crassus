@@ -1,11 +1,22 @@
 
 ThisBuild / version := "0.1.0-SNAPSHOT"
 libraryDependencies += "com.ibm.db2" % "jcc" % "11.5.8.0"
+Compile / mainClass := Some("org.pwharned.main")
+
+//enablePlugins(ScalaNativePlugin)
+//nativeMode:= "release-fast"
+enablePlugins(GraalVMNativeImagePlugin)
 lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
   .settings(
     name := "caseClassGenerator",
     scalaVersion := "2.13.16"
   )
+graalVMNativeImageOptions ++= Seq(
+  "--allow-incomplete-classpath",
+  "-H:ResourceConfigurationFiles=../../resource-config.json",
+
+)
+
 ThisBuild/ scalacOptions ++= Seq(
   "-deprecation",
   "-encoding", "UTF-8",

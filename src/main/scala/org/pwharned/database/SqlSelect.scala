@@ -9,11 +9,13 @@ import scala.deriving.*
 
 trait SqlSelect[T] {
   def names: List[String]
+
   def name: String
   def select: String
+  def selectWhere: String
   def getClassesFieldType: List[String]
   def fromResultSet(rs: java.sql.ResultSet): T
-
+  def bindValues(a: PrimaryKeyFields[T]#Out): Seq[Any]
 }
 
 
@@ -67,6 +69,57 @@ object SqlSelect:
           }
 
         }
+      }
+
+      def selectWhere(obj: T): String =
+        val tableName = constValue[m.MirroredLabel]
+        val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
+        // Extract values using productIterator
+        val values = obj.productIterator.toList
+
+        // Filter out fields with None or null values
+        val where = fields.zip(values).collect {
+          case (name, value) if value != None => s"$name = ?"
+        }.mkString(" and ")
+
+
+        val sql = s"SELECT ${fields.mkString(",")} from $tableName where $where  "
+        sql
+        
+      def selectWhere: String = {
+        val tableName = constValue[m.MirroredLabel]
+        val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
+     
+        val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T].map(x => s" $x = ? ").mkString(" AND ")
+
+        val sql = s"SELECT ${fields.mkString(",")} from $tableName WHERE $primaryKey "
+        sql
+
+      }
+
+      def bindValuesOb(a: T): Seq[Any] = {
+        val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
+
+        val values = a.productIterator.toSeq
+
+        (values) collect {
+          ///case None => null // Handle Option[None] correctly
+          case Some(v) => v // Extract value from Option[T]
+          case other if other != None => other // Use raw value for primitives, excluding nulls
+        }
+
+      }
+      def bindValues(a: PrimaryKeyFields[T]#Out): Seq[Any] = {
+        val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
+        
+        val primaryKeyValue = a.productIterator.toSeq
+
+        (primaryKeyValue) collect {
+          //case None => null // Handle Option[None] correctly
+          case Some(v) => v // Extract value from Option[T]
+          case other if other != None => other // Use raw value for primitives, excluding nulls
+        }
+
       }
 
     }

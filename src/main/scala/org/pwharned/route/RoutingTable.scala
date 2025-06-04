@@ -118,33 +118,3 @@ end RoutingTable
 
 // Our RoutingTable is now indexed by the HttpMethod (each HTTP method gets its own tree).
 
-@main def testRoutingTable(): Unit =
-  import scala.concurrent.ExecutionContext.Implicits.global
-
-  // Define some example routes.
-  val route1: Route[HttpMethod] = route(
-    GET,
-    "/users/profile/{user_id}".asPath,
-    (req: HttpRequest) => Future(HttpResponse.ok("Profiles"))
-  )
-  val route2: Route[HttpMethod] = route(
-    GET,
-    "/users/ids".asPath,
-    (req: HttpRequest) => Future(HttpResponse.ok("Ids"))
-  )
-  val route3: Route[HttpMethod] = route(
-    GET,
-    "/users/friends".asPath,
-    (req: HttpRequest) => Future(HttpResponse.ok("friends"))
-  )
-
-  // Build the routing table. Note the explicit type parameter.
-  val routes: List[Route[HttpMethod]] = List(route1, route2, route3)
-  val routingTable: RoutingTable.RoutingTable = RoutingTable.build(routes)
-
-  // Test lookup for existing paths.
-  val foundUsersProfile = routingTable.find(GET, "/users/profile/4".asPath)
-  val foundUserIds      = routingTable.find(GET, "/users/ids".asPath)
-
-  println(s"Lookup users/profile (GET): ${foundUsersProfile}")
-  println(s"Lookup users/ids (GET): ${foundUserIds.isDefined}")

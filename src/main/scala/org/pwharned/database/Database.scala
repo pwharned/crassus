@@ -1,6 +1,6 @@
 package org.pwharned.database
 
-import org.pwharned.database.HKD.Persisted
+import org.pwharned.database.HKD.{Id, Persisted}
 import org.pwharned.http.{Headers, HttpResponse}
 import org.pwharned.json.{JsonSerializer, serialize}
 import org.pwharned.macros.*
@@ -32,6 +32,12 @@ extension (db: org.pwharned.database.Database.type )
     db.pool.withConnection {
 
       x => x.query[Persisted[T]]
+    }
+
+  inline def retrieve[A<: Product](a: PrimaryKeyFields[A]#Out)(using sql: SqlSelect[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[A]]] =
+    db.pool.withConnection {
+
+      x => x.query[A](a)
     }
   inline def create[A<:Product](a: A)(using sql: SqlSelect[A], sqlInsert: SqlInsert[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[A]]] =
     db.pool.withConnection {
@@ -152,6 +158,14 @@ extension (con: java.sql.Connection)
   inline def query[A <: Product](using sql: SqlSelect[A]): Iterator[A] =
     val stmt = con.prepareStatement(sql.select)
     
+    val rs = stmt.executeQuery()
+    Iterator.continually(rs.next()).takeWhile(identity).map(x => rs.as[A])
+  inline def query[A <: Product](a:PrimaryKeyFields[A]#Out)(using sql: SqlSelect[A]): Iterator[A] =
+    val stmt = con.prepareStatement(sql.selectWhere)
+    val bindValues = sql.bindValues(a)
+    bindValues.zipWithIndex.foreach { case (value, index) =>
+      stmt.setObject(index + 1, value) // Bind each parameter safely
+    }
     val rs = stmt.executeQuery()
     Iterator.continually(rs.next()).takeWhile(identity).map(x => rs.as[A])
 

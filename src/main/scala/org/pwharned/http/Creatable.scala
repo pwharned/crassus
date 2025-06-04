@@ -31,7 +31,6 @@ object Creatable:
           req.body.get(bytes)
           // Decode the bytes using the desired charset.
           val s = new String(bytes, StandardCharsets.UTF_8)
-          println(s)
           s.deserialize[New[T]] match
             case Left(value) => Future(HttpResponse.error(value.message))
             case Right(value) => {
