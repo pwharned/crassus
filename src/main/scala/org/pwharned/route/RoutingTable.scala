@@ -104,7 +104,7 @@ object RoutingTable:
 
 
   // We fix build so that it returns a RoutingTable specialized to IdentifierOrSegment.
-  def build(routes: List[Router.Route[HttpMethod]]): RoutingTable =
+  def build(routes: List[Router.Route[Protocal,HttpMethod]]): RoutingTable =
     routes.foldLeft(Map.empty[HttpMethod, Branch[Segment]]) { (acc, route) =>
       val currentTree = acc.getOrElse(
         route.method,

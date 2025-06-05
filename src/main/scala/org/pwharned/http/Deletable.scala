@@ -1,12 +1,14 @@
 package org.pwharned.http
 
 import org.pwharned.database.HKD.{Id, New, Persisted}
-import org.pwharned.database.{Database, PrimaryKeyExtractor, delete, PrimaryKeyFields, SqlDelete}
+import org.pwharned.database.{Database, PrimaryKeyExtractor, PrimaryKeyFields, SqlDelete, delete}
 import org.pwharned.http.HttpMethod.{DELETE, GET, HttpMethod, POST}
 import org.pwharned.http.{Headers, HttpRequest, HttpResponse, Segment}
 import org.pwharned.json.JsonSerializer
 import org.pwharned.route.Router.{Route, route}
 import org.pwharned.macros.toTuple
+import org.pwharned.route.{ConnectionHandler, Http, SocketWriter}
+
 import java.nio.charset.StandardCharsets
 import scala.compiletime.constValue
 import scala.concurrent.{ExecutionContext, Future}
@@ -15,15 +17,17 @@ import scala.util.{Failure, Success}
 
 
 trait Deletable[T]:
-  def delete(using ec: ExecutionContext): Route[HttpMethod] // renamed to delete for clarity
+  def delete(using ec: ExecutionContext): Route[Http, HttpMethod] // renamed to delete for clarity
 
 object Deletable:
   inline given derive[T[F[_]] <: Product](using
-                                          m: Mirror.ProductOf[T[Id]], // Use T[Id], the persisted type
-                                          sqlDelete: SqlDelete[T[Id]], // Must also work on T[Id]
-                                          serializer: JsonSerializer[T[Id]] // Likewise for the serializer
+                                          m: Mirror.ProductOf[T[Id]], 
+                                          sqlDelete: SqlDelete[T[Id]], 
+                                          serializer: JsonSerializer[T[Id]],
+                                         socketWriter: SocketWriter[Http],
+                                          connectionHandler: ConnectionHandler[Http]
                                          ): Deletable[T[Id]] = new Deletable[T[Id]]:
-    def delete(using ec: ExecutionContext): Route[HttpMethod] =
+    def delete(using ec: ExecutionContext): Route[Http, DELETE] =
       val tableName = constValue[m.MirroredLabel]
       // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
       val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[T[Id]].map(x => s"{$x}").mkString("/")
@@ -32,7 +36,7 @@ object Deletable:
         case (dynamic: Segment.Dynamic, index) => index
       }
 
-      route(DELETE, path, (req: HttpRequest.HttpRequest) => {
+      route[Http, DELETE](DELETE, path, (req: HttpRequest.HttpRequest) => {
         val keyStrings: List[String] =
           dynamicIndexes.map(req.path.segments.collect {
             case dynamic: Segment.Static => dynamic.segment.toString

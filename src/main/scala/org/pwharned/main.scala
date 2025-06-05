@@ -5,12 +5,12 @@ import org.pwharned.database.{Db2TypeMapper, DbTypeMapper, PrimaryKeyExtractor}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
 import org.pwharned.http.HttpRequest.HttpRequest
 import org.pwharned.http.HttpResponse
-import org.pwharned.database.HKD.{Id, Updated, New}
+import org.pwharned.database.HKD.{Id, New, Updated}
 import org.pwharned.http.asPath
 import org.pwharned.route.Router.{Route, route}
-import org.pwharned.route.{RouteRegistry, RoutingTable}
+import org.pwharned.route.{Http, RouteRegistry, RoutingTable}
 import org.pwharned.server.HTTPServer
-
+import org.pwharned.route.{httpWriter, httpConnection}
 import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -22,7 +22,7 @@ def main(): Unit =
   given DbTypeMapper = Db2TypeMapper
 
 
-  inline def r: Route[HttpMethod] = route(GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
+  inline def r: Route[Http, GET] = route[Http,GET](GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
   inline def userRoutes =RouteRegistry.getRoutes[user] :+ r
   inline def table: RoutingTable.RoutingTable = RoutingTable.build(userRoutes )
   println(table)

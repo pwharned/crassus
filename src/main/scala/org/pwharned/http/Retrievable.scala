@@ -8,23 +8,24 @@ import org.pwharned.json.{JsonSerializer, serialize}
 import org.pwharned.macros.toTuple
 import org.pwharned.route.Router.{Route, route}
 import org.pwharned.parse.{QueryDeserializer, fromQuery}
+import org.pwharned.route.{ConnectionHandler, Http, SocketWriter}
 
 import scala.compiletime.constValue
 import scala.concurrent.ExecutionContext
 import scala.deriving.Mirror
 import scala.util.{Failure, Success}
-
+import org.pwharned.route.Router.given_Conversion_Route_Route
 
 trait Retrievable[T]:
-  def get(using ec: ExecutionContext): Route[HttpMethod]
-  def getWhere(using ec: ExecutionContext): Route[HttpMethod]
+  def get(using ec: ExecutionContext): Route[Http,HttpMethod]
+  def getWhere(using ec: ExecutionContext): Route[Http, HttpMethod]
 
 
 
 object Retrievable:
-  inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[Persisted[T]], m2: Mirror.ProductOf[T[Id]], sqlSelect: SqlSelect[T[Id]],sqlSelectOptional: SqlSelect[Optional[T]], queryDeserializer: QueryDeserializer[Optional[T]], serializer: JsonSerializer[T[Id]],optionalSerializaer: JsonSerializer[Optional[T]]): Retrievable[T[Id]] =
+  inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[Persisted[T]], m2: Mirror.ProductOf[T[Id]],s:SocketWriter[Http], c: ConnectionHandler[Http], sqlSelect: SqlSelect[T[Id]],sqlSelectOptional: SqlSelect[Optional[T]], queryDeserializer: QueryDeserializer[Optional[T]], serializer: JsonSerializer[T[Id]],optionalSerializaer: JsonSerializer[Optional[T]]): Retrievable[T[Id]] =
     new Retrievable[T[Id]]:
-      def get(using ec: ExecutionContext): Route[HttpMethod]  =
+      def get(using ec: ExecutionContext): Route[Http, HttpMethod]  =
         val tableName = constValue[m.MirroredLabel]
         route(GET, s"/api/$tableName".toPath,(req: HttpRequest.HttpRequest) => {
 
@@ -36,7 +37,6 @@ object Retrievable:
                 case Success(value) => HttpResponse.ok(value,Headers.apply(Map("content-type" -> "Application/json")))
               }      )
             case Right(value) =>
-              println(value)
               Database.retrieveParameterized[Optional[T]](value).map(x => x.map(y => y.serialize) match {
                 case Failure(exception) => HttpResponse.error(exception.toString)
                 case Success(value) => HttpResponse.ok(value,Headers.apply(Map("content-type" -> "Application/json")))
@@ -50,7 +50,7 @@ object Retrievable:
 
         )
 
-      def getWhere(using ec: ExecutionContext): Route[HttpMethod] =
+      def getWhere(using ec: ExecutionContext): Route[Http, HttpMethod] =
         val tableName = constValue[m.MirroredLabel]
         // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
         val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[T[Id]].map(x => s"{$x}").mkString("/")
