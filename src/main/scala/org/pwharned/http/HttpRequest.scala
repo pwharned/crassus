@@ -1,6 +1,8 @@
 package org.pwharned.http
 
 import org.pwharned.http.HttpMethod
+import org.pwharned.http.HttpPath.HttpPath
+
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
@@ -91,10 +93,10 @@ object HttpRequest:
 
   // Extension methods give you a nice API to work with HttpRequest.
   extension (req: HttpRequest)
-    def methodBuffer: ByteBuffer = req._1
-    def pathBuffer: ByteBuffer = req._2
-    def headersBuffer: ByteBuffer = req._3
-    def bodyBuffer: ByteBuffer = req._4
+    private def methodBuffer: ByteBuffer = req._1
+    private def pathBuffer: ByteBuffer = req._2
+    private def headersBuffer: ByteBuffer = req._3
+    private def bodyBuffer: ByteBuffer = req._4
 
     // Decode the ByteBuffer into a String. We use a duplicate in order not to disturb positions.
     def method: HttpMethod.HttpMethod =
@@ -102,11 +104,11 @@ object HttpRequest:
         methodBuffer.arrayOffset() + methodBuffer.position(),
         methodBuffer.remaining(),
         StandardCharsets.UTF_8))
-    def path: String =
-      new String(pathBuffer.duplicate().array(),
+    def path: HttpPath =
+      HttpPath.apply(new String(pathBuffer.duplicate().array(),
         pathBuffer.arrayOffset() + pathBuffer.position(),
         pathBuffer.remaining(),
-        StandardCharsets.UTF_8)
+        StandardCharsets.UTF_8))
     def headers: String =
       new String(headersBuffer.duplicate().array(),
         headersBuffer.arrayOffset() + headersBuffer.position(),

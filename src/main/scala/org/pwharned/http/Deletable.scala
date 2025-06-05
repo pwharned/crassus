@@ -34,7 +34,7 @@ object Deletable:
 
       route(DELETE, path, (req: HttpRequest.HttpRequest) => {
         val keyStrings: List[String] =
-          dynamicIndexes.map(req.path.toPath.segments.collect {
+          dynamicIndexes.map(req.path.segments.collect {
             case dynamic: Segment.Static => dynamic.segment.toString
           })
 

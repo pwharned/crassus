@@ -109,7 +109,7 @@ object HKD:
     case Nullable[t] => Option[t]
     case _ => A
   type OptionalField[A] = A match
-    case PrimaryKey[t] => Option[PrimaryKey[t]]
+    case PrimaryKey[t] => Option[t]
     case Nullable[t] => Option[t]
     case Option[t] => Option[t]
     case _ => Option[A]

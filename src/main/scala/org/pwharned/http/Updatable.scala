@@ -36,7 +36,7 @@ object Updatable:
         route(PATCH, path, (req: HttpRequest.HttpRequest) => {
 
 
-          val keyStrings: List[String] = dynamicIndexes.map(req.path.toPath.segments.collect {
+          val keyStrings: List[String] = dynamicIndexes.map(req.path.segments.collect {
             case dynamic: Segment.Static => dynamic.segment.toString
           })
 

@@ -22,15 +22,13 @@ trait Retrievable[T]:
 
 
 object Retrievable:
-  inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[Persisted[T]], m2: Mirror.ProductOf[T[Id]], sqlSelect: SqlSelect[T[Id]], queryDeserializer: QueryDeserializer[Optional[T]], serializer: JsonSerializer[T[Id]]): Retrievable[T[Id]] =
+  inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[Persisted[T]], m2: Mirror.ProductOf[T[Id]], sqlSelect: SqlSelect[T[Id]],sqlSelectOptional: SqlSelect[Optional[T]], queryDeserializer: QueryDeserializer[Optional[T]], serializer: JsonSerializer[T[Id]],optionalSerializaer: JsonSerializer[Optional[T]]): Retrievable[T[Id]] =
     new Retrievable[T[Id]]:
       def get(using ec: ExecutionContext): Route[HttpMethod]  =
         val tableName = constValue[m.MirroredLabel]
         route(GET, s"/api/$tableName".toPath,(req: HttpRequest.HttpRequest) => {
 
-          val p = req.path
-          val idx = p.indexOf('?')
-          val queryString = if idx >= 0 && idx < p.length - 1 then p.substring(idx + 1) else ""
+          val queryString = req.path.query.value
           queryString.stripMargin.fromQuery[Optional[T]] match {
             case Left(value)  =>
               Database.retrieve[T].map( x => x.map(y => y.serialize) match {
@@ -38,7 +36,8 @@ object Retrievable:
                 case Success(value) => HttpResponse.ok(value,Headers.apply(Map("content-type" -> "Application/json")))
               }      )
             case Right(value) =>
-              Database.retrieveParameterized[T[Id]](value.asInstanceOf[T[Id]]).map( x => x.map(y => y.serialize) match {
+              println(value)
+              Database.retrieveParameterized[Optional[T]](value).map(x => x.map(y => y.serialize) match {
                 case Failure(exception) => HttpResponse.error(exception.toString)
                 case Success(value) => HttpResponse.ok(value,Headers.apply(Map("content-type" -> "Application/json")))
               }      )
@@ -62,7 +61,7 @@ object Retrievable:
 
         route(GET, path, (req: HttpRequest.HttpRequest) => {
           val keyStrings: List[String] =
-            dynamicIndexes.map(req.path.toPath.segments.collect {
+            dynamicIndexes.map(req.path.segments.collect {
               case dynamic: Segment.Static => dynamic.segment.toString
             })
 

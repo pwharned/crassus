@@ -129,7 +129,7 @@ object HTTPServer:
             else
               val req = request.get       
               val method = req.method
-              val path = req.path.toPath
+              val path = req.path
               val key = routingTable.find(method,path)
             
   

@@ -12,6 +12,15 @@ object PathSegment:
   extension (ps: PathSegment)
     def value: String = ps
 
+object Query:
+  opaque type Query = Option[String]
+  given [T]: Conversion[T, Option[T]] = x => Some(x)
+  val None: Query = Option.empty[String]
+  def apply(s: String): Query = s
+
+  extension (ps: Query)
+    def value: String = ps.getOrElse("")
+
 object Identifier:
   opaque type Identifier[X] = X
 
@@ -25,12 +34,16 @@ object Segment:
 
 // The HttpPath is simply a List of Segments.
 object HttpPath:
-  opaque type HttpPath = List[Segment]
+  opaque type HttpPath = (List[Segment], Query.Query)
 
-  def apply(segments: List[Segment]): HttpPath = segments
+  def apply(segments: List[Segment]): HttpPath = (segments, Query.None)
+  def apply(segments: List[Segment], query: Query.Query): HttpPath = (segments, query)
 
   inline def apply(pathString: String): HttpPath =
-    val parts: List[Segment] = pathString
+    val url = pathString.split('?')
+    val query = Query.apply(url.tail.mkString)
+    
+    val parts: List[Segment] = url.head
       .split("/")
       .filter(_.nonEmpty)
       .map { segment =>
@@ -42,12 +55,12 @@ object HttpPath:
       }
       .toList
 
-    HttpPath(parts)
+    HttpPath(parts, query)
   @tailrec
   def filter(f: HttpPath => HttpPath): HttpPath = HttpPath.filter(f)
   extension (hp: HttpPath)
-    def segments: List[Segment] = hp
-
+    def segments: List[Segment] = hp._1
+    def query: Query.Query = hp._2
   // Helper function to safely convert a String into a PathSegment.
   private def toPathSegment(s: String): PathSegment.PathSegment = PathSegment(s)
 
@@ -58,8 +71,9 @@ object HttpPath:
     import quotes.reflect.*
     s.value match
       case Some(pathString) =>
-        // Split the path string by '/' and filter out empty segments.
-        val parts: List[Expr[Segment]] = pathString
+        val url = pathString.split('?')
+        val query = url.tail.mkString
+        val parts: List[Expr[Segment]] = url.head
           .split("/")
           .filter(_.nonEmpty)
           .toList
@@ -72,11 +86,14 @@ object HttpPath:
             else
               '{ Segment.Static(toPathSegment(${ Expr(segment) })) }
           }
-        Expr.ofList(parts)
+        // Convert query part
+        val queryExpr = '{ Query(${ Expr(query) }) }
+
+        // Construct HttpPath
+        '{ HttpPath(${ Expr.ofList(parts) }, $queryExpr) }
       case None =>
         quotes.reflect.report.error("HTTP path must be a compile-time constant.")
-        '{ Nil }
-// At compile time, the literal will be converted to our HttpPath type.
+        '{ HttpPath(Nil, Query.None) }// At compile time, the literal will be converted to our HttpPath type.
 
 
 extension (inline s: String) inline def asPath: HttpPath = HttpPath.literal(s)
