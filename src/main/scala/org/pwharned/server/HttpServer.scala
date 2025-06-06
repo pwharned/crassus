@@ -1,11 +1,10 @@
 package org.pwharned.server
 import org.pwharned.http.HttpMethod.HttpMethod
-import org.pwharned.http.HttpPath
-import org.pwharned.http.{HttpRequest, HttpResponse}
+import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse, Segment, asRequest, toPath}
 import org.pwharned.route.*
 import org.pwharned.route.Router
-import org.pwharned.http.{toPath, asRequest}
-import org.pwharned.route.given 
+import org.pwharned.route.given
+
 import java.io.PrintWriter
 import java.net.{InetSocketAddress, Socket}
 import java.nio.ByteBuffer
@@ -99,7 +98,7 @@ object HTTPServer:
 
   given ExecutionContext = ExecutionContext.fromExecutor(ex)
 
-  inline def start(inline port: Int, inline routingTable: RoutingTable.RoutingTable): Unit =
+  inline def start(inline port: Int, inline routingTable: RoutingTable.RoutingTable[Segment,Protocal]): Unit =
 
     val serverChannel = ServerSocketChannel.open()
     serverChannel.bind(new InetSocketAddress(port))
@@ -131,11 +130,7 @@ object HTTPServer:
 
               val response = key.flatMap {
                 _.route.map { route =>
-                  route.handler(req).flatMap { res =>
-                    given SocketWriter[route.F] = summon[SocketWriter[route.F]] // Implicitly get the correct writer
-
-                    summon[SocketWriter[route.F]].write(socket, res) // Write response appropriately
-                  }
+                  route.processRequest(clientChannel,req)
                 }
               }.getOrElse(Future(HttpResponse.notFound()).flatMap(res => summon[SocketWriter[Http]].write(clientChannel, res)))
 
@@ -147,8 +142,7 @@ object HTTPServer:
                   clientChannel.close()
                 }
                 case Success(value) => {
-                  
-                  clientChannel.close()
+                  ()
                 }
   
               }

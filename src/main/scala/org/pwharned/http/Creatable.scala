@@ -23,9 +23,9 @@ trait Creatable[T]:
 object Creatable:
   inline given derive[T[F[_]] <: Product](using m: Mirror.ProductOf[New[T]], sqlSelect: SqlSelect[T[Id]], serializer: JsonSerializer[Persisted[T]]): Creatable[Persisted[T]] =
     new Creatable[Persisted[T]]:
-      def post(using ec: ExecutionContext): Route[Http,POST] =
+      def post(using ec: ExecutionContext): Route[Http,HttpMethod] =
         val tableName = constValue[m.MirroredLabel]
-        route[Http, POST](POST, s"/api/$tableName".toPath, (req: HttpRequest.HttpRequest) => {
+        route(POST, s"/api/$tableName".toPath, (req: HttpRequest.HttpRequest) => {
 
 
           val bytes = new Array[Byte](req.body.remaining())

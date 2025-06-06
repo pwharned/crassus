@@ -23,11 +23,11 @@ object Router:
                                          )(using writer: SocketWriter[F], connection: ConnectionHandler[F]) {
 
     def processRequest(socket: SocketChannel, request: HttpRequest)(using ec: ExecutionContext): Future[Unit] = {
-      handler(request).map { x =>
-        writer.write(socket = socket, response = x)
-        // Generate response
-        connection.handleConnection(socket) // Handle connection appropriately
-      }
+      for {
+        response <- handler(request)
+        _ <- writer.write(socket, response)
+      } yield connection.handleConnection(socket)
+
     }
   }
   // The opaque type Route now is backed by RouteDef.
@@ -53,25 +53,28 @@ object Router:
       def path: HttpPath = r.path
 
 sealed trait Protocal[F]
+
 sealed trait SSE[F] extends Protocal[F]
 sealed trait Http[F] extends Protocal[F]
 
+
 trait SocketWriter[F[_]] {
-  def write(socket: SocketChannel, response: HttpResponse): Future[Unit]
+  def write(socket: SocketChannel, response: HttpResponse)(implicit ec: ExecutionContext): Future[Unit]
 }
 
 
 // Implement type class instances
 given sseWriter: SocketWriter[SSE] with {
-  def write(socket: SocketChannel, response: HttpResponse): SSE[Unit] = {
+  def write(socket: SocketChannel, response: HttpResponse)(implicit ec: ExecutionContext): Future[Unit] = {
     // SSE streams responses continuously, so this would be non-terminal
-    ???
+    Future(())
   }
 }
 
 given httpWriter: SocketWriter[Http] with {
   def write(socket: SocketChannel, response: HttpResponse)(implicit ec: ExecutionContext): Future[Unit] = Future{
-    inline val statusLine = s"HTTP/1.1 ${response.status} OK\r\n"
+    
+    val statusLine = s"HTTP/1.1 ${response.status} OK\r\n"
     val headers = response.headers.asMap.map { case (key, value) => s"$key: $value\r\n" }.mkString
     val body = s"\r\n${response.body}"
     val httpResponse = statusLine + headers + body
@@ -87,21 +90,22 @@ given httpWriter: SocketWriter[Http] with {
 }
 
 trait ConnectionHandler[F[_]] {
-  def handleConnection(socket: SocketChannel): F[Unit]
+  def handleConnection(socket: SocketChannel): Unit
 }
 
 // Implement connection behaviors
 given sseConnection: ConnectionHandler[SSE] with {
-  def handleConnection(socket: SocketChannel): SSE[Unit] = {
+  def handleConnection(socket: SocketChannel): Unit = {
     // SSE keeps the connection open for event streaming
-    ???
+    socket.close()
+    
   }
 }
 
 given httpConnection: ConnectionHandler[Http] with {
-  def handleConnection(socket: SocketChannel): Http[Unit] = {
+  def handleConnection(socket: SocketChannel): Unit = {
     // HTTP closes the connection after response
-    ???
+  socket.close()
   }
 }
 

@@ -27,7 +27,7 @@ object Deletable:
                                          socketWriter: SocketWriter[Http],
                                           connectionHandler: ConnectionHandler[Http]
                                          ): Deletable[T[Id]] = new Deletable[T[Id]]:
-    def delete(using ec: ExecutionContext): Route[Http, DELETE] =
+    def delete(using ec: ExecutionContext): Route[Http, HttpMethod] =
       val tableName = constValue[m.MirroredLabel]
       // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
       val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[T[Id]].map(x => s"{$x}").mkString("/")
@@ -36,7 +36,7 @@ object Deletable:
         case (dynamic: Segment.Dynamic, index) => index
       }
 
-      route[Http, DELETE](DELETE, path, (req: HttpRequest.HttpRequest) => {
+      route(DELETE, path, (req: HttpRequest.HttpRequest) => {
         val keyStrings: List[String] =
           dynamicIndexes.map(req.path.segments.collect {
             case dynamic: Segment.Static => dynamic.segment.toString
