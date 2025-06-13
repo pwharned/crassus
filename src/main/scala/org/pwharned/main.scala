@@ -4,7 +4,7 @@ import generated.user
 import org.pwharned.database.{Database, Db2TypeMapper, DbTypeMapper, PrimaryKeyExtractor}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
 import org.pwharned.http.HttpRequest.HttpRequest
-import org.pwharned.http.{BodyEncoder, HttpResponse, Retrievable, Segment, asPath}
+import org.pwharned.http.{BodyEncoder, HttpResponse, Segment, asPath}
 import org.pwharned.database.HKD.{Id, New, Updated}
 import org.pwharned.route.Router.{Route, route}
 import org.pwharned.route.RoutingTable.RoutingTable
@@ -34,8 +34,14 @@ def main(): Unit =
 
 
 
-  inline def userRoutes = RouteRegistry.list[SSE, user]
-  inline def routes: List[Route[Protocal, org.pwharned.http.HttpMethod.HttpMethod]] = List(userRoutes) :+ r
+  inline def getUsers = RouteRegistry.list[SSE, user]
+
+  inline def getUsersByPK = RouteRegistry.listWhere[SSE, user]
+
+  inline def createUsers = RouteRegistry.create[SSE, user]
+
+
+  inline def routes: List[Route[Protocal, org.pwharned.http.HttpMethod.HttpMethod]] = List( getUsersByPK, getUsers, createUsers) :+ r
 
   inline def table: RoutingTable[Segment, Protocal] = RoutingTable.build[Segment, Protocal](routes)
   println(table)

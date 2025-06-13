@@ -59,7 +59,7 @@ object HKD:
     case Nullable[t] => Option[t]
     case _ => Option[A]
   type PersistedField[A] = A match
-    case PrimaryKey[t] => t
+    case PrimaryKey[t] => PrimaryKey[t]
     case Nullable[t] => Option[t]
     case _ => A
   type New[T[_[_]]] = T[NewField]

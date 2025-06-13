@@ -39,15 +39,15 @@ extension (db: org.pwharned.database.Database.type )
 
       x => x.query[A](a)
     }
-  inline def retrieveParameterized[A <: Product](a: A)(using sql: SqlSelect[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[A]]] =
+  inline def retrieveParameterized[A <: Product, B<:Product](a: A)(using sql: SqlSelect[B], sqls: SqlSelect[A], json: JsonSerializer[B], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[B]]] =
     db.pool.withConnection {
 
-      x => x.queryParameterized[A](a)
+      x => x.queryParameterized[A, B](a)
     }
-  inline def create[A<:Product](a: A)(using sql: SqlSelect[A], sqlInsert: SqlInsert[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[A]]] =
+  inline def create[A<:Product, B<: Product](a: A)(using sql: SqlSelect[B], sqlInsert: SqlInsert[A], json: JsonSerializer[B], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[B]]] =
     db.pool.withConnection {
 
-      x => x.insert[A](a)
+      x => x.insert[A, B](a)
     }
   inline def delete[A <: Product](a: PrimaryKeyFields[A]#Out)(using sql: SqlSelect[A], sqlDelete: SqlDelete[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[A]]] =
     db.pool.withConnection {
@@ -150,7 +150,7 @@ extension (con: java.sql.Connection)
     }
 
 
-  inline def insert[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A]): Iterator[A] =
+  inline def insert[A <: Product, B<:Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B]): Iterator[B] =
     val stmt = con.prepareStatement(sqlInsert.insertStatement)
     val bindValues = sqlInsert.bindValues(obj)
     bindValues.zipWithIndex.foreach { case (value, index) =>
@@ -159,7 +159,7 @@ extension (con: java.sql.Connection)
     val rs = stmt.executeQuery()
     Iterator.continually(rs.next())
       .takeWhile(identity)
-      .map(x => rs.as[A])
+      .map(x => rs.as[B])
   inline def query[A <: Product](using sql: SqlSelect[A]): Iterator[A] =
     val stmt = con.prepareStatement(sql.select)
     
@@ -173,14 +173,14 @@ extension (con: java.sql.Connection)
     }
     val rs = stmt.executeQuery()
     Iterator.continually(rs.next()).takeWhile(identity).map(x => rs.as[A])
-  inline def queryParameterized[A <: Product](a:A )(using sql: SqlSelect[A]): Iterator[A] =
-    val stmt = con.prepareStatement(sql.selectWhere (a) )
-    val bindValues = sql.bindValuesOb(a)
+  inline def queryParameterized[A <: Product, B<:Product](a:A )(using sql: SqlSelect[B], sqls: SqlSelect[A]): Iterator[B] =
+    val stmt = con.prepareStatement(sqls.selectWhere (a) )
+    val bindValues = sqls.bindValuesOb(a)
     bindValues.zipWithIndex.foreach { case (value, index) =>
       stmt.setObject(index + 1, value) // Bind each parameter safely
     }
     val rs = stmt.executeQuery()
-    Iterator.continually(rs.next()).takeWhile(identity).map(x => rs.as[A])
+    Iterator.continually(rs.next()).takeWhile(identity).map(x => rs.as[B])
 
   inline def createTableAsync[A <: Product](using schema: SqlSchema[A], ec: ExecutionContext, db: DbTypeMapper): Future[Unit] =
     Future {
