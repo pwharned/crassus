@@ -7,66 +7,7 @@ import scala.language.postfixOps
 import scala.language.implicitConversions
 
 object HKD:
-  /*
-  // Your opaque types remain as before.
-  opaque type PrimaryKey[X] = X
-
-  object PrimaryKey:
-    def apply[X](x: X): PrimaryKey[X] = x
-
-    given [T]: Conversion[T, PrimaryKey[T]] = x => PrimaryKey(x)
-
-
-  // ── Generic Type Aliases ──
-  type Id[A] = A
-
-  // When a “new” record is created from a request, its fields may be absent.
-  type New[T[F[_]]] = T[Option]
-  // When a record is persisted (e.g. from the DB), all fields exist.
-  type Persisted[T[F[_]]] = T[Id]
-
-  // ── Field Mapping via a Type Class ──
-
-  // We want to compute a “new field” type for any given A.
-  // For PrimaryKey[T], that should be Option[PrimaryKey[T]]
-  // For Nullable[T], that should be Option[T]
-  // For any other type A, that will be Option[A].
-  trait NewFieldMapping[A]:
-    type Out
-
-  object NewFieldMapping:
-    // The low-priority fallback instance.
-    trait LowPriority:
-      // Fallback for any type not handled by a more specific instance.
-      given generic[A]: NewFieldMapping[A] with
-        type Out = A
-
-    object LowPriority extends LowPriority
-
-    // Bring in the fallback given.
-    export LowPriority.generic
-
-    // More specific instance for PrimaryKey.
-    given primaryKeyInstance[T]: NewFieldMapping[PrimaryKey[T]] with
-      type Out = Option[T]
-
-    // More specific instance for Nullable.
-    given nullableInstance[T]: NewFieldMapping[Nullable[T]] with
-      type Out = Option[T]
-
-  // A convenient alias to extract the wrapped type.
-  type NewField[A] = NewFieldMapping[A]#Out
-
-
-
-  // ── A helper to derive a “new record” type if needed.
-  // (Here, we’re assuming that your HKD design will eventually traverse each field
-  // using the NewField mapping, for example via a generic derivation technique.
-  // That code is not shown here, but NewField is available to use.)
-  type NewRecord[T[_[_]]] = T[NewField]
-*/
-
-
+ 
   sealed trait PrimaryKey[A]:
     def value: A
 
@@ -118,7 +59,7 @@ object HKD:
     case Nullable[t] => Option[t]
     case _ => Option[A]
   type PersistedField[A] = A match
-    case PrimaryKey[t] => t
+    case PrimaryKey[t] => PrimaryKey[t]
     case Nullable[t] => Option[t]
     case _ => A
   type New[T[_[_]]] = T[NewField]

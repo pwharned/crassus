@@ -1,10 +1,9 @@
 package org.pwharned.server
 import org.pwharned.http.HttpMethod.HttpMethod
-import org.pwharned.http.HttpPath
-import org.pwharned.http.{HttpRequest, HttpResponse}
+import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse, Segment, asRequest, toPath}
 import org.pwharned.route.*
-import org.pwharned.route.Router.RouteDef
-import org.pwharned.http.{toPath, asRequest}
+import org.pwharned.route.Router
+import org.pwharned.route.given
 
 import java.io.PrintWriter
 import java.net.{InetSocketAddress, Socket}
@@ -46,14 +45,11 @@ def sendResponse(socket: SocketChannel, response: HttpResponse): Unit =
   val httpResponse = statusLine + headers + body
   // Convert string to bytes and wrap in ByteBuffer
   val buffer = ByteBuffer.wrap(httpResponse.getBytes("UTF-8"))
-
-
   // Write to socket channel
   while (buffer.hasRemaining) {
     socket.write(buffer)
   }
 
-  // Close connection
   socket.close()
 
 // Check if the buffer (up to its current position) contains the end-of-headers marker: CR LF CR LF (i.e. 13,10,13,10)
@@ -102,7 +98,7 @@ object HTTPServer:
 
   given ExecutionContext = ExecutionContext.fromExecutor(ex)
 
-  inline def start(inline port: Int, inline routingTable: RoutingTable.RoutingTable): Unit =
+  inline def start(inline port: Int, inline routingTable: RoutingTable.RoutingTable[Segment,Protocal]): Unit =
 
     val serverChannel = ServerSocketChannel.open()
     serverChannel.bind(new InetSocketAddress(port))
@@ -131,11 +127,14 @@ object HTTPServer:
               val method = req.method
               val path = req.path
               val key = routingTable.find(method,path)
-            
-  
-              val response: Future[HttpResponse]  = key.flatMap {
-                x => x.route.map( x=> x.apply(req))
-              }.getOrElse(Future(HttpResponse.notFound()))
+
+              val response = key.flatMap {
+                _.route.map { route =>
+                  route.processRequest(clientChannel,req)
+                }
+              }.getOrElse(Future(HttpResponse.notFound()).flatMap(res => summon[SocketWriter[Http]].write(clientChannel, res)))
+
+
               response.onComplete {
                 case Failure(exception) => {
                   println("Found Exception")
@@ -143,8 +142,7 @@ object HTTPServer:
                   clientChannel.close()
                 }
                 case Success(value) => {
-                  sendResponse(clientChannel, value)
-                  clientChannel.close()
+                  ()
                 }
   
               }
