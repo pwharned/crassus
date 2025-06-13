@@ -39,9 +39,11 @@ def main(): Unit =
   inline def getUsersByPK = RouteRegistry.listWhere[SSE, user]
 
   inline def createUsers = RouteRegistry.create[SSE, user]
+  inline def deleteUsers = RouteRegistry.delete[Http, user]
+  inline def updateUsers = RouteRegistry.update[Http, user]
 
 
-  inline def routes: List[Route[Protocal, org.pwharned.http.HttpMethod.HttpMethod]] = List( getUsersByPK, getUsers, createUsers) :+ r
+  inline def routes: List[Route[Protocal, org.pwharned.http.HttpMethod.HttpMethod]] = List( getUsersByPK, getUsers, createUsers, deleteUsers, updateUsers) :+ r
 
   inline def table: RoutingTable[Segment, Protocal] = RoutingTable.build[Segment, Protocal](routes)
   println(table)

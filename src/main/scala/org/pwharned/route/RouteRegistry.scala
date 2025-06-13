@@ -1,9 +1,9 @@
 package org.pwharned.route
 
-import org.pwharned.database.{Database, PrimaryKeyExtractor, PrimaryKeyFields, SqlInsert, SqlSelect, create, retrieve, retrieveParameterized}
+import org.pwharned.database.{Database, PrimaryKeyExtractor, update, PrimaryKeyFields, SqlInsert, SqlSelect, create, delete, retrieve, retrieveParameterized}
 import org.pwharned.database.HKD.*
-import org.pwharned.http.HttpMethod.{GET, HttpMethod, POST}
-import org.pwharned.http.{BodyEncoder, Deletable, HttpRequest, HttpResponse, Segment, Updatable, toPath}
+import org.pwharned.http.HttpMethod.{DELETE, GET, HttpMethod, PATCH, POST}
+import org.pwharned.http.{BodyEncoder, HttpRequest, HttpResponse, Segment, toPath}
 import org.pwharned.route.Router.Route
 import org.pwharned.json.{JsonDeserializer, JsonSerializer, deserialize}
 import org.pwharned.macros.toTuple
@@ -114,5 +114,82 @@ object RouteRegistry:
       }
 
 
+    }
+    )
+
+  inline def delete[P[_], T[_[_]] <: Product](using // ← T now has correct kind
+                                              db: Database.type,
+                                              sql: SqlSelect[Persisted[T]], // SqlSelect[UserPersisted]
+                                              sqlC: SqlInsert[New[T]],
+                                              enc: BodyEncoder[P, Iterator[Persisted[T]]],
+                                              sw: SocketWriter[P],
+                                              ch: ConnectionHandler[P],
+                                              ec: ExecutionContext,
+                                              m: Mirror.ProductOf[Persisted[T]]
+                                             ): Route[P, DELETE] =
+  
+    val tableName = constValue[m.MirroredLabel]
+    // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
+    val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[Persisted[T]].map(x => s"{$x}").mkString("/")
+    val path = s"/api/$tableName/$primaryKeys".toPath
+    val dynamicIndexes = path.segments.zipWithIndex.collect {
+      case (dynamic: Segment.Dynamic, index) => index
+    }
+  
+    route(DELETE, path, (req: HttpRequest.HttpRequest) => {
+      val keyStrings: List[String] =
+        dynamicIndexes.map(req.path.segments.collect {
+          case dynamic: Segment.Static => dynamic.segment.toString
+        })
+      // If PrimaryKeyFields is defined for the persisted type, make sure the type uses T[Id]
+      val b: PrimaryKeyFields[Persisted[T]]#Out =
+        toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Persisted[T]]#Out]
+
+      toResponse(db.delete[Persisted[T]](b))(enc.apply)
+
+
+    }
+    )
+
+
+  inline def update[P[_], T[_[_]] <: Product](using // ← T now has correct kind
+                                              db: Database.type,
+                                              sql: SqlSelect[Persisted[T]], // SqlSelect[UserPersisted]
+                                              sqlC: SqlInsert[New[T]],
+                                              enc: BodyEncoder[P, Iterator[Persisted[T]]],
+                                              jsd: JsonDeserializer[Updated[T]],
+                                              sw: SocketWriter[P],
+                                              ch: ConnectionHandler[P],
+                                              ec: ExecutionContext,
+                                              m: Mirror.ProductOf[Updated[T]]
+                                             ): Route[P, PATCH] =
+  
+    val tableName = constValue[m.MirroredLabel]
+    // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
+    val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[Updated[T]].map(x => s"{$x}").mkString("/")
+    val path = s"/api/$tableName/$primaryKeys".toPath
+    val dynamicIndexes = path.segments.zipWithIndex.collect {
+      case (dynamic: Segment.Dynamic, index) => index
+    }
+  
+    route(PATCH, path, (req: HttpRequest.HttpRequest) => {
+  
+      val keyStrings: List[String] = dynamicIndexes.map(req.path.segments.collect {
+        case dynamic: Segment.Static => dynamic.segment.toString
+      })
+  
+      val b: PrimaryKeyFields[Updated[T]]#Out = toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Updated[T]]#Out]
+  
+  
+      val bytes = new Array[Byte](req.body.remaining())
+      req.body.get(bytes)
+      val s = new String(bytes, StandardCharsets.UTF_8)
+
+
+      s.deserialize[Updated[T]] match {
+          case Right(value) => toResponse(db.update[Updated[T], Persisted[T]](value,b))(enc.apply)
+          case Left(exception) => Future(HttpResponse.error(exception.message))
+        }
+  
     }
     )

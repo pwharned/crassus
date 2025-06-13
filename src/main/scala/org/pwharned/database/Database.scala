@@ -60,10 +60,10 @@ extension (db: org.pwharned.database.Database.type )
 
       x =>x.update[A](a)
     }
-  inline def update[A <: Product](a: A, b: PrimaryKeyFields[A]#Out)(using sql: SqlSelect[A], sqlUpdate: SqlUpdate[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[A]]] =
+  inline def update[A <: Product, B<:Product](a: A, b: PrimaryKeyFields[A]#Out)(using sql: SqlSelect[B], sqlUpdate: SqlUpdate[A], json: JsonSerializer[A], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[B]]] =
     db.pool.withConnection {
 
-      x => x.update[A](a,b)
+      x => x.update[A,B](a,b)
     }
 
 extension (con: java.sql.Connection)
@@ -84,7 +84,7 @@ extension (con: java.sql.Connection)
     Iterator.continually(rs.next())
       .takeWhile(identity)
       .map(x => rs.as[A])
-  def update[A <: Product](obj: A, b: PrimaryKeyFields[A]#Out)(using sqlUpdate: SqlUpdate[A], sqlSelect: SqlSelect[A]): Iterator[A] =
+  def update[A <: Product, B<:Product](obj: A, b: PrimaryKeyFields[A]#Out)(using sqlUpdate: SqlUpdate[A], sqlSelect: SqlSelect[B]): Iterator[B] =
     val stmt = con.prepareStatement(sqlUpdate.updateStatement(obj))
     sqlUpdate.bindValues(obj, b).zipWithIndex.foreach { case (value, index) =>
       stmt.setObject(index + 1, value) // Bind each parameter safely
@@ -92,7 +92,7 @@ extension (con: java.sql.Connection)
     val rs = stmt.executeQuery()
     Iterator.continually(rs.next())
       .takeWhile(identity)
-      .map(x => rs.as[A])
+      .map(x => rs.as[B])
 
   def updateAsync[A <: Product](obj: A)(using sqlUpdate: SqlUpdate[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
     Future {
