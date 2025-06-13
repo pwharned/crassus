@@ -1,9 +1,9 @@
 package org.pwharned.route
 
-import org.pwharned.http.HttpMethod.{GET, HttpMethod}
+import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.HttpPath.HttpPath
 import org.pwharned.http.HttpRequest.HttpRequest
-import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse}
+import org.pwharned.http.HttpResponse
 import org.pwharned.route.Router.Route
 
 import java.nio.ByteBuffer
@@ -16,7 +16,7 @@ object Router:
   // A case class wrapping metadata plus a handler function which now needs an HttpRequest.
 
   // Route now includes connection handling logic
-  case class Route[F[_], T <: HttpMethod](
+  case class Route[+F[_], +T <: HttpMethod](
                                            method: T,
                                            path: HttpPath,
                                            handler: HttpRequest => Future[HttpResponse]
@@ -64,30 +64,51 @@ trait SocketWriter[F[_]] {
 
 
 // Implement type class instances
-given sseWriter: SocketWriter[SSE] with {
-  def write(socket: SocketChannel, response: HttpResponse)(implicit ec: ExecutionContext): Future[Unit] = {
-    // SSE streams responses continuously, so this would be non-terminal
-    Future(())
-  }
-}
+given sseWriter: SocketWriter[SSE] with
+  def write(socket: java.nio.channels.SocketChannel,
+            response: HttpResponse)
+           (using ExecutionContext): Future[Unit] =
 
-given httpWriter: SocketWriter[Http] with {
-  def write(socket: SocketChannel, response: HttpResponse)(implicit ec: ExecutionContext): Future[Unit] = Future{
-    
-    val statusLine = s"HTTP/1.1 ${response.status} OK\r\n"
-    val headers = response.headers.asMap.map { case (key, value) => s"$key: $value\r\n" }.mkString
-    val body = s"\r\n${response.body}"
-    val httpResponse = statusLine + headers + body
-    // Convert string to bytes and wrap in ByteBuffer
-    val buffer = ByteBuffer.wrap(httpResponse.getBytes("UTF-8"))
-    // Write to socket channel
-    while (buffer.hasRemaining) {
-      socket.write(buffer)
+    // Mandatory SSE headers
+    val head =
+      s"HTTP/1.1 ${response.status} OK\r\n" +
+        "Content-Type: text/event-stream\r\n" +
+        "Cache-Control: no-cache\r\n" +
+        "Connection: keep-alive\r\n" +
+        response.headers.asMap.map((k,v) => s"$k: $v\r\n").mkString +
+        "\r\n"
+
+    val headFuture = Future {
+      val buf = ByteBuffer.wrap(head.getBytes("UTF-8"))
+      while buf.hasRemaining do socket.write(buf)
+      socket.socket().getOutputStream.flush()
     }
-    socket.close()
 
-  }
-}
+    // Initial body (could be Strict with an opening event or empty)
+    for _ <- headFuture
+        _ <- response.body.writeTo(socket)
+    yield ()                 // do *not* close the socket
+
+
+given httpWriter: SocketWriter[Http] with
+  def write(socket: java.nio.channels.SocketChannel,
+            response: HttpResponse)
+           (using ExecutionContext): Future[Unit] =
+    // 1) HTTP head
+    val head =
+      s"HTTP/1.1 ${response.status} OK\r\n" +
+        response.headers.asMap.map((k, v) => s"$k: $v\r\n").mkString +
+        "\r\n"
+
+    val headFuture = Future {
+      val buf = ByteBuffer.wrap(head.getBytes("UTF-8"))
+      while buf.hasRemaining do socket.write(buf)
+    }
+
+    for
+      _ <- headFuture
+      _ <- response.body.writeTo(socket)
+    yield socket.close()
 
 trait ConnectionHandler[F[_]] {
   def handleConnection(socket: SocketChannel): Unit

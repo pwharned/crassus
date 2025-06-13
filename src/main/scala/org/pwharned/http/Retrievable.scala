@@ -41,8 +41,8 @@ object Retrievable:
                 case Failure(exception) => HttpResponse.error(exception.toString)
                 case Success(value) => HttpResponse.ok(value,Headers.apply(Map("content-type" -> "Application/json")))
               }      )
-          
-          
+
+
           }
 
         }
