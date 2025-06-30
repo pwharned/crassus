@@ -1,0 +1,179 @@
+{
+  "reflection": [
+    {
+      "type": "[Ljava.lang.String;"
+    },
+    {
+      "type": "[Lorg.pwharned.http.Segment;"
+    },
+    {
+      "type": "com.ibm.db2.jcc.DB2Driver"
+    },
+    {
+      "type": "com.ibm.db2.jcc.DB2SimpleDataSource"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.ConPE"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.ConsvAS"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.ConsvEE"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.ConsvIS"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.ConsvO"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.ConsvZS"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.DB2SQLDS"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.DB2SQLDSTrial"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.DB2UW"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.DB2UWTrial"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.DB2iSeries"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.DB2iSeriesTrial"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.DB2zOS"
+    },
+    {
+      "type": "com.ibm.db2.jcc.licenses.DB2zOSTrial"
+    },
+    {
+      "type": "com.ibm.jvm.Trace"
+    },
+    {
+      "type": "com.ibm.net.SocketUtils"
+    },
+    {
+      "type": "com.ibm.pdq.cmx.client.DataSourceFactory"
+    },
+    {
+      "type": "com.ibm.pdq.runtime.internal.wrappers.db2.ConnectionProxyHandler"
+    },
+    {
+      "type": "java.lang.ClassValue"
+    },
+    {
+      "type": "java.lang.System"
+    },
+    {
+      "type": "java.lang.invoke.VarHandle",
+      "methods": [
+        {
+          "name": "releaseFence",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "java.sql.SQLException",
+      "fields": [
+        {
+          "name": "next"
+        }
+      ]
+    },
+    {
+      "type": "org.pwharned.database.Database$",
+      "fields": [
+        {
+          "name": "db$lzy1"
+        }
+      ]
+    },
+    {
+      "type": "org.pwharned.server.HTTPServer$",
+      "fields": [
+        {
+          "name": "given_ExecutionContext$lzy1"
+        }
+      ]
+    },
+    {
+      "type": "sun.misc.Unsafe",
+      "fields": [
+        {
+          "name": "theUnsafe"
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "glob": "DB2JccConfiguration.properties"
+    },
+    {
+      "glob": "META-INF/services/java.lang.System$LoggerFinder"
+    },
+    {
+      "glob": "META-INF/services/java.net.spi.InetAddressResolverProvider"
+    },
+    {
+      "glob": "META-INF/services/java.nio.channels.spi.SelectorProvider"
+    },
+    {
+      "glob": "META-INF/services/java.sql.Driver"
+    },
+    {
+      "glob": "META-INF/services/java.util.spi.ResourceBundleControlProvider"
+    },
+    {
+      "glob": "com/ibm/db2/jcc/DB2JccConfiguration.properties"
+    },
+    {
+      "glob": "com/ibm/db2/jcc/resources/T4Resources_en.properties"
+    },
+    {
+      "glob": "com/ibm/db2/jcc/t2zos/af_en.properties"
+    },
+    {
+      "glob": "com/ibm/db2/jcc/t2zos/af_en_US.properties"
+    },
+    {
+      "glob": "pdq.properties"
+    }
+  ],
+  "bundles": [
+    {
+      "name": "com.ibm.db2.jcc.resources.T4Resources",
+      "locales": [
+        "en-US"
+      ]
+    },
+    {
+      "name": "com.ibm.db2.jcc.t2zos.af",
+      "locales": [
+        "en-US"
+      ]
+    }
+  ],
+  "jni": [
+    {
+      "type": "java.lang.Boolean",
+      "methods": [
+        {
+          "name": "getBoolean",
+          "parameterTypes": [
+            "java.lang.String"
+          ]
+        }
+      ]
+    }
+  ]
+}

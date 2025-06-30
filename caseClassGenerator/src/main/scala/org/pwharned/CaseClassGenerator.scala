@@ -1,0 +1,53 @@
+package org.pwharned.generator
+import org.pwharned.{Column, SQLParser}
+import org.pwharned.SQLParser.{ColumnOps, alterTablePrimaryKeyParser}
+
+import java.nio.CharBuffer
+import scala.io.Source
+
+//case class User[F[_]](id: F[PrimaryKey[Int]], name: F[String])
+object CaseClassGenerator  {
+  def generateCaseClasses: String = {
+    // Get resource as stream from classpath
+
+    val resourceStream = getClass.getResourceAsStream("/schema.sql")
+    if (resourceStream == null) {
+      throw new IllegalStateException("Could not find schema.sql in resources")
+    }
+
+    // Use scala.io.Source to read from the stream
+    val input = Source.fromInputStream(resourceStream)
+    val lines = input.getLines().mkString("\n")
+
+    val statements  = lines.split(";")
+    // val lines = Source.fromFile(inputFile).getLines().toList
+    val createTableStatements = statements.filter( x=> x.trim.toUpperCase.startsWith("CREATE TABLE")).map(x => SQLParser.createTableParser(x))
+
+    val alterTableStatements = statements.filter( x=> x.trim.toUpperCase.startsWith("ALTER TABLE")).map( x=> SQLParser.alterTablePrimaryKeyParser(x))
+
+    createTableStatements.map {
+      case Left(value) => {System.out.println(value)}
+      case Right(value) =>
+        val alterations = alterTableStatements.filter {
+          x => x.isRight
+        }.map( x=> x.toOption.get).filter( x=> x._1.table.toUpperCase==value._1.name.toUpperCase)
+
+        val columns = value._1.columns.map( x=> {
+          alterations.find(y => y._1.columns.contains(x.name)) match {
+            case Some(value) => Column(x.name, x.dataType,x.nullable,Some(true),x.generated_always_as_identity)
+            case None => x
+          }
+        })
+
+        System.out.println(value)
+        s"""
+           |case class ${value._1.name}[F[_]] (${columns.map(x => x.toField).mkString(",")})""".stripMargin
+    }
+
+  }.mkString("\n")
+}
+
+
+
+
+
