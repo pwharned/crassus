@@ -5,8 +5,8 @@ notifications:
   slackChannel: el-assets-dev
 build:
   strategy: cirrus-deployment
-  pipeline: java-v21-mvn-jdk-container-image
-  version: v2
+  pipeline: java-v21-mvn-ol-container-image
+  version: v0
   config:
     cirrus-pipeline-name: tel-tal-api-rust
     cirrus-project-name: tel-assets
