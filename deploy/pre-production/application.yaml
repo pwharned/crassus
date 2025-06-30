@@ -1,0 +1,24 @@
+apiVersion: cirrus.ibm.com/v1alpha1
+kind: Application
+metadata:
+  name: expert-labs-assets-tel-tal-api-rust 
+spec:
+  envFrom:
+    - secretRef:
+        name: rust-db-url
+  headless: false
+  livenessProbe:
+    httpGet:
+      path: /health/ping
+      port: 8080
+    periodSeconds: 30
+    timeoutSeconds: 30
+  port: 8080
+  replicas: 1
+  quota: q256mb
+  readinessProbe:
+    httpGet:
+      path: /health/ping
+      port: 8080
+    periodSeconds: 30
+    timeoutSeconds: 30

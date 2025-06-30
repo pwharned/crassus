@@ -1,0 +1,107 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.pwharned</groupId>
+    <artifactId>crassus-assembly-0</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>SBT Assembly with Maven</name>
+    <description>Maven project that uses SBT for assembly</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>copy-sbt-assembly-jar</id>
+                        <phase>package</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <copy
+                                        file="${project.basedir}/target/scala-3.7.0/${project.artifactId}.${project.version}.jar"
+                                        tofile="${project.build.directory}/${project.build.finalName}.jar"
+                                        overwrite="true"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Plugin to download and install SBT -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <!-- Execution to check if SBT is installed -->
+                    <execution>
+                        <id>check-sbt</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>sh</executable>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>command -v sbt || echo "SBT not found"</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+
+                    <!-- Execution to install SBT if not present -->
+                    <execution>
+                        <id>install-sbt</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>sh</executable>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument>
+                                    if [[ "${sbtCheckResult}" == "SBT not found" ]]; then
+                                    echo "Installing SBT...";
+                                    curl -sL "https://github.com/sbt/sbt/releases/download/v1.10.10/sbt-1.10.10.tgz" > sbt-1.10.10.tgz
+                                    tar -xcvf sbt-1.10.10.tgz
+                                    export PATH=$(pwd):$PATH
+                                    echo "SBT already installed";
+                                    fi
+                                </argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+
+                    <!-- Execution to run sbt assembly -->
+                    <execution>
+                        <id>run-sbt-assembly</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>sbt</executable>
+                            <arguments>
+                                <argument>assembly</argument>
+                            </arguments>
+                            <workingDirectory>${project.basedir}</workingDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

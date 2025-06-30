@@ -1,0 +1,16 @@
+apiVersion: automation.cio/v1alpha1
+kind: RepositoryConfig
+ealImapNumber: APM0045937
+notifications:
+  slackChannel: el-assets-dev
+build:
+  strategy: cirrus-deployment
+  pipeline: java-v21-mvn-jdk-container-image
+  version: v2
+  config:
+    cirrus-pipeline-name: tel-tal-api-rust
+    cirrus-project-name: tel-assets
+    cirrus-region: wdc-containers
+    service-port: '8080'
+    #install-packages-ci: 'gcc gcc-c++ openssl openssl-devel cmake'
+    #install-packages-verification: 'gcc gcc-c++ openssl openssl-devel cmake'
