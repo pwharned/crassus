@@ -8,7 +8,7 @@ build:
   pipeline: java-v21-mvn-ol-container-image
   version: v0
   config:
-    cirrus-pipeline-name: tel-tal-api-rust
+    cirrus-pipeline-name: crassus
     cirrus-project-name: tel-assets
     cirrus-region: wdc-containers
     service-port: '8080'
