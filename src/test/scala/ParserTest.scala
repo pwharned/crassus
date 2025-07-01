@@ -7,7 +7,7 @@ import org.pwharned.parse.fromQuery
 import scala.language.implicitConversions
 import java.nio.ByteBuffer
 import org.pwharned.database.HKD.PrimaryKey
-import org.pwharned.json.JsonDeserializer.{M, mapsSerializer, mapSerializer}
+import org.pwharned.json.JsonDeserializer.{ jsonAstDeserializer}
 import org.pwharned.json.{JsonDeserializer, deserialize}
 import org.pwharned.rpc.RpcRequest
 
@@ -123,14 +123,10 @@ def testParse(): Unit =
     case Right(value) => println("Succesful parsing: " + value)
   }
 
-  val rpcstring ="""{  "jsonrpc": "2.0","method": "subtract","params": [42, 23],"id": 1}"""
-  rpcstring.deserialize[RpcRequest] match {
-    case Left(value) => println(value)
-    case Right(value) => println(value)
-  }  
 
-  val mapString ="""{  "jsonrpc":1, "test":"test", "test2":{"test":1}  }"""
-  mapsSerializer.deserialize(mapString) match {
+
+  val mapString ="""{  "jsonrpc":1, "test":"test", "test2":{"test":1}, "test3":[1,2]  }"""
+  jsonAstDeserializer.deserialize(mapString) match {
     case Left(value) => println(value)
     case Right(value) => println(value)
   }

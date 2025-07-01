@@ -1,6 +1,7 @@
 package org.pwharned.parse
 
 import java.nio.ByteBuffer
+import scala.annotation.tailrec
 import scala.deriving.*
 import scala.compiletime.*
 
@@ -13,7 +14,47 @@ type Parser[T] = String => Either[ParseError, (T, String)]
 
 trait Parse:
 
+  extension [A](p: Parser[A])
+    /** parse p, then q, but return p’s result */
+    inline def <*[B](q: Parser[B]): Parser[A] = input =>
+      p(input).flatMap { case (a, rest1) =>
+        q(rest1).map { case (_, rest2) =>
+          (a, rest2)
+        }
+      }
 
+    def sepBy(sep: Parser[Any]): Parser[List[A]] =
+      input =>
+        // First, try to parse one element
+        p(input) match {
+          // If we fail right away, return empty list without consuming input
+          case Left(_) => Right((Nil, input))
+
+          // We got a head, now loop for more
+          case Right((head, rest0)) =>
+            @tailrec
+            def loop(acc: List[A], in: String): Either[ParseError, (List[A], String)] =
+              sep(in) match {
+                // no separator ⇒ we're done
+                case Left(_) =>
+                  Right((acc.reverse, in))
+
+                // consumed sep; now try another p
+                case Right((_, afterSep)) =>
+                  p(afterSep) match {
+                    // if parsing the next element fails, we stop
+                    case Left(_) =>
+                      Right((acc.reverse, afterSep))
+
+                    // got another element; keep going
+                    case Right((next, rest2)) =>
+                      loop(next :: acc, rest2)
+                  }
+              }
+
+            // start the loop with the first element
+            loop(List(head), rest0)
+        }
   inline def char(c: Char): Parser[Char] = input =>
     input.headOption match
       case Some(value) if value == c => Right((value, input.tail))
@@ -150,7 +191,32 @@ object Primitives extends Parse:
         } catch {
           case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
         }
-
+  inline def longParser: Parser[Long] =
+    input =>
+      val neg = if input.startsWith("-") then "-" else ""
+      val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
+      val digits = inputAfterNeg.takeWhile(_.isDigit)
+      if digits.isEmpty then Left(ParseError(0, input, s"Expected Long, found $input"))
+      else
+        try {
+          val value = (neg + digits).toInt
+          Right((value, inputAfterNeg.drop(digits.length)))
+        } catch {
+          case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
+        }
+  inline def doubleParser: Parser[Double] =
+    input =>
+      val neg = if input.startsWith("-") then "-" else ""
+      val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
+      val digits = inputAfterNeg.takeWhile( x => x.isDigit || x =='.')
+      if digits.isEmpty then Left(ParseError(0, input, s"Expected integer, found $input"))
+      else
+        try {
+          val value = (neg + digits).toInt
+          Right((value, inputAfterNeg.drop(digits.length)))
+        } catch {
+          case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
+        }
   inline def boolParser: Parser[Boolean] =
     input =>
       if input.startsWith("true") then Right((true, input.drop("true".length)))

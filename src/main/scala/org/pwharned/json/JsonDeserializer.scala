@@ -29,6 +29,10 @@ object JsonDeserializer extends Parse:
     given JsonFieldParser[Int] with
       def parser: Parser[Int] = Primitives.intParser
 
+    given JsonFieldParser[Double] with
+      def parser: Parser[Double] = Primitives.doubleParser
+    given JsonFieldParser[Long] with
+      def parser: Parser[Long] = Primitives.longParser
     given JsonFieldParser[Boolean] with
       def parser: Parser[Boolean] = Primitives.boolParser
     given JsonFieldParser[Float] with
@@ -42,6 +46,16 @@ object JsonDeserializer extends Parse:
     given [T](using underlying: JsonFieldParser[T]): JsonFieldParser[Nullable[T]] with
       def parser: Parser[Nullable[T]] =
         underlying.parser.map(Nullable(_))
+
+
+    given jsPrimitiveParser: JsonFieldParser[JsPrimitive] with
+      def parser: Parser[JsPrimitive] =
+        summon[JsonFieldParser[String]].parser
+          .alt(summon[JsonFieldParser[Int]].parser)
+          .alt(summon[JsonFieldParser[Boolean]].parser)
+          .alt(summon[JsonFieldParser[Long]].parser)
+          .alt(summon[JsonFieldParser[Double]].parser)
+          .alt(summon[JsonFieldParser[Float]].parser)
 
     // For Option[T], first check for "null"; otherwise delegate.
     given [T](using underlying: JsonFieldParser[T]): JsonFieldParser[Option[T]] with
@@ -62,6 +76,7 @@ object JsonDeserializer extends Parse:
           head <- underlying.parser // parse first element
           tail <- (comma.flatMap( _ => underlying.parser)).many
           _ <- char(']') // consume “]”
+          _ <- whitespace
         } yield head :: tail
 
   def keyValuePair[A](key: String, valueParser: Parser[A]): Parser[A] =
@@ -76,22 +91,7 @@ object JsonDeserializer extends Parse:
       _ <- whitespace
     } yield value
 
-  inline given unionFieldParser[A, B](using
-                                      evA: JsonFieldParser[A],
-                                      evB: JsonFieldParser[B]
-                                     ): JsonFieldParser[A | B] with
 
-    def parser: Parser[A | B] =
-      // widen left side
-      val pA: Parser[A | B] =
-        evA.parser.map(a => a: A | B)
-
-      // widen right side
-      val pB: Parser[A | B] =
-        evB.parser.map(b => b: A | B)
-
-      // merge
-      pA.or(pB)
 
   def keyValuePair[A](valueParser: Parser[A]): Parser[A] =
         for {
@@ -129,15 +129,7 @@ object JsonDeserializer extends Parse:
   }
 
 
-  inline given unionParser(using
-                                 pa: JsonFieldParser[Int],
-                                 pb: JsonFieldParser[String]
-                                ): JsonFieldParser[Int | String] with
-    def parser: Parser[Int | String] = input =>
-      pa.parser(input) match
-        case Right((a, rest)) => Right((a, rest))
-        case Left(_) =>
-          pb.parser(input).map((b, rest) => (b, rest))
+
 
 
   inline def deriveParsers[T <: Tuple](fieldNames: List[String]): Parser[T] =
@@ -172,74 +164,67 @@ object JsonDeserializer extends Parse:
       }
     }
 
-  inline given mapsSerializer: JsonDeserializer[Map[String, String | Int | M]] =
-    new JsonDeserializer[Map[String, String | Int | M]] {
+  type JsPrimitive = String | Int | Boolean | Long | Null | Double | Float
 
-      override def deserialize: Parser[Map[String, String | Int | M]] =
+  enum JsonAst:
+    case Obj(fields: Map[String, JsonAst])
+    case Arr(items: List[JsonAst])
+    case JsValue(value: JsPrimitive)
 
-        // 1) Build a recursive value parser
-        lazy val valueP: Parser[String | Int | M] =
-          summonInline[JsonFieldParser[Int]].parser.map(i => i: String | Int | M)
-            .alt(summonInline[JsonFieldParser[String]].parser.map(s => s: String | Int | M))
-            .alt(summonInline[JsonFieldParser[M]].parser.map(m => m: String | Int | M))
+  type JsonValue[J <: JsonAst] = J match
+    case JsonAst.Obj => Map[String, JsonValue[JsonAst]]
+    case JsonAst.Arr => List[JsonValue[JsonAst]]
+    case JsonAst.JsValue => JsPrimitive
 
-        // 2) A single "key": value pair
-        val pairP: Parser[(String, String | Int | M)] = for {
-          _ <- whitespace
-          _ <- char('"')
-          key <- stringInline
-          _ <- char('"')
-          _ <- whitespace
-          _ <- char(':')
-          _ <- whitespace
-          value <- valueP
-        } yield (key, value)
+  type ToJson[T] <: JsonAst = T match
+    case JsPrimitive => JsonAst.JsValue
+    case List[x] => JsonAst.Arr
+    case Map[String, x] => JsonAst.Obj
 
-        // 3) The full object with many pairs
-        for {
-          _ <- whitespace
-          _ <- char('{')
-          _ <- whitespace
-          first <- pairP
-          rest <- comma.flatMap(_ => pairP).many
-          _ <- char('}')
-          _ <- whitespace
-        } yield (first :: rest).toMap
-    }
+  val sample: JsonAst =
+    JsonAst.Obj(Map(
+      "name" -> JsonAst.JsValue( "alice"),
+      "age" -> JsonAst.JsValue(30.0),
+      "tags" -> JsonAst.Arr(List(JsonAst.JsValue("scala"), JsonAst.JsValue("json")))
+    ))
 
 
-  inline given mapSerializer: JsonDeserializer[M] =
-    new JsonDeserializer[M] {
+  inline given jsonAstDeserializer: JsonDeserializer[JsonAst] =
+    new JsonDeserializer[JsonAst] {
+      override def deserialize: Parser[JsonAst] =
+        new Parser[JsonAst] {
+          def apply(input: String): Either[ParseError, (JsonAst, String)] = {
+            // 1) primitive → JsonAst.JsValue
+            val primP: Parser[JsonAst] =
+              summon[JsonFieldParser[JsPrimitive]].parser
+                .map(JsonAst.JsValue)
 
-      override def deserialize: Parser[M] =
+            // 2) array → JsonAst.Arr
+            lazy val arrP: Parser[JsonAst] =
+              for {
+                _ <- char('[') <* whitespace
+                xs <- deserialize.sepBy(comma)
+                _ <- char(']') <* whitespace
+              } yield JsonAst.Arr(xs.toList)
 
-        // 1) Build a value parser for String | Int
-        val valueP: Parser[String | Int] =
-          summonInline[JsonFieldParser[String]].parser
-            .alt(summonInline[JsonFieldParser[Int]].parser)
+            // 3) object → JsonAst.Obj
+            lazy val objP: Parser[JsonAst] =
+              for {
+                _ <- char('{') <* whitespace
+                pairs <- (for {
+                  _ <- char('"')
+                  key <- stringInline
+                  _ <- char('"') <* whitespace
+                  _ <- char(':') <* whitespace
+                  v <- deserialize
+                } yield key -> v).sepBy(comma)
+                _ <- char('}') <* whitespace
+              } yield JsonAst.Obj(pairs.toMap)
 
-        // 2) A single "key": value pair as a Map
-        val pairP: Parser[Map[String, String | Int]] = for {
-          _ <- whitespace
-          _ <- char('"')
-          key <- stringInline
-          _ <- char('"')
-          _ <- whitespace
-          _ <- char(':')
-          _ <- whitespace
-          value <- valueP
-        } yield Map(key -> value)
-
-        // 3) The full object with many pairs
-        for {
-          _ <- whitespace
-          _ <- char('{')
-          _ <- whitespace
-          first <- pairP
-          rest <- comma.flatMap(_ => pairP).many
-          _ <- char('}')
-          _ <- whitespace
-        } yield (first :: rest).flatMap(_.toList).toMap
+            // try object first, then array, then primitive
+            objP(input).orElse(arrP(input)).orElse(primP(input))
+          }
+        }
     }
 
 

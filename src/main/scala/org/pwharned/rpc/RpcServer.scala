@@ -1,7 +1,9 @@
 package org.pwharned.rpc
 import org.pwharned.rpc.listToCaseClass
 import org.pwharned.http.HttpResponse
+import org.pwharned.json.JsonDeserializer.JsonFieldParser
 import org.pwharned.json.{JsonDeserializer, JsonSerializer, deserialize, serialize}
+import org.pwharned.parse.Parser
 
 import scala.compiletime.summonInline
 import scala.deriving.Mirror
@@ -19,7 +21,16 @@ trait RpcEndpoint[P<:Product, R](using js: JsonSerializer[R], mirror:Mirror.Prod
   def returnSerialized(p: P): String =
      js.serialize(call(p))
 }
-
+given unionParser(using
+                  pa: JsonFieldParser[Int],
+                  pb: JsonFieldParser[String]
+                 ): JsonFieldParser[Int | String] with
+  def parser: Parser[Int | String] = input =>
+    pa.parser(input) match
+      case Right((a, rest)) => Right((a, rest))
+      case Left(_) =>
+        pb.parser(input).map((b, rest) => (b, rest))
+        
 class RpcServer(endpoints: List[RpcEndpoint[?,?]]):
   private val byName = endpoints.map(e => e.name -> e).toMap
 
