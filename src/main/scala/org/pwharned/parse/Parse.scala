@@ -4,12 +4,15 @@ import java.nio.ByteBuffer
 import scala.deriving.*
 import scala.compiletime.*
 
-case class ParseError(position: Int, input: String, message: String)
+case class ParseError(position: Int, input: String, message: String):
+  def merge(other: ParseError): ParseError =
+    val bestPos = this.position max other.position
+    val combined = (this.message ++ other.message).distinct
+    ParseError(bestPos,input, combined)
+type Parser[T] = String => Either[ParseError, (T, String)]
 
 trait Parse:
 
-
-  type Parser[T] = String => Either[ParseError, (T, String)]
 
   inline def char(c: Char): Parser[Char] = input =>
     input.headOption match
@@ -24,7 +27,7 @@ trait Parse:
     inline def map[B](f: A => B): Parser[B] = input =>
       p(input).map { case (value, rest) => (f(value), rest) }
 
-    inline def many: Parser[List[A]] = input =>
+    def many: Parser[List[A]] = input =>
       p(input) match
         case Right((value, rest)) =>
           many(rest).map { case (values, remaining) => (value :: values, remaining) }
@@ -36,9 +39,25 @@ trait Parse:
         case Right((value, rest)) => Right((Some(value), rest))
         case Left(_) => Right((None, input))
 
-    inline def or(pAlt: Parser[A]): Parser[A] = input =>
+    inline def alt(pAlt: Parser[A]): Parser[A] = input =>
       p(input).orElse(pAlt(input))
-
+      
+    def or[B >: A](other: Parser[B]): Parser[B] = new Parser[B]:
+      override def apply(input: String): Either[ParseError,(B,String)] =
+        // 1. try the first parser
+        this(input) match
+          case right @ Right(_) =>
+            right
+  
+          case Left(err1) =>
+            // 2. on failure, backtrack: feed the original input to `other`
+            other(input) match
+              case right2 @ Right(_) =>
+                right2
+  
+              case Left(err2) =>
+                // 3. both failed: combine errors (see below)
+                Left(err1.merge(err2))
   inline def string(s: String): Parser[String] = input =>
     if input.startsWith(s) then Right((s, input.drop(s.length)))
     else Left(ParseError(0, input, s"Expected '$s'"))
@@ -123,7 +142,7 @@ object Primitives extends Parse:
       val neg = if input.startsWith("-") then "-" else ""
       val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
       val digits = inputAfterNeg.takeWhile(_.isDigit)
-      if digits.isEmpty then Left(ParseError(0, input, "Expected integer"))
+      if digits.isEmpty then Left(ParseError(0, input, s"Expected integer, found $input"))
       else
         try {
           val value = (neg + digits).toInt

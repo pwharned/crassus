@@ -41,6 +41,13 @@ object JsonSerializer:
     def serialize(ob: String): String = {
       if ob == null then "null" else s"\"${ob}\""
     }
+  given JsonSerializer[Int|String] with
+    def serialize(ob: Int|String): String = {
+      ob match {
+        case x: Int => x.toString
+        case y: String => s"\"${ob}\""
+      }
+    }
 
   given JsonSerializer[Boolean] with
     def serialize(ob: Boolean): String = ob.toString

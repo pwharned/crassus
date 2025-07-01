@@ -113,7 +113,7 @@ object RouteRegistry:
       // Decode the bytes using the desired charset.
       val s = new String(bytes, StandardCharsets.UTF_8)
       s.deserialize[New[T]] match {
-        case Right(value) => toResponse(db.create[New[T], Persisted[T]](value))(enc.apply)
+        case Right(value) => toResponse(db.create[New[T], Persisted[T]](value._1))(enc.apply)
         case Left(exception) => Future(HttpResponse.error(exception.message))
       }
 
@@ -191,7 +191,7 @@ object RouteRegistry:
 
 
       s.deserialize[Updated[T]] match {
-          case Right(value) => toResponse(db.update[Updated[T], Persisted[T]](value,b))(enc.apply)
+          case Right(value) => toResponse(db.update[Updated[T], Persisted[T]](value._1,b))(enc.apply)
           case Left(exception) => Future(HttpResponse.error(exception.message))
         }
   

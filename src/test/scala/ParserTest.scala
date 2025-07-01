@@ -3,9 +3,15 @@ package org.pwharned
 import org.pwharned.parse.ParseBuffer
 import org.pwharned.parse.ParseBuffer.{flatMap, map}
 import org.pwharned.parse.fromQuery
+
 import scala.language.implicitConversions
 import java.nio.ByteBuffer
 import org.pwharned.database.HKD.PrimaryKey
+import org.pwharned.json.JsonDeserializer.{M, mapsSerializer, mapSerializer}
+import org.pwharned.json.{JsonDeserializer, deserialize}
+import org.pwharned.rpc.RpcRequest
+
+import scala.compiletime.summonInline
 @main
 def testParse(): Unit =
   
@@ -96,8 +102,8 @@ def testParse(): Unit =
   val completeUserFromQuery3 =
     """""".stripMargin.fromQuery[Optional[User]]
   completeUserFromQuery3 match {
-    case Left(value) => throw Exception("This should not have failed, user is complete " + value.message + " " + value.input + " " + value.position)
-    case Right(value) => println("Succesful parsing")
+    case Left(value) => println("This will fail because we dont accept a completely empty string as parsable")
+    case Right(value) =>throw Exception("This should  have failed, user is not complete ")
   }
 
 
@@ -105,8 +111,26 @@ def testParse(): Unit =
   case class User2[F[_]](
                          name: F[Nullable[String]]
                        )
-  timed{
-    (0 to 1).foreach{
-      x => test.deserialize[Persisted[User2]]
-    }
+
+
+  case class nested(id: Int)
+  case class nester(nest: nested)
+  val nested_test = """{"nest":{"id": 1}}"""
+  val nested_deserialized = nested_test.deserialize[nester]
+
+  nested_deserialized match {
+    case Left(value) => println(value)
+    case Right(value) => println("Succesful parsing: " + value)
+  }
+
+  val rpcstring ="""{  "jsonrpc": "2.0","method": "subtract","params": [42, 23],"id": 1}"""
+  rpcstring.deserialize[RpcRequest] match {
+    case Left(value) => println(value)
+    case Right(value) => println(value)
+  }  
+
+  val mapString ="""{  "jsonrpc":1, "test":"test", "test2":{"test":1}  }"""
+  mapsSerializer.deserialize(mapString) match {
+    case Left(value) => println(value)
+    case Right(value) => println(value)
   }

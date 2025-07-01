@@ -3,7 +3,7 @@ package org.pwharned
 import generated.*
 import org.pwharned.database.HKD.*
 import org.pwharned.database.{ConnectionDetails, Database, DbTypeMapper, EnvLoader, FieldType, PostgresTypeMapper, SelectStatement, SqlSelect, UnionFields, UnionTypes, retrieve}
-import org.pwharned.http.HttpMethod.{GET, HttpMethod}
+import org.pwharned.http.HttpMethod.{GET, HttpMethod, POST}
 import org.pwharned.http.HttpRequest.HttpRequest
 import org.pwharned.http.{BodyEncoder, HttpResponse, Segment, asPath}
 import org.pwharned.route.Router.{Route, route}
@@ -13,13 +13,17 @@ import org.pwharned.server.HTTPServer
 import org.pwharned.http.jsonArrayEncoder
 import org.pwharned.json.serialize
 import org.pwharned.http.toPath
+import org.pwharned.json.deserialize
 import org.pwharned.http.{jsonIteratorEncoder, sseIteratorEncoder}
+import org.pwharned.rpc.{RpcEndpoint, RpcRequest, RpcServer, Schema, listToCaseClass}
 
+import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
 import java.util.concurrent.Executors
 import scala.compiletime.summonInline
 import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.deriving.Mirror
 
 case class assetAttributes(result: String)
 
@@ -49,6 +53,33 @@ def main(): Unit =
 
   //inline def r: Route[Http, GET] = route[Http,GET](GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
   inline def r = route[SSE,GET](GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
+  inline def rpc = route[SSE,POST](POST, "/api/rpc".asPath, (req: HttpRequest) => Future{
+
+    rpcServer.handle(StandardCharsets.UTF_8.decode(req.body).toString)
+
+  })
+
+  case class SubtractOne(args: List[Int])
+  case class SubtractOneArgs(a:Int, b: Int)
+  case class SubtractOneResult(r: Int)
+  inline given SubtractOneEndpoint: RpcEndpoint[SubtractOneArgs, SubtractOneResult]:
+    val name = "subtractOne"
+
+    def call(p: SubtractOneArgs) = SubtractOneResult(p.a - p.b)
+
+    inline override def decodeParams(args: List[Int| String]): Either[String, SubtractOneArgs] =
+      try Right(listToCaseClass[SubtractOneArgs](args))
+      catch
+        case e: Throwable =>
+          Left(s"bad args for SubtractOneArgs: ${e.getMessage}")
+  
+    override def schemaP: Schema[SubtractOneArgs] = Schema[SubtractOneArgs]
+
+    override def schemaR: Schema[SubtractOneResult] = Schema[SubtractOneResult]
+
+
+  inline def rpcServer = new RpcServer(endpoints = List(SubtractOneEndpoint))
+
 
   // HTTP: one JSON array
   given Database.type = Database
@@ -69,7 +100,7 @@ def main(): Unit =
 
   inline def assetAttributeRoute = RouteRegistry.get[Http, IdHKD[assetAttributes]]
   inline def parent_child_route = RouteRegistry.get[Http, IdHKD[parent_child]]
-  inline def table: RoutingTable[Segment, Protocal] = RoutingTable.build[Segment, Protocal](List(assetAttributeRoute, parent_child_route))
+  inline def table: RoutingTable[Segment, Protocal] = RoutingTable.build[Segment, Protocal](List(assetAttributeRoute, parent_child_route, rpc))
 
 
   HTTPServer.start(8080, table)

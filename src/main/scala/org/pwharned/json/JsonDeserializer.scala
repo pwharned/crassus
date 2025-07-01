@@ -1,7 +1,7 @@
 package org.pwharned.json
 
 import org.pwharned.database.HKD.{Nullable, PrimaryKey}
-import org.pwharned.parse.{Parse, ParseError, Primitives}
+import org.pwharned.parse.{Parse, ParseError, Parser, Primitives}
 
 import scala.compiletime.*
 import scala.deriving.*
@@ -15,7 +15,7 @@ def showTypeMacroImpl[T: Type](using Quotes): Expr[String] =
   Expr(TypeRepr.of[T].show)
 
 trait JsonDeserializer[T]:
-  def deserialize(s: String): Either[ParseError, T]
+  def deserialize: Parser[T]
 
 object JsonDeserializer extends Parse:
 
@@ -56,29 +56,14 @@ object JsonDeserializer extends Parse:
           }
 
     given listParser[T](using underlying: JsonFieldParser[T]): JsonFieldParser[List[T]] with
-      def parser: String => Either[ParseError, (List[T], String)] =
-        input =>
-          val inner = input.trim
-            .stripPrefix("[")
-            .stripSuffix("]")
-            .trim
+      def parser: Parser[List[T]] =
+        for {
+          _ <- char('[') // consume “[”
+          head <- underlying.parser // parse first element
+          tail <- (comma.flatMap( _ => underlying.parser)).many
+          _ <- char(']') // consume “]”
+        } yield head :: tail
 
-          if inner.isEmpty then
-            Right((Nil, ""))
-          else
-            val tokens = inner.split(",").toList.map(_.trim)
-
-            // foldLeft to accumulate (List[T], "") without needing a final reverse:
-            val init: Either[ParseError, (List[T], String)] = Right((List.empty, ""))
-            val result = tokens.foldLeft(init) { (accE, tok) =>
-              for {
-                (xs, _) <- accE // current List[T]
-                (x, rem) <- underlying.parser(tok) // parse this one
-              } yield (xs :+ x, "") // append x onto xs
-            }
-
-            result
-            
   def keyValuePair[A](key: String, valueParser: Parser[A]): Parser[A] =
     for {
       _     <- char('"')
@@ -91,6 +76,35 @@ object JsonDeserializer extends Parse:
       _ <- whitespace
     } yield value
 
+  inline given unionFieldParser[A, B](using
+                                      evA: JsonFieldParser[A],
+                                      evB: JsonFieldParser[B]
+                                     ): JsonFieldParser[A | B] with
+
+    def parser: Parser[A | B] =
+      // widen left side
+      val pA: Parser[A | B] =
+        evA.parser.map(a => a: A | B)
+
+      // widen right side
+      val pB: Parser[A | B] =
+        evB.parser.map(b => b: A | B)
+
+      // merge
+      pA.or(pB)
+
+  def keyValuePair[A](valueParser: Parser[A]): Parser[A] =
+        for {
+          _ <- char('"')
+          key <- stringInline
+          _ <- char('"')
+          _ <- char(':')
+          _ <- whitespace
+          value <- valueParser
+          _ <- comma.optional
+          _ <- whitespace
+        } yield value
+
   // If a key is missing, return None without consuming input.
   def optKeyValuePair[A](key: String, valueParser: Parser[A]): Parser[Option[A]] =
     input =>
@@ -102,14 +116,29 @@ object JsonDeserializer extends Parse:
   // Selects the correct parser based on field type.
   inline def fieldParser[h](key: String): Parser[h] = {
     inline erasedValue[h] match {
+
       case _: Option[t] =>
 
         optKeyValuePair(key, summonInline[JsonFieldParser[t]].parser).asInstanceOf[Parser[h]]
+      case _: Product =>keyValuePair(key, summonInline[JsonDeserializer[h]].deserialize)
+
       case _ =>
         keyValuePair(key, summonInline[JsonFieldParser[h]].parser)
     }
+
   }
-  
+
+
+  inline given unionParser(using
+                                 pa: JsonFieldParser[Int],
+                                 pb: JsonFieldParser[String]
+                                ): JsonFieldParser[Int | String] with
+    def parser: Parser[Int | String] = input =>
+      pa.parser(input) match
+        case Right((a, rest)) => Right((a, rest))
+        case Left(_) =>
+          pb.parser(input).map((b, rest) => (b, rest))
+
 
   inline def deriveParsers[T <: Tuple](fieldNames: List[String]): Parser[T] =
     inline erasedValue[T] match
@@ -129,35 +158,116 @@ object JsonDeserializer extends Parse:
 
           }
 
+  type M = Map[String, String | Int]
+
+  inline given JsonFieldParser[M] = new JsonFieldParser[M] {
+    def parser: Parser[M] = summonInline[JsonDeserializer[M]].deserialize
+  }
+
+  inline given jsonFieldParserFromDeserializer[A](using jd: JsonDeserializer[A]): JsonFieldParser[A] =
+    new JsonFieldParser[A] {
+      def parser: Parser[A] = new Parser[A] {
+        def apply(input: String): Either[ParseError, (A, String)] =
+          jd.deserialize(input) // no remaining input
+      }
+    }
+
+  inline given mapsSerializer: JsonDeserializer[Map[String, String | Int | M]] =
+    new JsonDeserializer[Map[String, String | Int | M]] {
+
+      override def deserialize: Parser[Map[String, String | Int | M]] =
+
+        // 1) Build a recursive value parser
+        lazy val valueP: Parser[String | Int | M] =
+          summonInline[JsonFieldParser[Int]].parser.map(i => i: String | Int | M)
+            .alt(summonInline[JsonFieldParser[String]].parser.map(s => s: String | Int | M))
+            .alt(summonInline[JsonFieldParser[M]].parser.map(m => m: String | Int | M))
+
+        // 2) A single "key": value pair
+        val pairP: Parser[(String, String | Int | M)] = for {
+          _ <- whitespace
+          _ <- char('"')
+          key <- stringInline
+          _ <- char('"')
+          _ <- whitespace
+          _ <- char(':')
+          _ <- whitespace
+          value <- valueP
+        } yield (key, value)
+
+        // 3) The full object with many pairs
+        for {
+          _ <- whitespace
+          _ <- char('{')
+          _ <- whitespace
+          first <- pairP
+          rest <- comma.flatMap(_ => pairP).many
+          _ <- char('}')
+          _ <- whitespace
+        } yield (first :: rest).toMap
+    }
+
+
+  inline given mapSerializer: JsonDeserializer[M] =
+    new JsonDeserializer[M] {
+
+      override def deserialize: Parser[M] =
+
+        // 1) Build a value parser for String | Int
+        val valueP: Parser[String | Int] =
+          summonInline[JsonFieldParser[String]].parser
+            .alt(summonInline[JsonFieldParser[Int]].parser)
+
+        // 2) A single "key": value pair as a Map
+        val pairP: Parser[Map[String, String | Int]] = for {
+          _ <- whitespace
+          _ <- char('"')
+          key <- stringInline
+          _ <- char('"')
+          _ <- whitespace
+          _ <- char(':')
+          _ <- whitespace
+          value <- valueP
+        } yield Map(key -> value)
+
+        // 3) The full object with many pairs
+        for {
+          _ <- whitespace
+          _ <- char('{')
+          _ <- whitespace
+          first <- pairP
+          rest <- comma.flatMap(_ => pairP).many
+          _ <- char('}')
+          _ <- whitespace
+        } yield (first :: rest).flatMap(_.toList).toMap
+    }
+
+
   inline given derived[T <: Product](using m: Mirror.ProductOf[T]): JsonDeserializer[T] =
     new JsonDeserializer[T]:
-      def deserialize(s: String): Either[ParseError, T] =
-        // Get names from the case class at compile time.
+      def deserialize: Parser[T] =
         val fieldNames: List[String] =
           constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
-        // Build a JSON object parser:
+
         val parser: Parser[m.MirroredElemTypes] =
           for {
-            _      <- whitespace
-            _      <- char('{')
-            _      <- whitespace
+            _ <- whitespace
+            _ <- char('{')
+            _ <- whitespace
             values <- deriveParsers[m.MirroredElemTypes](fieldNames)
-            _      <- whitespace
-            _      <- char('}')
+            _ <- whitespace
+            _ <- char('}')
           } yield values
 
-        parser(s) match {
-          case Right((tuple, remaining)) =>
-            if remaining.trim.nonEmpty then
-              Left(ParseError(0, remaining, "Extra input after JSON"))
-            else
-              try Right(m.fromTuple(tuple))
+        input =>
+          parser(input) match
+            case Right((tuple, rest)) =>
+              try Right((m.fromTuple(tuple), rest))
               catch case e: Exception =>
-                Left(ParseError(0, s, s"Error constructing instance: ${e.getMessage}"))
-          case Left(err) => Left(err)
-        }
-        
+                Left(ParseError(0, input, s"Error constructing instance: ${e.getMessage}"))
+            case Left(err) => Left(err)
+
 extension (s: String)
-  def deserialize[A <: Product](using j: JsonDeserializer[A]): Either[ParseError, A] = summon[JsonDeserializer[A]].deserialize(s)
+  def deserialize[A <: Product](using j: JsonDeserializer[A]): Either[ParseError, (A, String)] = summon[JsonDeserializer[A]].deserialize.apply(s)
 
 
