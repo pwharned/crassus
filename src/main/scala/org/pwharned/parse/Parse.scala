@@ -55,13 +55,7 @@ trait Parse:
             // start the loop with the first element
             loop(List(head), rest0)
         }
-  inline def char(c: Char): Parser[Char] = input =>
-    input.headOption match
-      case Some(value) if value == c => Right((value, input.tail))
-      case Some(value) => Left(ParseError(0, input, s"Expected '$c', found '$value'"))
-      case None => Left(ParseError(0, input, s"Unexpected end of input, expected '$c'"))
 
-  extension [A](p: Parser[A])
     inline def flatMap[B](f: A => Parser[B]): Parser[B] = input =>
       p(input).flatMap { case (value, rest) => f(value)(rest) }
 
@@ -73,7 +67,7 @@ trait Parse:
         case Right((value, rest)) =>
           many(rest).map { case (values, remaining) => (value :: values, remaining) }
         case Left(_) => Right((Nil, input))
-        
+
 
     inline def optional: Parser[Option[A]] = input =>
       p(input) match
@@ -82,23 +76,38 @@ trait Parse:
 
     inline def alt(pAlt: Parser[A]): Parser[A] = input =>
       p(input).orElse(pAlt(input))
-      
+
     def or[B >: A](other: Parser[B]): Parser[B] = new Parser[B]:
-      override def apply(input: String): Either[ParseError,(B,String)] =
+      override def apply(input: String): Either[ParseError, (B, String)] =
         // 1. try the first parser
-        this(input) match
-          case right @ Right(_) =>
+        this (input) match
+          case right@Right(_) =>
             right
   
           case Left(err1) =>
             // 2. on failure, backtrack: feed the original input to `other`
             other(input) match
-              case right2 @ Right(_) =>
+              case right2@Right(_) =>
                 right2
   
               case Left(err2) =>
                 // 3. both failed: combine errors (see below)
                 Left(err1.merge(err2))
+    
+    def token: Parser[A] =
+      for {
+        _ <- whitespace
+        a <- p
+        _ <- whitespace
+      } yield a
+
+  inline def char(c: Char): Parser[Char] = input =>
+    input.headOption match
+      case Some(value) if value == c => Right((value, input.tail))
+      case Some(value) => Left(ParseError(0, input, s"Expected '$c', found '$value'"))
+      case None => Left(ParseError(0, input, s"Unexpected end of input, expected '$c'"))
+
+
   inline def string(s: String): Parser[String] = input =>
     if input.startsWith(s) then Right((s, input.drop(s.length)))
     else Left(ParseError(0, input, s"Expected '$s'"))
@@ -108,7 +117,7 @@ trait Parse:
     else Left(ParseError(0, input, s"Expected '$s'"))
 
   inline def whitespace: Parser[String] = input =>
-    val spaces = input.takeWhile(_.isWhitespace)
+    val spaces = input.takeWhile( x=> x.isWhitespace || x == '\n')
     Right((spaces, input.drop(spaces.length)))
 
   inline def comma: Parser[Unit] = input =>
@@ -123,12 +132,6 @@ trait Parse:
     val id = input.takeWhile(c => c!= '"')
     Right((id, input.drop(id.length)))
 
-  def token[A](p: Parser[A]): Parser[A] =
-    for {
-      _ <- whitespace
-      a <- p
-      _ <- whitespace
-    } yield a
 
 
 trait ParseBuffer:
@@ -221,7 +224,7 @@ object Primitives extends Parse:
     input =>
       if input.startsWith("true") then Right((true, input.drop("true".length)))
       else if input.startsWith("false") then Right((false, input.drop("false".length)))
-      else Left(ParseError(0, input, "Expected boolean"))
+      else Left(ParseError(0, input, s"Expected boolean, found $input"))
 
   inline def floatParser: Parser[Float] =
     input =>

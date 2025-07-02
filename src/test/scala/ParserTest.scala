@@ -7,8 +7,9 @@ import org.pwharned.parse.fromQuery
 import scala.language.implicitConversions
 import java.nio.ByteBuffer
 import org.pwharned.database.HKD.PrimaryKey
-import org.pwharned.json.JsonDeserializer.{ jsonAstDeserializer}
+import org.pwharned.json.JsonDeserializer.{JsonAst, jsonAstDeserializer}
 import org.pwharned.json.{JsonDeserializer, deserialize}
+import org.pwharned.parse.Primitives.whitespace
 import org.pwharned.rpc.RpcRequest
 
 import scala.compiletime.summonInline
@@ -98,7 +99,12 @@ def testParse(): Unit =
     case Left(value) => throw Exception("This should not have failed, user is complete " + value.message + " " + value.input + " " + value.position)
     case Right(value) => println("Succesful parsing")
   }
-
+  val sample: JsonAst =
+    JsonAst.Obj(Map(
+      "name" -> JsonAst.JsValue( "alice"),
+      "age" -> JsonAst.JsValue(30.0),
+      "tags" -> JsonAst.Arr(List(JsonAst.JsValue("scala"), JsonAst.JsValue("json")))
+    ))
   val completeUserFromQuery3 =
     """""".stripMargin.fromQuery[Optional[User]]
   completeUserFromQuery3 match {
@@ -125,8 +131,22 @@ def testParse(): Unit =
 
 
 
-  val mapString ="""{  "jsonrpc":1, "test":"test", "test2":{"test":1}, "test3":[1,2]  }"""
+  val mapString ="""\n{  "$jsonrpc":1, "test": "test", "test2":{"test":1}, "test3":[1,2]  }"""
   jsonAstDeserializer.deserialize(mapString) match {
     case Left(value) => println(value)
     case Right(value) => println(value)
+  }
+
+  val test2 = """{
+                |"$id": "https://spec.openapis.org/oas/3.1/schema/2025-02-13",
+                |  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                |  "description": "The description of OpenAPI v3.1.x Documents without Schema Object validation",
+                |  "type": "object"}""".stripMargin
+  jsonAstDeserializer.deserialize(test2) match {
+    case Left(value) => println(value)
+    case Right(value) => println(value)
+  }
+
+  whitespace("\n") match {
+    case Right(value) => println("Found the following whitespace"+ value._2.length)
   }
