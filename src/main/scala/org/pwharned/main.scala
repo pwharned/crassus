@@ -1,30 +1,30 @@
 package org.pwharned
 
 import generated.*
+import org.pwharned.`lazy`.Lazy
 import org.pwharned.database.HKD.*
-import org.pwharned.database.{ConnectionDetails, Database, DbTypeMapper, EnvLoader, FieldType, PostgresTypeMapper, SelectStatement, SqlSelect, UnionFields, UnionTypes, retrieve}
+import org.pwharned.database.{ConnectionDetails, Database, DbTypeMapper, EnvLoader, PostgresTypeMapper, SelectStatement, SqlSelect}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod, POST}
-import org.pwharned.http.HttpRequest.HttpRequest
-import org.pwharned.http.{BodyEncoder, HttpResponse, Segment, asPath}
-import org.pwharned.route.Router.{Route, route}
-import org.pwharned.route.RoutingTable.RoutingTable
-import org.pwharned.route.{Http, Protocal, RouteRegistry, RoutingTable, SSE, httpConnection, httpWriter, sseConnection, sseWriter}
-import org.pwharned.server.HTTPServer
-import org.pwharned.http.jsonArrayEncoder
 import org.pwharned.json.serialize
+import org.pwharned.http.HttpRequest.HttpRequest
+import org.pwharned.http.{HttpResponse, Segment, asPath, textBodyEncoder}
+import org.pwharned.route.Router.{Route, route}
+import org.pwharned.route.{AnyNode, RouteRegistry, RoutingTable, httpConnection, sseConnection}
+import org.pwharned.http.{Http, Protocal, SSE, SocketWriter}
+import org.pwharned.server.HTTPServer
 import org.pwharned.http.toPath
-import org.pwharned.json.deserialize
-import org.pwharned.http.{jsonIteratorEncoder, sseIteratorEncoder}
-import org.pwharned.rpc.{RpcEndpoint, RpcRequest, RpcServer, Schema, listToCaseClass}
-
+import org.pwharned.http.jsonIteratorEncoder
+import org.pwharned.openapi.{Schema, components, schema, server, given}
+import org.pwharned.rpc.{RpcEndpoint, RpcSchema, RpcServer, listToCaseClass}
+import org.pwharned.http.{httpWriter, sseWriter}
+import org.pwharned.openapi.toOpenApi
 import java.nio.charset.StandardCharsets
-import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
 import java.util.concurrent.Executors
 import scala.compiletime.summonInline
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.Mirror
-
+import org.pwharned.route.RouteRegistry.lazily
 case class assetAttributes(result: String)
 
 object assetAttributes:
@@ -52,8 +52,8 @@ def main(): Unit =
 
 
   //inline def r: Route[Http, GET] = route[Http,GET](GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
-  inline def r = route[SSE,GET](GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
-  inline def rpc = route[SSE,POST](POST, "/api/rpc".asPath, (req: HttpRequest) => Future{
+  inline def r = route[SSE,GET, String](GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
+  inline def rpc = route[SSE,POST, String](POST, "/api/rpc".asPath, (req: HttpRequest) => Future{
 
     rpcServer.handle(StandardCharsets.UTF_8.decode(req.body).toString)
 
@@ -65,7 +65,7 @@ def main(): Unit =
   inline given SubtractOneEndpoint: RpcEndpoint[SubtractOneArgs, SubtractOneResult]:
     val name = "subtractOne"
 
-    def call(p: SubtractOneArgs) = SubtractOneResult(p.a - p.b)
+    def call(p: SubtractOneArgs): SubtractOneResult = SubtractOneResult(p.a - p.b)
 
     inline override def decodeParams(args: List[Int| String]): Either[String, SubtractOneArgs] =
       try Right(listToCaseClass[SubtractOneArgs](args))
@@ -73,9 +73,9 @@ def main(): Unit =
         case e: Throwable =>
           Left(s"bad args for SubtractOneArgs: ${e.getMessage}")
   
-    override def schemaP: Schema[SubtractOneArgs] = Schema[SubtractOneArgs]
+    override def schemaP: RpcSchema[SubtractOneArgs] = RpcSchema[SubtractOneArgs]
 
-    override def schemaR: Schema[SubtractOneResult] = Schema[SubtractOneResult]
+    override def schemaR: RpcSchema[SubtractOneResult] = RpcSchema[SubtractOneResult]
 
 
   inline def rpcServer = new RpcServer(endpoints = List(SubtractOneEndpoint))
@@ -93,15 +93,22 @@ def main(): Unit =
 
   Database.createPool(connectionDetails)
   inline def assetRoutes = RouteRegistry.resourceRoutes[Http, assets]
-  
-  type IdHKD[T] = [F[_]] =>> T
 
+  inline def getAssetsRoute = RouteRegistry.get[Http,assets]
 
 
   inline def assetAttributeRoute = RouteRegistry.get[Http, IdHKD[assetAttributes]]
-  inline def parent_child_route = RouteRegistry.get[Http, IdHKD[parent_child]]
-  inline def table: RoutingTable[Segment, Protocal] = RoutingTable.build[Segment, Protocal](List(assetAttributeRoute, parent_child_route, rpc))
 
+  inline def parent_child_route = RouteRegistry.get[Http, IdHKD[parent_child]]
+  //println(getAssetsRoute.schema)
+  val schema = summonInline[Schema[parent_child]].toSchema.serialize
+
+
+  val routes = List(assetAttributeRoute, parent_child_route, rpc)
+
+  println(routes.toOpenApi.serialize)
+  lazy val table  = RoutingTable.build(routes.map( x=> Lazy(() => x)))
+  inline def ro: Option[AnyNode[Protocal]]  = table.find(GET, "/api/assetAttributes".toPath)
 
   HTTPServer.start(8080, table)
 

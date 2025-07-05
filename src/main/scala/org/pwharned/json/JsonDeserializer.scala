@@ -9,13 +9,7 @@ import scala.quoted.*
 import org.pwharned.database.HKD.~>.idToId
 import org.pwharned.json
 
-final class Lazy[T](private val thunk: () => T):
-  lazy val value: T = thunk()
-
-object Lazy:
-  inline given [T](using inline t: => T): Lazy[T] =
-    new Lazy(() => t)
-
+import  org.pwharned.`lazy`.Lazy
 
 type JsPrimitive = String | Int | Boolean | Long | Null | Double | Float
 

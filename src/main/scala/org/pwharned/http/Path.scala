@@ -23,10 +23,12 @@ object Query:
 
 object Identifier:
   opaque type Identifier[X] = X
-
   def apply[X](x: X): Identifier[X] = x
-  given [T]: Conversion[T, Identifier[T]] = x => Identifier(x)
 
+  extension [X](id: Identifier.Identifier[X])
+    def value: X = id
+
+  given [T]: Conversion[T, Identifier[T]] = x => Identifier(x)
 sealed trait Segment
 object Segment:
   final case class Static(segment: PathSegment.PathSegment) extends Segment
@@ -60,6 +62,7 @@ object HttpPath:
   def filter(f: HttpPath => HttpPath): HttpPath = HttpPath.filter(f)
   extension (hp: HttpPath)
     def segments: List[Segment] = hp._1
+    
     def query: Query.Query = hp._2
   // Helper function to safely convert a String into a PathSegment.
   private def toPathSegment(s: String): PathSegment.PathSegment = PathSegment(s)
@@ -97,7 +100,6 @@ object HttpPath:
 
 
 extension (inline s: String) inline def asPath: HttpPath = HttpPath.literal(s)
-
 extension ( s: String)  def toPath: HttpPath = HttpPath(s)
 
 // Use the runtime classifier on each segment:

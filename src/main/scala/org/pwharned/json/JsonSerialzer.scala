@@ -6,6 +6,7 @@ import org.pwharned.json
 import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.deriving.*
+import org.pwharned.`lazy`.Lazy
 
 trait JsWrap[F[_], A]:
   def wrap(fa: F[A], serializeA: A => String): String
@@ -31,8 +32,15 @@ object JsonSerializer:
         val readers = summonAllUnwrapped[m.MirroredElemTypes]
           .map(_.asInstanceOf[JsonSerializer[Any]]) // widen so we can .read
         // 3. read each column (you could prefix the column 
-        val jsonFields = fieldNames.zipWithIndex.map { case (k,v)  => s""""$k":${readers(v).serialize(productValues(v))  }""" }
-        s"{ ${jsonFields.mkString(", ")} }"
+
+        val fields = fieldNames.zip(readers.zip(productValues)).filter {
+          case (name, (ser, v)) => v!=null & v!=None & v!=Nil
+        }.map {
+          case (name, (ser, v)) => s""""$name":${ser.serialize(v)}"""
+        }
+
+        s"{${fields.mkString(",")}}"
+
       def serialize(obj:List[T]): String = "[" + obj.map(x => serialize(x)).mkString(",") + "]"
 
       def serialize(obj: Iterator[T]): String =  obj.foldLeft("[")( (acc, x) =>  acc + serialize( x) + "," ).stripSuffix(",") + "]"
@@ -41,13 +49,7 @@ object JsonSerializer:
     def serialize(ob: String): String = {
       if ob == null then "null" else s"\"${ob}\""
     }
-  given JsonSerializer[Int|String] with
-    def serialize(ob: Int|String): String = {
-      ob match {
-        case x: Int => x.toString
-        case y: String => s"\"${ob}\""
-      }
-    }
+
 
   given JsonSerializer[Boolean] with
     def serialize(ob: Boolean): String = ob.toString
@@ -60,7 +62,10 @@ object JsonSerializer:
   given JsonSerializer[java.util.UUID] with
     def serialize(ob: java.util.UUID): String = ob.toString
 
-
+  given mapSerializer[A](using base: JsonSerializer[A]): JsonSerializer[Map[String, A]] with
+    def serialize(ob: Map[String, A]): String = "{" + ob.map(x => {
+      s"\"${x._1}\":${base.serialize(x._2)}"
+    }).mkString(",") + "}"
   given listSerializer[A](using base: JsonSerializer[A]): JsonSerializer[List[A]] with
     def serialize(ob: List[A]): String = "[" + ob.map(x =>  base.serialize(x) ).mkString(",") + "]"
   given iteratorSerializer[A](using base: JsonSerializer[A]): JsonSerializer[Iterator[A]] with
@@ -84,11 +89,11 @@ object JsonSerializer:
   private inline def summonAllUnwrapped[Elems <: Tuple]: List[JsonSerializer[?]] =
     inline erasedValue[Elems] match
       case _: EmptyTuple   => Nil
-      case _: (h *: t)     => summonInline[JsonSerializer[h]] :: summonAllUnwrapped[t]
+      case _: (h *: t)     => summonInline[Lazy[JsonSerializer[h]]].value :: summonAllUnwrapped[t]
 
 
 
-extension[T<:Product](obj: T) (using json: JsonSerializer[T])
+extension[T](obj: T) (using json: JsonSerializer[T])
   inline def serialize: String = summon[JsonSerializer[T]].serialize(obj)
 extension[T <: Product] (obj: Iterator[T]) (using json: JsonSerializer[T] )
   inline def serialize: String = summon[JsonSerializer[Iterator[T]]].serialize(obj)

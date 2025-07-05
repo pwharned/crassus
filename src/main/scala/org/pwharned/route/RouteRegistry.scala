@@ -1,13 +1,15 @@
 package org.pwharned.route
 
-import org.pwharned.database.{Database, PrimaryKeyExtractor, update, PrimaryKeyFields, SqlInsert, SqlSelect, create, delete, retrieve, retrieveParameterized}
+import org.pwharned.`lazy`.Lazy
+import org.pwharned.database.{Database, PrimaryKeyExtractor, PrimaryKeyFields, SqlInsert, SqlSelect, create, delete, retrieve, retrieveParameterized, update}
 import org.pwharned.database.HKD.*
 import org.pwharned.http.HttpMethod.{DELETE, GET, HttpMethod, PATCH, POST}
-import org.pwharned.http.{BodyEncoder, HttpRequest, HttpResponse, Segment, toPath}
+import org.pwharned.http.{BodyEncoder, HttpRequest, HttpResponse, Protocal, Segment, SocketWriter, toPath}
 import org.pwharned.route.Router.Route
 import org.pwharned.json.{JsonDeserializer, JsonSerializer, deserialize}
 import org.pwharned.macros.toTuple
 import org.pwharned.parse.{QueryDeserializer, fromQuery}
+import org.pwharned.openapi.{Schema, given_Schema_Iterator}
 
 import java.nio.charset.StandardCharsets
 import scala.concurrent.Future
@@ -17,8 +19,8 @@ import scala.deriving.Mirror
 import scala.util.{Failure, Success, Try}
 
 private def toResponse[A](fa: Future[Try[A]])
-                         (encode: A => HttpResponse)
-                         (using ExecutionContext): Future[HttpResponse] =
+                         (encode: A => HttpResponse[A])
+                         (using ExecutionContext): Future[HttpResponse[A]  ]  =
 
   fa.map {
     case Failure(exception) => HttpResponse.error(exception.getMessage)
@@ -36,7 +38,7 @@ object RouteRegistry:
                                          ch: ConnectionHandler[P],
                                          ec: ExecutionContext,
                                          m: Mirror.ProductOf[Persisted[T]]
-                                        ): Route[P, GET] =
+                                        ): Route[P, GET,  Iterator[Persisted[T]]] =
 
     val table = constValue[m.MirroredLabel]
 
@@ -66,7 +68,7 @@ object RouteRegistry:
                                             ch: ConnectionHandler[P],
                                             ec: ExecutionContext,
                                             m: Mirror.ProductOf[Persisted[T]]
-                                           ): Route[P, GET] =
+                                           ): Route[P, GET, Iterator[Persisted[T]]] =
 
     val table = constValue[m.MirroredLabel]
 
@@ -101,7 +103,7 @@ object RouteRegistry:
                                                  ec: ExecutionContext,
                                               jds: JsonDeserializer[New[T]],
                                                  m: Mirror.ProductOf[Persisted[T]]
-                                                ): Route[P, POST] =
+                                                ): Route[P, POST, Iterator[Persisted[T]]] =
 
     val table = constValue[m.MirroredLabel]
     // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
@@ -130,7 +132,7 @@ object RouteRegistry:
                                               ch: ConnectionHandler[P],
                                               ec: ExecutionContext,
                                               m: Mirror.ProductOf[Persisted[T]]
-                                             ): Route[P, DELETE] =
+                                             ): Route[P, DELETE, Iterator[Persisted[T]]] =
   
     val tableName = constValue[m.MirroredLabel]
     // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
@@ -165,8 +167,10 @@ object RouteRegistry:
                                               sw: SocketWriter[P],
                                               ch: ConnectionHandler[P],
                                               ec: ExecutionContext,
-                                              m: Mirror.ProductOf[Updated[T]]
-                                             ): Route[P, PATCH] =
+                                              m: Mirror.ProductOf[Updated[T]],
+                                             pm: Mirror.ProductOf[Persisted[T]]
+                                            
+                                             ): Route[P, PATCH, Iterator[Persisted[T]]] =
   
     val tableName = constValue[m.MirroredLabel]
     // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
@@ -219,7 +223,7 @@ object RouteRegistry:
 
                                                       // Query-specific requirements
                                                       queryDeserializer: QueryDeserializer[Optional[T]]
-                                                     ): List[Route[P, ? <: HttpMethod]] = {
+                                                     ): List[Route[P, ? <: HttpMethod, ?]] = {
 
     // Generate all routes for this entity
     List(
@@ -230,3 +234,12 @@ object RouteRegistry:
       patch[P, T] // PATCH /api/entity/{id}
     )
   }
+
+
+  extension [P[_] <: Protocal[_], M <: HttpMethod, T](routes: List[Route[P, M, T]])
+    inline def lazily: List[Lazy[Route[P, M, T]]] =
+      routes.map(r => Lazy( () =>  r))
+
+  extension [R <: Route[_, _, _]](routes: List[R])
+    inline def lazily: List[Lazy[R]] =
+      routes.map(r => new Lazy(() => r))

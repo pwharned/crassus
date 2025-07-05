@@ -1,53 +1,57 @@
 package org.pwharned.http
 
 import org.pwharned.json.{JsonSerializer, serialize}
-import org.pwharned.route.{Http, SSE}
+import org.pwharned.http.{Http, SSE}
 
 import java.nio.charset.StandardCharsets
 
 /** Build a streaming HTTP body for a concrete protocol P from a DB
  * result of type R. */
 trait BodyEncoder[P[_], R]:
-  def apply(r: R): HttpResponse        // we return the *whole* response
+  def apply(r: R): HttpResponse[R]        // we return the *whole* response
 
 object BodyEncoder:
   // Convenience summon
   inline def apply[P[_], R](using be: BodyEncoder[P, R]): BodyEncoder[P, R] = be
 
-given jsonIteratorEncoder[A<:Product](using js: JsonSerializer[A])
-  : BodyEncoder[Http, Iterator[A]] with
 
-  def apply(rows: Iterator[A]): HttpResponse =
+given jsonIteratorEncoder[A <: Product](using js: JsonSerializer[A])
+: BodyEncoder[Http, Iterator[A]] with
 
-    /* ----------------------- 1. build a chunk iterator -------------------- */
-    // every chunk is already a UTF-8 byte array ready to be sent
-    val chunks: Iterator[Array[Byte]] =
-      if !rows.hasNext then                        // empty result  ⇒  "[]"
-        Iterator.single("[]".getBytes(StandardCharsets.UTF_8))
+  def apply(rows: Iterator[A]): HttpResponse[Iterator[A]] =
+    val chunks =
+      if !rows.hasNext then Iterator.single("[]".getBytes)
       else
-        val jsonRows  = rows.map(_.serialize)      // Iterator[String]
-        val firstElem = Iterator.single("[" + jsonRows.next())   // "[<row0>"
-        val restElems = jsonRows.map("," + _)                     // ",<rowN>"
-        val closing   = Iterator.single("]")                      // "]"
-        (firstElem ++ restElems ++ closing).map(_.getBytes(StandardCharsets.UTF_8))
+        val jr       = rows.map(_.serialize)
+        val first    = Iterator.single(("[" + jr.next()).getBytes)
+        val middles  = jr.map("," + _).map(_.getBytes)
+        val closing  = Iterator.single("]".getBytes)
+        first ++ middles ++ closing
 
-    /* ----------------------- 2. wrap into Body.Streamed ------------------- */
     val body = Body.Streamed(() =>
       if chunks.hasNext then Some(chunks.next()) else None
     )
-    
+
     HttpResponse(
       status  = 200,
       headers = Headers(Map("Content-Type" -> "application/json")),
       body    = body
     )
-given jsonArrayEncoder[A<:Product](using js: JsonSerializer[A]): BodyEncoder[Http, List[A]] with
-  def apply(rows: List[A]): HttpResponse =
-    val json = rows.map(_.serialize).mkString("[", ",", "]")
-    HttpResponse.ok(json, Headers(Map("Content-Type" -> "application/json")))
+given jsonArrayEncoder[A <: Product](using js: JsonSerializer[A])
+: BodyEncoder[Http, List[A]] with
+
+  def apply(rows: List[A]): HttpResponse[List[A]] =
+    HttpResponse.ok(rows, Headers(Map("Content-Type" -> "application/json")))
+
+given textBodyEncoder
+: BodyEncoder[Http, String ] with
+
+  def apply(response: String): HttpResponse[String] =
+    HttpResponse.ok(response, Headers(Map("Content-Type" -> "text/plain")))
+
 /** Encode rows to a *continuous* SSE stream: every row is one JSON line.   */
 given sseEncoder[A<:Product](using js: JsonSerializer[A]): BodyEncoder[SSE, LazyList[A]] with
-  def apply(rows: LazyList[A]): HttpResponse =
+  def apply(rows: LazyList[A]): HttpResponse[LazyList[A]] =
     // build a pull-based function for Body.Streamed
     def nextChunk(it: Iterator[A])(): Option[Array[Byte]] =
       if it.hasNext then
@@ -65,7 +69,7 @@ given sseEncoder[A<:Product](using js: JsonSerializer[A]): BodyEncoder[SSE, Lazy
       body    = body
     )
 given sseIteratorEncoder[A<:Product](using js: JsonSerializer[A]): BodyEncoder[SSE, Iterator[A]] with
-  def apply(rows: Iterator[A]): HttpResponse =
+  def apply(rows: Iterator[A]): HttpResponse[Iterator[A]] =
     // build a pull-based function for Body.Streamed
     def nextChunk(it: Iterator[A])(): Option[Array[Byte]] =
       if it.hasNext then

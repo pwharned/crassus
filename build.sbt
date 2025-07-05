@@ -23,7 +23,7 @@ ThisBuild/ scalacOptions ++= Seq(
   "-encoding", "UTF-8",
   "-feature",
   "-unchecked",
-  "-Ystatistics",
+  "-Xlog-implicits"
 )
 lazy val root = project.in(file("."))
   .settings(

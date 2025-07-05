@@ -372,6 +372,7 @@
         "parameters": [
           {
             "name": "petId",
+            "name": "petId",
             "in": "path",
             "description": "ID of pet that needs to be updated",
             "required": true,

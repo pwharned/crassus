@@ -42,5 +42,5 @@ def writeAndFlush[F[_]](client: SocketChannel, data: String)(using F: Async[F]):
 // A helper to convert HttpResponse into an SSE-friendly string.
 // In a real app, you would convert your data structure (e.g., JSON) into the text that
 // follows the SSE protocol format (e.g., "data: ...\n\n").
-def responseToSSEString(resp: HttpResponse): String =
+def responseToSSEString[A](resp: HttpResponse[A]): String =
   s"data: ${resp.toString}\n\n"

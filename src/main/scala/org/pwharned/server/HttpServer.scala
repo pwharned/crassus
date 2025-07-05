@@ -1,6 +1,6 @@
 package org.pwharned.server
 import org.pwharned.http.HttpMethod.HttpMethod
-import org.pwharned.http.{HttpPath, HttpRequest, HttpResponse, Segment, asRequest, toPath}
+import org.pwharned.http.{Http, HttpPath, HttpRequest, HttpResponse, Protocal, Segment, SocketWriter, asRequest, toPath, httpWriter}
 import org.pwharned.route.*
 import org.pwharned.route.Router
 import org.pwharned.route.given
@@ -16,7 +16,7 @@ import scala.util.{Failure, Success}
 import org.pwharned.database.HKD.~>.idToId
 
 
-def sendResponseAsync(socket: Socket, response: Future[HttpResponse])(using ec: ExecutionContext): Unit =
+def sendResponseAsync(socket: Socket, response: Future[HttpResponse[?]])(using ec: ExecutionContext): Unit =
   val out = PrintWriter(socket.getOutputStream, true)
   response.onComplete{
     case Failure(exception) =>   out.println(s"HTTP/1.1 500 Bad Request")
@@ -29,7 +29,7 @@ def sendResponseAsync(socket: Socket, response: Future[HttpResponse])(using ec: 
     }
   }
 
-def sendResponse(socket: Socket, response: HttpResponse): Unit =
+def sendResponse(socket: Socket, response: HttpResponse[?]): Unit =
     val out = PrintWriter(socket.getOutputStream, true)
         out.println(s"HTTP/1.1 ${response.status} OK")
         response.headers.asMap foreach { case (key, value) => out.println(s"$key: $value") }
@@ -38,7 +38,7 @@ def sendResponse(socket: Socket, response: HttpResponse): Unit =
         out.flush()
         socket.close()
 
-def sendResponse(socket: SocketChannel, response: HttpResponse): Unit =
+def sendResponse(socket: SocketChannel, response: HttpResponse[?]): Unit =
   val statusLine = s"HTTP/1.1 ${response.status} OK\r\n"
   val headers = response.headers.asMap.map { case (key, value) => s"$key: $value\r\n" }.mkString
   val body = s"\r\n${response.body}"
@@ -98,7 +98,7 @@ object HTTPServer:
 
   given ExecutionContext = ExecutionContext.fromExecutor(ex)
 
-  inline def start(inline port: Int, inline routingTable: RoutingTable.RoutingTable[Segment,Protocal]): Unit =
+  inline def start(inline port: Int, inline routingTable: RoutingTable.RoutingTable[HttpMethod,Protocal]): Unit =
 
     val serverChannel = ServerSocketChannel.open()
     serverChannel.bind(new InetSocketAddress(port))
@@ -132,7 +132,7 @@ object HTTPServer:
                 _.route.map { route =>
                   route.processRequest(clientChannel,req)
                 }
-              }.getOrElse(Future(HttpResponse.notFound()).flatMap(res => summon[SocketWriter[Http]].write(clientChannel, res)))
+              }.getOrElse(Future(HttpResponse.notFound).flatMap(res => summon[SocketWriter[Http]].write(clientChannel, res)))
 
 
               response.onComplete {

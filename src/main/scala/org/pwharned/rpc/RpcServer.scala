@@ -4,13 +4,13 @@ import org.pwharned.http.HttpResponse
 import org.pwharned.json.JsonDeserializer
 import org.pwharned.json.{JsonDeserializer, JsonSerializer, deserialize, serialize}
 import org.pwharned.parse.Parser
-
+import org.pwharned.http.textBodyEncoder
 import scala.compiletime.summonInline
 import scala.deriving.Mirror
 
 trait RpcEndpoint[P<:Product, R](using js: JsonSerializer[R], mirror:Mirror.ProductOf[P]) {
-  def schemaP: Schema[P]
-  def schemaR: Schema[R]
+  def schemaP: RpcSchema[P]
+  def schemaR: RpcSchema[R]
   def call(p: P): R
   def name: String
   
@@ -34,7 +34,7 @@ given unionParser(using
 class RpcServer(endpoints: List[RpcEndpoint[?,?]]):
   private val byName = endpoints.map(e => e.name -> e).toMap
 
-  def handle(raw: String): HttpResponse =
+  def handle(raw: String): HttpResponse[String] =
     // 1) parse the outer RpcRequest
     summonInline[JsonDeserializer[RpcRequest]].deserialize(raw) match
       case Left(err) =>

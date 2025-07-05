@@ -32,6 +32,9 @@ object HKD:
 
 
   type Id[A] = A
+  type IdHKD[T] = [F[_]] =>> T
+  type UnHKD[H[_[_]]] = H[[X] =>> Id[X]]
+
 
   // ── Natural Transformation Helper ──
   trait ~>[F[_], G[_]]:

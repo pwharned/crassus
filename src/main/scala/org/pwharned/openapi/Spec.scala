@@ -1,20 +1,20 @@
 package org.pwharned.openapi
 
-import org.pwharned.json.JsonDeserializer.mapDeserializer
-import org.pwharned.json.deserialize
+import org.pwharned.json.{serialize, deserialize}
 case class root(
                       openapi: String,
                       info:      info,
                       servers:   List[server],
                       paths:     Map[String, pathItem],
-                      components: components
+                      components: Option[components]
                     )
 
 // info
 case class info(
                  version: String,
                  title:   String,
-                 license: Option[license]
+                 description: String,
+                 license: Option[license] =  None
                )
 
 case class license(
@@ -29,7 +29,10 @@ case class server(
 // paths
 case class pathItem(
                      get:  Option[operation] = None,
-                     post: Option[operation] = None
+                     post: Option[operation] = None,
+                     patch:  Option[operation] = None,
+                     delete: Option[operation] = None,
+                     put:  Option[operation] = None
                    )
 
 case class operation(
@@ -72,10 +75,13 @@ case class components(
 case class schema(
                    `type`:     Option[String]              = None,
                    format:     Option[String]              = None,
-                   items:      Option[items]              = None,
+                   example:      Option[items]              = None,
                    `$ref`:     Option[String]              = None,
-                additionalProperties: Option[schema]
+                   items: Option[schema] = None,
+                   additionalProperties: Option[schema] = None,
+                   properties: Option[Map[String, schema]] = None
                  )
+
 
 case class items(`type`: Option[String], `$ref`: Option[String])
 @main
@@ -94,5 +100,5 @@ def test:Unit =
       |}""".stripMargin
   rawJson.deserialize[root] match {
     case Left(value) => println(value)
-    case Right(value) => println(value)
+    case Right(value) => println(value._1.serialize)
   }
