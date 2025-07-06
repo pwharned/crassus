@@ -40,7 +40,9 @@ case class operation(
                       operationId: String,
                       tags:        List[String],
                       parameters:  Option[List[parameter]] = None,
-                      responses:   Map[String, response]
+                      responses:   Map[String, response],
+                      requestBody:  Option[request] = None
+
                     )
 
 case class parameter(
@@ -57,6 +59,11 @@ case class response(
                      content:     Option[Map[String, mediaType]] = None
                    )
 
+case class request(
+                     description: Option[String],
+                     headers: Option[Map[String, header]] = None,
+                     content: Option[Map[String, mediaType]] = None
+                   )
 case class header(
                    description: String,
                    schema:      schema
@@ -75,7 +82,6 @@ case class components(
 case class schema(
                    `type`:     Option[String]              = None,
                    format:     Option[String]              = None,
-                   example:      Option[items]              = None,
                    `$ref`:     Option[String]              = None,
                    items: Option[schema] = None,
                    additionalProperties: Option[schema] = None,
@@ -98,7 +104,11 @@ def test:Unit =
       |}
 
       |}""".stripMargin
+  import org.pwharned.json.JsonSerializer.given
+  import org.pwharned.json.JsWrap.given
+
   rawJson.deserialize[root] match {
     case Left(value) => println(value)
     case Right(value) => println(value._1.serialize)
   }
+

@@ -117,8 +117,7 @@ def main(): Unit =
 
 
   println(routes.toOpenApi.serialize)
-
-
+  
   lazy val table  = RoutingTable.build(routes.map( x=> Lazy(() => x)))
   println(table)
   HTTPServer.start(8080, table)

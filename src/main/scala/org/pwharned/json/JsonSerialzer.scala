@@ -53,6 +53,14 @@ object JsonSerializer:
       if ob == null then "null" else s"\"${ob}\""
     }
 
+  given unionSerializer[A, B](using
+                              sa: JsonSerializer[A],
+                              sb: JsonSerializer[B]
+                             ): JsonSerializer[A | B] with
+
+    def serialize(ab: A | B): String = ab match
+      case a: A => sa.serialize(a)
+      case b: B => sb.serialize(b)
 
   given JsonSerializer[Boolean] with
     def serialize(ob: Boolean): String = ob.toString

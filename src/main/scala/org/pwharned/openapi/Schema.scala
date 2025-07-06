@@ -2,6 +2,8 @@ package org.pwharned.openapi
 
 
 import org.pwharned.database.summonFieldTypes
+
+import java.nio.ByteBuffer
 import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -60,6 +62,20 @@ given Schema[Int] with
 given Schema[String] with
   def labels = Nil
   def `type`  = Some("string")
+  def toSchema = schema(`type` = `type`)
+
+given Schema[Unit] with
+  def labels = Nil
+
+  def `type` = None
+
+  def toSchema = schema(`type` = `type`)
+
+given Schema[ByteBuffer] with
+  def labels = Nil
+
+  def `type` = None
+
   def toSchema = schema(`type` = `type`)
 
 given [A](using sch: Schema[A]): Schema[Iterator[A]] with

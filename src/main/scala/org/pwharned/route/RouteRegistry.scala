@@ -10,6 +10,7 @@ import org.pwharned.json.{JsonDeserializer, JsonSerializer, deserialize}
 import org.pwharned.macros.toTuple
 import org.pwharned.parse.{QueryDeserializer, fromQuery}
 import org.pwharned.openapi.{Schema, given_Schema_Iterator}
+import org.pwharned.openapi.given_Schema_Unit
 
 import java.nio.charset.StandardCharsets
 import scala.concurrent.Future
@@ -102,7 +103,8 @@ object RouteRegistry:
                                                  ch: ConnectionHandler[P],
                                                  ec: ExecutionContext,
                                               jds: JsonDeserializer[New[T]],
-                                                 m: Mirror.ProductOf[Persisted[T]]
+                                                 m: Mirror.ProductOf[Persisted[T]],
+                                            mr: Mirror.ProductOf[New[T]]
                                                 ): Route[P, POST, New[T], Iterator[Persisted[T]]] =
 
     val table = constValue[m.MirroredLabel]
@@ -198,7 +200,7 @@ object RouteRegistry:
                                                       ch: ConnectionHandler[P],
                                                       ec: ExecutionContext,
                                                       mPersisted: Mirror.ProductOf[Persisted[T]],
-
+                                                      mNew: Mirror.ProductOf[New[T]],
                                                       // Create-specific requirements
                                                       sqlC: SqlInsert[New[T]],
                                                       jdsNew: JsonDeserializer[New[T]],
