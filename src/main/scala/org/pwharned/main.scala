@@ -7,16 +7,12 @@ import org.pwharned.database.{ConnectionDetails, Database, DbTypeMapper, EnvLoad
 import org.pwharned.http.HttpMethod.{GET, HttpMethod, POST}
 import org.pwharned.json.{JsonSerializer, JsonString, serialize}
 import org.pwharned.http.HttpRequest.HttpRequest
-import org.pwharned.http.{HttpResponse, Segment, asPath, textBodyEncoder}
+import org.pwharned.http.{Body, Headers, Http, HttpResponse, Protocal, SSE, Segment, SocketWriter, asPath, httpWriter, jsonIteratorEncoder, sseWriter, textBodyEncoder, toPath}
 import org.pwharned.route.Router.{Route, route}
 import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection, sseConnection}
-import org.pwharned.http.{Http, Protocal, SSE, SocketWriter}
 import org.pwharned.server.HTTPServer
-import org.pwharned.http.toPath
-import org.pwharned.http.jsonIteratorEncoder
 import org.pwharned.openapi.{Schema, components, schema, server, given}
 import org.pwharned.rpc.{RpcEndpoint, RpcSchema, RpcServer, listToCaseClass}
-import org.pwharned.http.{httpWriter, sseWriter}
 import org.pwharned.openapi.toOpenApi
 
 import java.nio.charset.StandardCharsets
@@ -68,6 +64,18 @@ def main(): Unit =
 
   })
 
+  inline def swagger = route[Http, GET, Unit, String](GET, "/doc/openapi".asPath, (req: HttpRequest[Unit]) => Future {
+    val source = scala.io.Source.fromFile("static/index.html")
+    HttpResponse (body = Body.text(source.getLines().mkString), headers = Headers(Map("content-type"-> "text/html")))
+
+  })
+
+  inline def openapi = route[Http, GET, Unit, String](GET, "/doc/openapi.json".asPath, (req: HttpRequest[Unit]) => Future {
+    val source = scala.io.Source.fromFile("static/openapi.json")
+    HttpResponse(body = Body.text(source.getLines().mkString), headers = Headers(Map("content-type" -> "text/html")))
+
+  })
+
   case class SubtractOne(args: List[Int])
   case class SubtractOneArgs(a:Int, b: Int)
   case class SubtractOneResult(r: Int)
@@ -110,16 +118,23 @@ def main(): Unit =
 
   inline def parent_child_route = RouteRegistry.get[Http, IdHKD[parent_child]]
 
-  val jsString: JsonString = JsonString("hello")
-  val serialized = jsString.serialize
-  println(serialized)
-  val routes = List(assetAttributeRoute, parent_child_route, r)
+
+  val routes = List(assetAttributeRoute, parent_child_route, r, swagger, openapi)
 
 
-  println(routes.toOpenApi.serialize)
+
+  import java.io.PrintWriter
+
+  val pw = new PrintWriter("static/openapi.json") // opens (or creates) the file
+  try {
+    pw.write(routes.toOpenApi.serialize)
+  } finally {
+    pw.close() // always close to flush and free resources
+  }
+
+  println()
   
   lazy val table  = RoutingTable.build(routes.map( x=> Lazy(() => x)))
-  println(table)
   HTTPServer.start(8080, table)
 
 

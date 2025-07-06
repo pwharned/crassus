@@ -70,9 +70,13 @@ object Router:
       val summary = s"${m.toLowerCase} a ${returnType.toLowerCase}"
       val operationId= s"${m.toLowerCase}_${returnType.toLowerCase}"
       val mediaType = new mediaType(schema = ressch.toSchema)
-      val req: Option[request] = ressch.toSchema match {
-        case x if x.`type`.isEmpty => None
-        case _ => Some(request(Some("A correctly formatted request"), headers = None,  Some(Map("application/json" ->  new mediaType(schema = reqsch.toSchema)))))
+      val req: Option[request] = reqsch.toSchema match {
+        case x if x.`type`.isEmpty => {
+          None
+        }
+        case x => {
+          Some(request(Some("A correctly formatted request"), headers = None,  Some(Map("application/json" ->  new mediaType(schema = reqsch.toSchema)))))
+        }
       }
       val res = response("Successful operation", headers = None, content = Some(Map("application/json" -> mediaType )))
 
