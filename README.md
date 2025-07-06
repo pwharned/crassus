@@ -1,14 +1,92 @@
 # Crassus
 
-Demonstrating how to use Scala3 macros and mirrors to 
-1. Automatically generate case classes that reflect the structure of a table in a sql databse
-2. Automatically generate implementations for retrieving intances of the case class from java.sql.Result set in a typesafe manner
+A fully contained, self documenting framework for developing  REST and RPC APIs in scala3. 
 
+This project has zero dependencies, everything is written from scratch in scala3.
+
+It includes:
+
+1. A simple web server built using JVM virtual threads
+2. Json serialization/Deserialization
+3. A parser and workflow for automatically generating HTTP routes based on SQL DDL ( Db2 and Postgres)
+4. Automatic OpenAPI generation
+
+
+# Create a simple route
+
+Following is an example of how to create a simple route based on a SQL statement
+
+```
+// Create an execution context and a type mapper to map Sql Types to Postgres - Db2 is also supported
+given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
+given DbTypeMapper = PostgresTypeMapper
+given Database.type = Database
+
+// load some database connection details.
+val connectionDetails = EnvLoader.loadFromEnvFile[ConnectionDetails](".env") match {
+case Right(details) => details
+case Left(error) =>
+  println(s"Error: $error")
+  sys.exit(1)
+}
+// create a pool
+Database.createPool(connectionDetails)
+
+// create a small case class to capture thee results from the database.
+
+case class parent_child(child: String, Parent: String)
+
+// specify the select statement that goes with this
+object parent_child:
+  given SelectStatement[parent_child]:
+    override def select: String = "select a.name as child, b.name as parent from attributes a join parent c on c.caid = a.id join parent p on p.paid = c.paid join attributes b on b.id = p.paid"
+
+// create the route
+inline def parent_child_route = RouteRegistry.get[Http, IdHKD[parent_child]]
+val routes = List(parent_child_route)
+
+// build and serve the routing table
+lazy val table  = RoutingTable.build(routes.map( x=> Lazy(() => x)))
+HTTPServer.start(8080, table)
+
+```
+
+# Creating Routes with Automatic Openapi generaiton
+
+
+
+```
+
+  inline def swagger = route[Http, GET, Unit, String](GET, "/doc/openapi".asPath, (req: HttpRequest[Unit]) => Future {
+    val source = scala.io.Source.fromFile("static/index.html")
+    HttpResponse (body = Body.text(source.getLines().mkString), headers = Headers(Map("content-type"-> "text/html")))
+
+  })
+  
+  
+  val routes = List(assetAttributeRoute, parent_child_route, r, swagger, openapi)
+
+
+  import java.io.PrintWriter
+
+  val pw = new PrintWriter("static/openapi.json") // opens (or creates) the file
+  try {
+    pw.write(routes.toOpenApi.serialize)
+  } finally {
+    pw.close() // always close to flush and free resources
+  }
+  
+  lazy val table  = RoutingTable.build(routes.map( x=> Lazy(() => x)))
+  HTTPServer.start(8080, table)
+
+  
+```
 # Case class generation
 
 Since Dotty does not support generation of case classes which are visible outside of the scope of the macro expansion, we use a multi stage build project. The caseClassGenerator uses a simple parser
 combinator to take a SQL DDL statement and transform it into an in internal parsable structure. From here, we simply write the case class definition to a source file visible in the main project,
 mapping the SQL datatypes to their Scala/Java representation.
+
 
 # Inline retrieval methods using Mirror type class derivation
 
@@ -38,7 +116,7 @@ Returning a lazily evaluated stream of instances of our case class.
 
 # Automatic Route Generation, HTTP Server, JSON Serialization/Deserialization
 
-Ultimate goal is to have a no boilerplate HTTP server that automatically generates routes corresponding to all basic CRUD operations on a given table. For example, given the following table:
+We can create a no boilerplate HTTP server that automatically generates routes corresponding to all basic CRUD operations on a given table. For example, given the following table:
 
 ```
 create table user(id: int not null primary key, name: String)
@@ -75,8 +153,7 @@ Currently this is achievable with the following:
 
 ```
 
-We use a very simple HTTP server that is nonetheless highly concurrent, I am not an expert at evaluating these things but at the moment it is outperforming my rust server by a significant margin, finishing 10k GET Requests to a table with 100 users in around ten seconds, which corresponds to almost 1k requests per seconds runing on my laptop.
-
+A simple but highly concurrent and fault tolerant HTTP server:
 ```
 
 ❯ python test.py --url "http://localhost:8080/api/user" --requests 10000
