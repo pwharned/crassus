@@ -91,8 +91,8 @@ def unwrappedTypeImpl[T: Type](using Quotes): Expr[String] = {
       loop(arg)
 
     case other =>
-      report.error(s"Unsupported field type: ${other.show}")
-      "Unsupported"
+      report.warning(s"Potentially Unsupported field type: ${other.show} will be converted to String")
+      "String"
   }
 
   Expr(loop(TypeRepr.of[T]))

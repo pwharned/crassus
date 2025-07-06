@@ -3,6 +3,7 @@ package org.pwharned.json
 
 import org.pwharned.database.HKD.*
 import org.pwharned.json
+
 import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.deriving.*
@@ -19,6 +20,8 @@ object JsWrap:
       val a = conv(value)
       if a == null then "null" // raw null → JSON null
       else ser(a) // otherwise delegate to base serializer
+  // the following is provided for cases when we have an already properly recored JsonString that enters the program, usually directly from the database.
+      // in this case we have to avoid wrapping the String value in double quotes.
 
 trait JsonSerializer[T]:
   def serialize(obj: T): String

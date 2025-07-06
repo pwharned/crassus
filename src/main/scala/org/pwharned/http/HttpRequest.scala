@@ -5,32 +5,49 @@ import org.pwharned.http.HttpPath.HttpPath
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import scala.compiletime.summonInline
 
 object HttpRequest:
   // The HttpRequest opaque type is now a tuple of four ByteBuffers:
   // (method, path, headers, body)
-  opaque type HttpRequest = (ByteBuffer, ByteBuffer, ByteBuffer, ByteBuffer)
+  opaque type HttpRequest[B] = (ByteBuffer, ByteBuffer, ByteBuffer, B)
 
+  type ReqParam[Req] = Req match
+    case Unit => HttpRequest // the old opaque-tuple type
+    case _ => HttpRequest[Req] // the new generic version
+  extension (req: HttpRequest[ByteBuffer])
+    inline def as[B](using br: BodyReader[B]): Either[String, HttpRequest[B]] =
+      br.read(req.body).map { b =>
+        HttpRequest(req._1, req._2, req._3, b)
+      }
   object HttpRequest:
     // Construct an HttpRequest from its parts.
-    def apply(
+    def apply[B](
                method: ByteBuffer,
                path: ByteBuffer,
                headers: ByteBuffer,
-               body: ByteBuffer
-             ): HttpRequest =
+               body: B
+             ): HttpRequest[B] =
       (method, path, headers, body)
 
-    /** Parses a full HTTP request from a ByteBuffer.
-     *
-     * Expects the request to be in the format:
-     *   METHOD SP PATH SP HTTP-Version CRLF
-     *   (headers terminated by CRLFCRLF)
-     *   BODY
-     */
-    def fromFullBuffer(buffer: ByteBuffer): Option[HttpRequest] =
+    given routeConversion[B, A](using br: BodyReader[B])
+    : Conversion[HttpRequest[B] => HttpResponse[A],
+      HttpRequest[ByteBuffer] => HttpResponse[A]] =
+      handler =>
+        rawReq =>
+          br.read(rawReq._4) match
+            case Left(err) =>
+              HttpResponse.error(
+                s"Bad Request – cannot parse JSON: $err"
+              )
+            case Right(decoded) =>
+              // re‐package and call the user’s handler
+              val typedReq =
+                HttpRequest(rawReq._1, rawReq._2, rawReq._3, decoded)
+              handler(typedReq)
+    def fromFullBuffer(buffer: ByteBuffer): Option[HttpRequest[ByteBuffer]] =
       // Work on a duplicate so we don't modify the caller's buffer.
-  
+
 
       def readUntil(delim: Byte): Option[ByteBuffer] =
         val start = buffer.position()
@@ -92,11 +109,11 @@ object HttpRequest:
       Some(HttpRequest(methodSlice, pathSlice, headersSlice, bodySlice))
 
   // Extension methods give you a nice API to work with HttpRequest.
-  extension (req: HttpRequest)
+  extension[B] (req: HttpRequest[B])
     private def methodBuffer: ByteBuffer = req._1
     private def pathBuffer: ByteBuffer = req._2
     private def headersBuffer: ByteBuffer = req._3
-    private def bodyBuffer: ByteBuffer = req._4
+    private def bodyBuffer: B = req._4
 
     // Decode the ByteBuffer into a String. We use a duplicate in order not to disturb positions.
     def method: HttpMethod.HttpMethod =
@@ -114,7 +131,7 @@ object HttpRequest:
         headersBuffer.arrayOffset() + headersBuffer.position(),
         headersBuffer.remaining(),
         StandardCharsets.UTF_8)
-    def body: ByteBuffer = bodyBuffer
+    def body: B = bodyBuffer
+    def parse: Option[HttpRequest[B]] = Some(req)
+extension (b: java.nio.ByteBuffer) def asRequest: Option[HttpRequest.HttpRequest[ByteBuffer]] = HttpRequest.HttpRequest.fromFullBuffer(b)
 
-    def parse: Option[HttpRequest] = Some(req)
-extension (b: java.nio.ByteBuffer) def asRequest: Option[HttpRequest.HttpRequest] = HttpRequest.HttpRequest.fromFullBuffer(b)

@@ -38,12 +38,12 @@ object RouteRegistry:
                                          ch: ConnectionHandler[P],
                                          ec: ExecutionContext,
                                          m: Mirror.ProductOf[Persisted[T]]
-                                        ): Route[P, GET,  Iterator[Persisted[T]]] =
+                                        ): Route[P, GET,  Unit, Iterator[Persisted[T]]] =
 
     val table = constValue[m.MirroredLabel]
 
 
-    route(GET, s"/api/$table".toPath, (req: HttpRequest.HttpRequest) =>
+    route(GET, s"/api/$table".toPath, (req: HttpRequest.HttpRequest[Unit]) =>
 
       {
 
@@ -68,7 +68,7 @@ object RouteRegistry:
                                             ch: ConnectionHandler[P],
                                             ec: ExecutionContext,
                                             m: Mirror.ProductOf[Persisted[T]]
-                                           ): Route[P, GET, Iterator[Persisted[T]]] =
+                                           ): Route[P, GET, Unit, Iterator[Persisted[T]]] =
 
     val table = constValue[m.MirroredLabel]
 
@@ -78,7 +78,7 @@ object RouteRegistry:
     val dynamicIndexes = path.segments.zipWithIndex.collect {
       case (dynamic: Segment.Dynamic, index) => index
     }
-    route(GET, path, (req: HttpRequest.HttpRequest) =>
+    route(GET, path, (req: HttpRequest.HttpRequest[Unit]) =>
 {
   val keyStrings: List[String] =
     dynamicIndexes.map(req.path.segments.collect {
@@ -103,21 +103,15 @@ object RouteRegistry:
                                                  ec: ExecutionContext,
                                               jds: JsonDeserializer[New[T]],
                                                  m: Mirror.ProductOf[Persisted[T]]
-                                                ): Route[P, POST, Iterator[Persisted[T]]] =
+                                                ): Route[P, POST, New[T], Iterator[Persisted[T]]] =
 
     val table = constValue[m.MirroredLabel]
     // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
     val path = s"/api/$table".toPath
 
-    route(POST, path, (req: HttpRequest.HttpRequest) => {
-      val bytes = new Array[Byte](req.body.remaining())
-      req.body.get(bytes)
-      // Decode the bytes using the desired charset.
-      val s = new String(bytes, StandardCharsets.UTF_8)
-      s.deserialize[New[T]] match {
-        case Right(value) => toResponse(db.create[New[T], Persisted[T]](value._1))(enc.apply)
-        case Left(exception) => Future(HttpResponse.error(exception.message))
-      }
+    route(POST, path, (req: HttpRequest.HttpRequest[New[T]]) => {
+    
+     toResponse(db.create[New[T], Persisted[T]](req.body))(enc.apply)
 
 
     }
@@ -132,7 +126,7 @@ object RouteRegistry:
                                               ch: ConnectionHandler[P],
                                               ec: ExecutionContext,
                                               m: Mirror.ProductOf[Persisted[T]]
-                                             ): Route[P, DELETE, Iterator[Persisted[T]]] =
+                                             ): Route[P, DELETE, Unit, Iterator[Persisted[T]]] =
   
     val tableName = constValue[m.MirroredLabel]
     // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
@@ -142,7 +136,7 @@ object RouteRegistry:
       case (dynamic: Segment.Dynamic, index) => index
     }
   
-    route(DELETE, path, (req: HttpRequest.HttpRequest) => {
+    route(DELETE, path, (req: HttpRequest.HttpRequest[Unit]) => {
       val keyStrings: List[String] =
         dynamicIndexes.map(req.path.segments.collect {
           case dynamic: Segment.Static => dynamic.segment.toString
@@ -170,7 +164,7 @@ object RouteRegistry:
                                               m: Mirror.ProductOf[Updated[T]],
                                              pm: Mirror.ProductOf[Persisted[T]]
                                             
-                                             ): Route[P, PATCH, Iterator[Persisted[T]]] =
+                                             ): Route[P, PATCH, Updated[T], Iterator[Persisted[T]]] =
   
     val tableName = constValue[m.MirroredLabel]
     // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
@@ -180,24 +174,16 @@ object RouteRegistry:
       case (dynamic: Segment.Dynamic, index) => index
     }
   
-    route(PATCH, path, (req: HttpRequest.HttpRequest) => {
+    route(PATCH, path, (req: HttpRequest.HttpRequest[Updated[T]]) => {
   
       val keyStrings: List[String] = dynamicIndexes.map(req.path.segments.collect {
         case dynamic: Segment.Static => dynamic.segment.toString
       })
 
       val b: PrimaryKeyFields[Updated[T]]#Out = toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Updated[T]]#Out]
-  
-  
-      val bytes = new Array[Byte](req.body.remaining())
-      req.body.get(bytes)
-      val s = new String(bytes, StandardCharsets.UTF_8)
 
 
-      s.deserialize[Updated[T]] match {
-          case Right(value) => toResponse(db.update[Updated[T], Persisted[T]](value._1,b))(enc.apply)
-          case Left(exception) => Future(HttpResponse.error(exception.message))
-        }
+         toResponse(db.update[Updated[T], Persisted[T]](req.body,b))(enc.apply)
   
     }
     )
@@ -223,7 +209,7 @@ object RouteRegistry:
 
                                                       // Query-specific requirements
                                                       queryDeserializer: QueryDeserializer[Optional[T]]
-                                                     ): List[Route[P, ? <: HttpMethod, ?]] = {
+                                                     ): List[Route[P, ? <: HttpMethod,?, ?]] = {
 
     // Generate all routes for this entity
     List(
@@ -236,10 +222,10 @@ object RouteRegistry:
   }
 
 
-  extension [P[_] <: Protocal[_], M <: HttpMethod, T](routes: List[Route[P, M, T]])
-    inline def lazily: List[Lazy[Route[P, M, T]]] =
+  extension [P[_] <: Protocal[_], M <: HttpMethod, Req, Res](routes: List[Route[P, M, Req, Res]])
+    inline def lazily: List[Lazy[Route[P, M, Req,Res]]] =
       routes.map(r => Lazy( () =>  r))
 
-  extension [R <: Route[_, _, _]](routes: List[R])
+  extension [R <: Route[_, _, _, _]](routes: List[R])
     inline def lazily: List[Lazy[R]] =
       routes.map(r => new Lazy(() => r))

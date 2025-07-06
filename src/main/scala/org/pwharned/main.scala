@@ -5,11 +5,11 @@ import org.pwharned.`lazy`.Lazy
 import org.pwharned.database.HKD.*
 import org.pwharned.database.{ConnectionDetails, Database, DbTypeMapper, EnvLoader, PostgresTypeMapper, SelectStatement, SqlSelect}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod, POST}
-import org.pwharned.json.serialize
+import org.pwharned.json.{JsonSerializer, JsonString, serialize}
 import org.pwharned.http.HttpRequest.HttpRequest
 import org.pwharned.http.{HttpResponse, Segment, asPath, textBodyEncoder}
 import org.pwharned.route.Router.{Route, route}
-import org.pwharned.route.{AnyNode, RouteRegistry, RoutingTable, httpConnection, sseConnection}
+import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection, sseConnection}
 import org.pwharned.http.{Http, Protocal, SSE, SocketWriter}
 import org.pwharned.server.HTTPServer
 import org.pwharned.http.toPath
@@ -18,6 +18,7 @@ import org.pwharned.openapi.{Schema, components, schema, server, given}
 import org.pwharned.rpc.{RpcEndpoint, RpcSchema, RpcServer, listToCaseClass}
 import org.pwharned.http.{httpWriter, sseWriter}
 import org.pwharned.openapi.toOpenApi
+
 import java.nio.charset.StandardCharsets
 import scala.language.implicitConversions
 import java.util.concurrent.Executors
@@ -25,7 +26,9 @@ import scala.compiletime.summonInline
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.Mirror
 import org.pwharned.route.RouteRegistry.lazily
-case class assetAttributes(result: String)
+
+import java.nio.ByteBuffer
+case class assetAttributes(result: JsonString)
 
 object assetAttributes:
   given SelectStatement[assetAttributes] with
@@ -35,6 +38,12 @@ object assetAttributes:
       "    FROM entityattributes e JOIN attributes attr ON attr.id = e.aid JOIN attributevalues av ON av.id = e.vid WHERE e.eid = a.asset_id  GROUP BY e.eid), " +
       "    '[]'::json" +
       " )) AS result FROM   ASSETS a"
+
+  given JsonSerializer[assetAttributes] with
+    def serialize(x: assetAttributes): String =
+      // x.result is already a JsonString → emit it verbatim
+      x.result.toString
+
 
 case class parent_child(child: String, Parent: String)
 
@@ -52,8 +61,8 @@ def main(): Unit =
 
 
   //inline def r: Route[Http, GET] = route[Http,GET](GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
-  inline def r = route[SSE,GET, String](GET, "/health/ping".asPath, (req: HttpRequest) => Future{ HttpResponse.ok("Ok")})
-  inline def rpc = route[SSE,POST, String](POST, "/api/rpc".asPath, (req: HttpRequest) => Future{
+  inline def r = route[SSE,GET, Unit, String](GET, "/health/ping".asPath, (req: HttpRequest[Unit]) => Future{ HttpResponse.ok("Ok")})
+  inline def rpc = route[SSE,POST, ByteBuffer, String](POST, "/api/rpc".asPath, (req: HttpRequest[ByteBuffer]) => Future{
 
     rpcServer.handle(StandardCharsets.UTF_8.decode(req.body).toString)
 
@@ -100,16 +109,18 @@ def main(): Unit =
   inline def assetAttributeRoute = RouteRegistry.get[Http, IdHKD[assetAttributes]]
 
   inline def parent_child_route = RouteRegistry.get[Http, IdHKD[parent_child]]
-  //println(getAssetsRoute.schema)
-  val schema = summonInline[Schema[parent_child]].toSchema.serialize
 
+  val jsString: JsonString = JsonString("hello")
+  val serialized = jsString.serialize
+  println(serialized)
+  val routes = List(assetAttributeRoute, parent_child_route, r)
 
-  val routes = List(assetAttributeRoute, parent_child_route, rpc)
 
   println(routes.toOpenApi.serialize)
-  lazy val table  = RoutingTable.build(routes.map( x=> Lazy(() => x)))
-  inline def ro: Option[AnyNode[Protocal]]  = table.find(GET, "/api/assetAttributes".toPath)
 
+
+  lazy val table  = RoutingTable.build(routes.map( x=> Lazy(() => x)))
+  println(table)
   HTTPServer.start(8080, table)
 
 

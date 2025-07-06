@@ -10,7 +10,7 @@ import scala.compiletime.summonInline
 object OpenApiBuilder:
 
   /** Top‐level entrypoint: pull title/version/servers from the implicit config */
-  def build[F[_]](routes: List[Route[F, HttpMethod, _]])
+  def build[F[_]](routes: List[Route[F, HttpMethod, ?,?]])
                  (using cfg: OpenApiConfig): root =
 
     // 1) build the `paths` map by grouping identical paths
@@ -41,7 +41,7 @@ object OpenApiBuilder:
 
 
 
-extension [F[_]](routes: List[Route[F, HttpMethod, _]])
+extension [F[_]](routes: List[Route[F, HttpMethod, ?,?]])
   /** summon your own OpenApiConfig and build the full root object */
   def toOpenApi(using cfg: OpenApiConfig): root =
     OpenApiBuilder.build(routes)

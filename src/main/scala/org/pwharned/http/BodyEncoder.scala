@@ -47,7 +47,11 @@ given textBodyEncoder
 : BodyEncoder[Http, String ] with
 
   def apply(response: String): HttpResponse[String] =
-    HttpResponse.ok(response, Headers(Map("Content-Type" -> "text/plain")))
+    HttpResponse(
+      status  = 200,
+      headers =  Headers(Map("Content-Type" -> "text/plain")),
+      body    = Body.text(response)
+    )
 
 /** Encode rows to a *continuous* SSE stream: every row is one JSON line.   */
 given sseEncoder[A<:Product](using js: JsonSerializer[A]): BodyEncoder[SSE, LazyList[A]] with

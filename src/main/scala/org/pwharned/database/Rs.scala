@@ -1,6 +1,9 @@
 package org.pwharned.database
 
 import org.pwharned.database.HKD.*
+import org.pwharned.json.JsonString
+
+import org.pwharned.json.given_Conversion_String_JsonString
 
 import java.sql.ResultSet
 import java.util.UUID
@@ -25,10 +28,12 @@ object SqlWrap:
 
 // you could also
 object Rs:
+  
 
   // 2) your leaf instances
   given Rs[String]  with
     def read(r:java.sql.ResultSet,c: String): String =r.getString(c)
+
   given Rs[Int]     with
     def read(r: java.sql.ResultSet, c: String): Int = r.getInt(c)
   given Rs[Boolean] with
