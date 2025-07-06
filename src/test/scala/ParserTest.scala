@@ -7,8 +7,8 @@ import org.pwharned.parse.fromQuery
 import scala.language.implicitConversions
 import java.nio.ByteBuffer
 import org.pwharned.database.HKD.PrimaryKey
-import org.pwharned.json.JsonDeserializer.{JsonAst, jsonAstDeserializer}
-import org.pwharned.json.{JsonDeserializer, deserialize}
+import org.pwharned.json.JsonDeserializer.jsonAstDeserializer
+import org.pwharned.json.{JsonAst, JsonDeserializer, deserialize}
 import org.pwharned.parse.Primitives.whitespace
 import org.pwharned.rpc.RpcRequest
 

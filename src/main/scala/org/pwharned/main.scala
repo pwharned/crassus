@@ -50,7 +50,7 @@ object parent_child:
 
 @main
 def main(): Unit =
-  
+
 
   given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
   given DbTypeMapper = PostgresTypeMapper
@@ -89,7 +89,7 @@ def main(): Unit =
       catch
         case e: Throwable =>
           Left(s"bad args for SubtractOneArgs: ${e.getMessage}")
-  
+
     override def schemaP: RpcSchema[SubtractOneArgs] = RpcSchema[SubtractOneArgs]
 
     override def schemaR: RpcSchema[SubtractOneResult] = RpcSchema[SubtractOneResult]
@@ -133,7 +133,7 @@ def main(): Unit =
   }
 
   println()
-  
+
   lazy val table  = RoutingTable.build(routes.map( x=> Lazy(() => x)))
   HTTPServer.start(8080, table)
 
