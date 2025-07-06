@@ -25,6 +25,7 @@ ThisBuild/ scalacOptions ++= Seq(
   "-unchecked"
 )
 scalacOptions ++= Seq("-Xmax-inlines", "50")
+scalacOptions ++= Seq("-opt", "unreachable-code,simplify-jumps,compact-locals,copy-propagation,redundant-casts,box-unbox,closure-invocations,nullness-tracking,inline")
 
 lazy val root = project.in(file("."))
   .settings(
