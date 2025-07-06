@@ -22,9 +22,10 @@ ThisBuild/ scalacOptions ++= Seq(
   "-deprecation",
   "-encoding", "UTF-8",
   "-feature",
-  "-unchecked",
-  "-Xlog-implicits"
+  "-unchecked"
 )
+scalacOptions ++= Seq("-Xmax-inlines", "50")
+
 lazy val root = project.in(file("."))
   .settings(
     name := "crassus",
