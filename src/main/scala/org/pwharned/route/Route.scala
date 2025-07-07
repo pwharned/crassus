@@ -8,13 +8,14 @@ import org.pwharned.openapi.{Schema, mediaType, operation, pathItem, request, re
 import org.pwharned.route.Router.Route
 
 import scala.compiletime.erasedValue
-import org.pwharned.macros.{simpleTypeName, typeName}
+import org.pwharned.macros.{extractEntityType, simpleTypeName, typeName, typeToString}
 
 import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 import scala.compiletime.summonInline
 import scala.concurrent.{ExecutionContext, Future}
-
+import scala.reflect.Typeable
+import scala.reflect.TypeTest
 object Router:
 
 
@@ -63,10 +64,10 @@ object Router:
 
   // Extensions to "unwrap" our opaque type so we can use it as a function and also access its metadata.
   object Route:
-    inline def apply[F[_], T <: HttpMethod, Req: BodyReader, Res](method: T, path: HttpPath, f: HttpRequest[Req] => Future[HttpResponse[Res]])( using s: SocketWriter[F], c: ConnectionHandler[F], ressch: Schema[Res], reqsch: Schema[Req]): Route[F, T, Req, Res] = {
+    inline def apply[F[_], T <: HttpMethod, Req: BodyReader, Res](method: T, path: HttpPath, f: HttpRequest[Req] => Future[HttpResponse[Res]])(using t: Typeable[Res],  s: SocketWriter[F], c: ConnectionHandler[F], ressch: Schema[Res], reqsch: Schema[Req]): Route[F, T, Req, Res] = {
 
       val m = simpleTypeName[T]
-      val returnType = simpleTypeName[Res]
+      val returnType = extractEntityType[Res]
       val summary = s"${m.toLowerCase} a ${returnType.toLowerCase}"
       val operationId= s"${m.toLowerCase}_${returnType.toLowerCase}"
       val mediaType = new mediaType(schema = ressch.toSchema)
@@ -87,6 +88,11 @@ object Router:
       val PathItem = m match {
         case "GET" =>  pathItem(get = Some(operation))
         case "POST" =>  pathItem(post = Some(operation))
+        case "DELETE" =>  pathItem(delete = Some(operation))
+        case "PATCH" =>  pathItem(patch = Some(operation))
+        case "PUT" =>  pathItem(put = Some(operation))
+
+
       }
       Route(method, path, f, pathItem = PathItem)
     }

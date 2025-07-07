@@ -87,7 +87,7 @@ object RoutingTable:
           b.updated(head, updatedNode)
         case Nil => b
 
-  def build[P[_] <: Protocal[_]](
+  def buildLazy[P[_] <: Protocal[_]](
                                   routes: List[Lazy[Router.Route[P, HttpMethod, _, _]]]
                                 ): RoutingTable[HttpMethod, P] =
     routes.foldLeft(Map.empty[HttpMethod, Branch[P]]) { (acc, route) =>
@@ -95,7 +95,14 @@ object RoutingTable:
       val updatedTree = currentTree.insertFinal(route.value.path.segments, route.value)
       acc.updated(route.value.method, updatedTree)
     }
-    
+  def build[P[_] <: Protocal[_]](
+                                  routes: List[Router.Route[P, HttpMethod, _, _]]
+                                ): RoutingTable[HttpMethod, P] =
+    routes.foldLeft(Map.empty[HttpMethod, Branch[P]]) { (acc, route) =>
+      val currentTree = acc.getOrElse(route.method, Map.empty)
+      val updatedTree = currentTree.insertFinal(route.path.segments, route)
+      acc.updated(route.method, updatedTree)
+    } 
   extension[H<:HttpMethod, P[_] <: Protocal[_]](table: RoutingTable[H, P])
     // Here we traverse the tree to locate the matching route.
     def find(m: H, p: HttpPath): Option[Node[P, ?,?]] =

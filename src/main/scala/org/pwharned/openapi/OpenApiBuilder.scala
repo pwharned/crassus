@@ -14,12 +14,23 @@ object OpenApiBuilder:
                  (using cfg: OpenApiConfig): root =
 
     // 1) build the `paths` map by grouping identical paths
-    val paths = routes.map({
-      x=> (x.path.segments.map {
-        case Segment.Static(segment) => "/" + segment.value.toString
-        case Segment.Dynamic(segment) => "/" + segment.value.toString
-      }.mkString("")  ,x.pathItem)
-    }).toMap
+
+    val paths = routes.groupBy{ x=>
+      {
+        x.path.segments.map {
+          case Segment.Static(segment) => "/" + segment.value.toString
+          case Segment.Dynamic(segment) => "/" + segment.value.toString
+        }.mkString("")
+      } }.map(x=> {
+      val get=  x._2.find( x=> x.method==GET).flatMap(x => x.pathItem.get)
+      val patch=  x._2.find( x=> x.method==PATCH).flatMap(x => x.pathItem.patch)
+      val post=  x._2.find( x=> x.method==POST).flatMap(x => x.pathItem.post)
+      val put=  x._2.find( x=> x.method==PUT).flatMap( x=> x.pathItem.put)
+      val delete = x._2.find(x => x.method == DELETE).flatMap(x => x.pathItem.delete)
+
+      (x._1, pathItem(get= get, patch = patch, post = post, put = put, delete = delete))
+
+    })
 
     // 2) summon info/license from cfg
     val infoObj = info(

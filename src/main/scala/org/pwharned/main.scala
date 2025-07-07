@@ -127,13 +127,13 @@ def main(): Unit =
     parent_route,
     practices_route,
     products_route,
-    relationship_route).flatten
+    relationship_route).flatten ++ List(openapi, swagger)
 
 
 
 
   import java.io.PrintWriter
-
+  println("Generating OPENAPI")
   val pw = new PrintWriter("static/openapi.json") // opens (or creates) the file
   try {
     pw.write(routes.toOpenApi.serialize)
@@ -141,7 +141,7 @@ def main(): Unit =
     pw.close() // always close to flush and free resources
   }
 
-
-  lazy val table  = RoutingTable.build(routes.map( x=> Lazy(() => x)))
+  println("building routing table")
+  lazy val table  = RoutingTable.build(routes)
 
   HTTPServer.start(8080, table)
