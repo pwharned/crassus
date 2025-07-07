@@ -55,9 +55,8 @@ def extractEntityTypeImpl[T: Type](using Quotes): Expr[String] = {
     tpe match {
 
       // direct hit
-      case AppliedType(tycon, List(arg))
-        if tycon.typeSymbol.fullName == "generated.entities" =>
-        Some(s"generated.entities[${arg.show}]")
+      case AppliedType(tycon, List(arg)) =>
+        Some(s"${arg.show}")
 
       // recurse into applied-type args
       case AppliedType(_, args) =>
