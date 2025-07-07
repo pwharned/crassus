@@ -2,23 +2,27 @@ package org.pwharned.generator
 import org.pwharned.{Column, SQLParser}
 import org.pwharned.SQLParser.{ColumnOps, alterTablePrimaryKeyParser}
 
+import java.io.File
 import java.nio.CharBuffer
 import scala.io.Source
 
 //case class User[F[_]](id: F[PrimaryKey[Int]], name: F[String])
 object CaseClassGenerator  {
-  def generateCaseClasses: String = {
+  def generateCaseClasses(filePath: String): String = {
     // Get resource as stream from classpath
-
-    val resourceStream = getClass.getResourceAsStream("/schema.sql")
-    if (resourceStream == null) {
-      throw new IllegalStateException("Could not find schema.sql in resources")
+    val input = Source.fromFile(filePath)("UTF-8")
+    //val resourceStream = getClass.getResourceAsStream("/schema.sql")
+    //if (resourceStream == null) {
+    //  throw new IllegalStateException("Could not find schema.sql in resources")
+   /// }
+    val file = new File(filePath)
+    if (!file.exists() || !file.isFile) {
+      throw new IllegalArgumentException(s"Schema file not found at: $filePath")
     }
 
-    // Use scala.io.Source to read from the stream
-    val input = Source.fromInputStream(resourceStream)
-    val lines = input.getLines().mkString("\n")
 
+    val lines = input.getLines().mkString("\n")
+    System.out.println("Discovered statements are  :" + lines)
     val statements  = lines.split(";")
     // val lines = Source.fromFile(inputFile).getLines().toList
     val createTableStatements = statements.filter( x=> x.trim.toUpperCase.startsWith("CREATE TABLE")).map(x => SQLParser.createTableParser(x))

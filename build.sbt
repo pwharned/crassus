@@ -10,7 +10,8 @@ enablePlugins(GraalVMNativeImagePlugin)
 lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
   .settings(
     name := "caseClassGenerator",
-    scalaVersion := "2.13.16"
+    scalaVersion := "2.13.16",
+    publish / skip := false
   )
 graalVMNativeImageOptions ++= Seq(
   "--allow-incomplete-classpath",
@@ -22,21 +23,19 @@ ThisBuild/ scalacOptions ++= Seq(
   "-deprecation",
   "-encoding", "UTF-8",
   "-feature",
-  "-unchecked"
+  "-unchecked",
+  "-Ystatistics",
 )
-scalacOptions ++= Seq("-Xmax-inlines", "50")
-scalacOptions ++= Seq("-opt", "unreachable-code,simplify-jumps,compact-locals,copy-propagation,redundant-casts,box-unbox,closure-invocations,nullness-tracking,inline")
-
 lazy val root = project.in(file("."))
   .settings(
     name := "crassus",
     scalaVersion := "3.7.0",
     Compile / sourceGenerators += Def.task {
       val outputDir = baseDirectory.value / "src/main/scala/org/pwharned/generated"
-
+      val base      = baseDirectory.value
       // Ensure caseClassGenerator is compiled first
       val _ = (caseClassGenerator / Compile / compile).value
-
+      val schema    = base / "schema.sql"                // locate your schema file
       // Load the compiled class dynamically
       val classpath = (caseClassGenerator / Compile / dependencyClasspath).value
       val classDir = (caseClassGenerator / Compile / classDirectory).value
@@ -48,9 +47,10 @@ lazy val root = project.in(file("."))
       val classLoader = new java.net.URLClassLoader(urls)
       println(s"Compiled classes are in: $classDir")
       println("Available classes: " + classLoader.getResources(""))
+      println("Path to schema file is " + schema.getAbsolutePath)
       val generatorClass = classLoader.loadClass("org.pwharned.generator.CaseClassGenerator")
-      val method = generatorClass.getMethod("generateCaseClasses")
-      val generatedCode = method.invoke(null).toString
+      val method   = generatorClass.getMethod("generateCaseClasses", classOf[String])
+      val generatedCode    = method.invoke(null, schema.getAbsolutePath).asInstanceOf[String]
       val code  =
         s"""
            |package generated
