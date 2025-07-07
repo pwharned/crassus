@@ -43,10 +43,23 @@ ThisBuild / scalacOptions ++= Seq(
   "-opt","allow-skip-class-loading"
 )
 
+
+lazy val excludedPrefixes = Seq(
+  "generated"
+)
+
+
+
 lazy val root = project.in(file("."))
   .settings(
     name := "crassus",
     scalaVersion := "3.7.0",
+    Compile / packageBin / mappings := {
+      val original: Seq[(File, String)] = (Compile / packageBin / mappings).value
+      original.filterNot { case (_, pathInJar) =>
+        excludedPrefixes.exists(pathInJar.contains)
+      }
+    },
     Compile / sourceGenerators += Def.task {
       val outputDir = baseDirectory.value / "src/main/scala/org/pwharned/generated"
       val base      = baseDirectory.value
