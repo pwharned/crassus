@@ -1,6 +1,7 @@
 package org.pwharned.openapi
 
 
+import org.pwharned.database.HKD.PrimaryKey
 import org.pwharned.database.summonFieldTypes
 
 import java.nio.ByteBuffer
@@ -52,7 +53,19 @@ object Schema:
           properties = Some(props)
         )
     }
-// you’ll also need base instances for primitives, lists, etc.
+
+given Schema[Boolean] with
+  def labels = Nil
+
+  def `type` = Some("boolean")
+
+  def toSchema = schema(`type` = `type`)
+given Schema[Float] with
+  def labels = Nil
+
+  def `type` = Some("number")
+
+  def toSchema = schema(`type` = `type`, format = Some("float"))
 given Schema[Int] with
   def labels = Nil
   def `type`  = Some("integer")
@@ -78,10 +91,40 @@ given Schema[ByteBuffer] with
 
   def toSchema = schema(`type` = `type`)
 
+given Schema[java.util.UUID] with
+  def labels = Nil
+
+  def `type` = Some("string")
+
+  def toSchema = schema(`type` = `type`, format = Some("UUID4"))
+
 given [A](using sch: Schema[A]): Schema[Iterator[A]] with
   def labels = Nil
   def `type`  = Some("array")
   def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
+
+given [A](using sch: Schema[A]): Schema[List[A]] with
+  def labels = Nil
+
+  def `type` = Some("array")
+
+  def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
+
+given [A](using sch: Schema[A]): Schema[PrimaryKey[A]] with
+  def labels = Nil
+
+  def `type` = sch.`type`
+
+  def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
+
+given [A](using sch: Schema[A]): Schema[Option[A]] with
+  def labels = Nil
+
+  def `type` = sch.`type`
+
+  def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
+
+
 
 given [A](using sch: Schema[A]): Schema[Map[String, A]] with
   def labels: List[String]           = Nil

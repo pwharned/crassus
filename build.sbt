@@ -26,6 +26,23 @@ ThisBuild/ scalacOptions ++= Seq(
   "-unchecked",
   "-Ystatistics",
 )
+
+
+ThisBuild / scalacOptions ++= Seq(
+  // individual optimizations
+  "-opt","unreachable-code",
+  "-opt","simplify-jumps",
+  "-opt","compact-locals",
+  "-opt","copy-propagation",
+  "-opt","redundant-casts",
+  "-opt","box-unbox",
+  "-opt","nullness-tracking",
+  "-opt","closure-invocations",
+  "-opt","allow-skip-core-module-init",
+  "-opt","assume-modules-non-null",
+  "-opt","allow-skip-class-loading"
+)
+
 lazy val root = project.in(file("."))
   .settings(
     name := "crassus",
