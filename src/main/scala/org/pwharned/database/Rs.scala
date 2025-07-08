@@ -46,9 +46,9 @@ object Rs:
   given arrayRs[A](using base: Rs[A]): Rs[List[A]] with
     def read(rs: ResultSet, col: String): List[A] =
       // pull out the PG array, cast to Array[Any] (or Array[String])
-      rs.getArray(col).getArray
-        .asInstanceOf[Array[A]]
+      Option(rs.getArray(col)).map(x => x.getArray.asInstanceOf[Array[A]]
         .toList
+      ).getOrElse(List.empty[A])
 
   given optionRs[A](using base: Rs[A]): Rs[Option[A]] with
     def read(rs: ResultSet, col: String): Option[A] =

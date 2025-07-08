@@ -2,13 +2,12 @@ package org.pwharned
 
 import org.pwharned.database.HKD.*
 import org.pwharned.database.*
+import org.pwharned.database.statements.{PostgresDialect, SqlDialect}
 import org.pwharned.json.serialize
 
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
-private val executor = Executors.newVirtualThreadPerTaskExecutor()
-given ExecutionContext = ExecutionContext.fromExecutor(executor) // Use virtual threads for Scala Futures
-
+given dial: SqlDialect = PostgresDialect
 
 def timed[A](block: => A): A =
   val start = System.nanoTime

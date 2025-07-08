@@ -9,21 +9,23 @@ import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.*
 
-trait SelectStatement[T] {
-  def select: String
+trait InsertStatement[T] {
+  def insert: String
+  def name: String
+  def names: List[String]
 
 }
 
 // you could also
-object SelectStatement:
-  transparent inline given derived[T<: Product] (using m: Mirror.ProductOf[T], s: SqlDialect):SelectStatement[T] =
-    new SelectStatement[T] {
+object InsertStatement:
+  transparent inline given derived[T<: Product] (using m: Mirror.ProductOf[T], s: SqlDialect):InsertStatement[T] =
+    new InsertStatement[T] {
       def name: String = constValue[m.MirroredLabel]
 
       def names: List[String] =
         constValueTuple[m.MirroredElemLabels].productIterator.toList.map(_.toString)
 
-      def select: String = s.select(name, names)
+      def insert: String = s.insertReturning(name, names)
     }
 
 

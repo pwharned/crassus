@@ -71,7 +71,7 @@ object JsonSerializer:
   given JsonSerializer[Int] with
     def serialize(ob: Int): String = ob.toString
   given JsonSerializer[java.util.UUID] with
-    def serialize(ob: java.util.UUID): String = ob.toString
+    def serialize(ob: java.util.UUID): String = s"\"${ob.toString}\""
 
   given mapSerializer[A](using base: JsonSerializer[A]): JsonSerializer[Map[String, A]] with
     def serialize(ob: Map[String, A]): String = "{" + ob.map(x => {

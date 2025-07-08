@@ -6,12 +6,15 @@ object SQLParser extends Parse {
     def toField: String = {
       val typeStr = column.nullable.getOrElse(true) match {
         case true => s"Nullable[${column.dataType.scalaType}]"
-        case false => column.dataType.scalaType
-      }
+        case false => column.default.getOrElse(false) match {
+          case true => s"Default[${column.dataType.scalaType}]"
+          case false =>   column.dataType.scalaType
+        }
+        }
 
       // Add annotation for primary key fields
       column.primary_key match {
-        case Some(true) => s" ${column.name}: F[PrimaryKey[$typeStr]]"
+        case Some(true) => s" ${column.name}: F[PrimaryKey[${column.dataType.scalaType}]]"
         case _ => s"${column.name}: F[$typeStr]"
       }
     }
@@ -84,7 +87,12 @@ object SQLParser extends Parse {
       not <- stringInsensitive("NOT").optional
       _ <- whitespace
       n <- stringInsensitive("NULL").optional
-    } yield s"$not $n"
+    } yield (not, n) match {
+      case (Some(_), Some(_)) => "NOT NULL"
+      case (None,   Some(_)) => "NULL"
+      case _                  => ""
+    }
+
   val columnparser: Parser[Column] =
     for {
       _ <- whitespace
@@ -92,7 +100,7 @@ object SQLParser extends Parse {
       _ <- whitespace
       dtype <- typeParser
       _ <-whitespace
-      _ <- defaultParser.optional
+      default <- defaultParser.optional
       _ <- whitespace
       nullable <- nullableParser.optional
       _ <- whitespace
@@ -100,17 +108,19 @@ object SQLParser extends Parse {
       _ <- whitespace
       identity <- stringInsensitive("GENERATED ALWAYS AS IDENTITY").optional
       _ <- whitespace.optional
-    } yield Column(name, dtype, Some(nullable.forall {
+    } yield Column(name, dtype, nullable.map {
+      case "NOT NULL" => false
       case "NULL" => true
-      case _ => false
-    }), primary_key.map{
+      case _ => true
+    }, primary_key.map{
       case "PRIMARY KEY" => true
       case _ => false
     },
       identity.map{
       case "GENERATED ALWAYS AS IDENTITY" => true
       case _ => false
-    }
+    },
+      Some(default.isDefined)
     
     )
 

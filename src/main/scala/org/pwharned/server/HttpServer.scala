@@ -138,7 +138,7 @@ object HTTPServer:
               response.onComplete {
                 case Failure(exception) => {
                   println(exception.getMessage + exception.getStackTrace.mkString)
-                  sendResponse(clientChannel, HttpResponse.error(exception.getMessage))
+                  summon[SocketWriter[Http]].write(clientChannel,HttpResponse.error(exception.getMessage))
                   clientChannel.close()
                 }
                 case Success(value) => {

@@ -38,7 +38,7 @@ object CaseClassGenerator  {
 
         val columns = value._1.columns.map( x=> {
           alterations.find(y => y._1.columns.contains(x.name)) match {
-            case Some(value) => Column(x.name, x.dataType,x.nullable,Some(true),x.generated_always_as_identity)
+            case Some(value) => Column(x.name, x.dataType,x.nullable,Some(true),x.generated_always_as_identity, x.default)
             case None => x
           }
         })

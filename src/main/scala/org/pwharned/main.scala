@@ -2,6 +2,7 @@ package org.pwharned
 import generated.*
 import org.pwharned.database.HKD.PrimaryKey
 import org.pwharned.`lazy`.Lazy
+import org.pwharned.database.statements.{PostgresDialect, SqlDialect}
 import org.pwharned.database.{ConnectionDetails, Database, DbTypeMapper, EnvLoader, FieldType, PostgresTypeMapper, SelectStatement, SqlSelect, UnionFields, UnionTypes, retrieve}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
 import org.pwharned.openapi.{Schema, given_Schema_String, given_Schema_Unit, schema, toOpenApi}
@@ -24,6 +25,8 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 
 @main
 def main(): Unit =
+  
+  given dialect: SqlDialect = PostgresDialect
 
 
   given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())

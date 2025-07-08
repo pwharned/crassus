@@ -30,6 +30,15 @@ object HKD:
     given [T]: Conversion[T, Nullable[T]] = x => Nullable(x)
     given [T]: Conversion[Nullable[T], T] = x => x.value
 
+  sealed trait Default[X]:
+    def value: X
+
+  object Default:
+    def apply[X](x: X): Default[X] = x
+
+    given [T]: Conversion[T, Default[T]] = x => Default(x)
+
+    given [T]: Conversion[Default[T], T] = x => x.value
 
   type Id[A] = A
   type IdHKD[T] = [F[_]] =>> T
@@ -52,19 +61,23 @@ object HKD:
   type NewField[A] = A match
     case PrimaryKey[t] => Option[PrimaryKey[t]]
     case Nullable[t] => Option[t]
+    case Default[t] => Option[t]
     case _ => A
   type OptionalField[A] = A match
     case PrimaryKey[t] => Option[t]
     case Nullable[t] => Option[t]
+    case Default[t] => Option[t]
     case Option[t] => Option[t]
     case _ => Option[A]
   type UpdatedField[A] = A match
     case PrimaryKey[t] => Option[PrimaryKey[t]]
     case Nullable[t] => Option[t]
+    case Default[t] => Option[t]
     case _ => Option[A]
   type PersistedField[A] = A match
     case PrimaryKey[t] => PrimaryKey[t]
     case Nullable[t] => Option[t]
+    case Default[t] => Option[t]
     case _ => A
   type New[T[_[_]]] = T[NewField]
   type Updated[T[_[_]]] = T[UpdatedField]

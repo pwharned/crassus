@@ -116,9 +116,14 @@ extension (con: java.sql.Connection)
 
   inline def insertAsync[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
     Future {
-      val stmt = con.prepareStatement(sqlInsert.insertStatement)
-      sqlInsert.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
-        stmt.setObject(index + 1, value) // Bind each parameter safely
+      val built = sqlInsert.insertReturning(obj)
+      val stmt = con.prepareStatement(built._1 )
+      built._2.zipWithIndex.foreach { case (value, index) =>
+        value match {
+          case None => stmt.setObject(index + 1, null)
+          case v => stmt.setObject(index+1, v)
+        }
+         // Bind each parameter safely
       }
       val rs = stmt.executeQuery()
 
@@ -127,7 +132,7 @@ extension (con: java.sql.Connection)
         .map( x => rs.as[A])
     }.recover {
       case ex: Exception =>
-        println(s"⚠️ Insert failed: ${ex.getMessage} : ${sqlInsert.insertStatement}")
+        println(s"⚠️ Insert failed: ${ex.getMessage} ")
         Iterator.empty[A]
     }
   inline def delete[A <: Product](obj: PrimaryKeyFields[A]#Out)(using sqlDelete: SqlDelete[A], sqlSelect: SqlSelect[A]): Iterator[A] =
@@ -155,10 +160,17 @@ extension (con: java.sql.Connection)
 
 
   inline def insert[A <: Product, B<:Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B]): Iterator[B] =
-    val stmt = con.prepareStatement(sqlInsert.insertStatement)
-    val bindValues = sqlInsert.bindValues(obj)
-    bindValues.zipWithIndex.foreach { case (value, index) =>
-      stmt.setObject(index + 1, value) // Bind each parameter safely
+    val built = sqlInsert.insertReturning(obj)
+    val stmt = con.prepareStatement(built._1)
+    built._2.zipWithIndex.foreach { case (value, index) =>
+      value match {
+        case None => stmt.setObject(index + 1, null)
+        case Some(v)  if v == Nil => stmt.setObject(index+1, null)
+        case Some(v) => stmt.setObject(index+1, null)
+        case Nil => stmt.setObject(index +1, null)
+        case v => stmt.setObject(index + 1, v)
+      }
+      // Bind each parameter safely
     }
     val rs = stmt.executeQuery()
     Iterator.continually(rs.next())
