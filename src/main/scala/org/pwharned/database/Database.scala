@@ -48,7 +48,7 @@ extension (db: org.pwharned.database.Database.type )
 
       x => x.queryParameterized[A, B](a)
     }
-  inline def create[A<:Product, B<: Product](a: A)(using sql: SqlSelect[B], sqlInsert: SqlInsert[A], json: JsonSerializer[B], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[B]]] =
+  inline def create[A<:Product, B<: Product](a: A)(using fb: FieldBinder[A], sql: SqlSelect[B], sqlInsert: SqlInsert[A], json: JsonSerializer[B], ec: scala.concurrent.ExecutionContext): Future[Try[Iterator[B]]] =
     db.pool.withConnection {
 
       x => x.insert[A, B](a)
@@ -114,17 +114,13 @@ extension (con: java.sql.Connection)
         Iterator.empty[A]
     }
 
-  inline def insertAsync[A <: Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
+  inline def insertAsync[A <: Product](obj: A)(using  fb: FieldBinder[A], sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[A], ec: ExecutionContext): Future[Iterator[A]] =
     Future {
       val built = sqlInsert.insertReturning(obj)
-      val stmt = con.prepareStatement(built._1 )
-      built._2.zipWithIndex.foreach { case (value, index) =>
-        value match {
-          case None => stmt.setObject(index + 1, null)
-          case v => stmt.setObject(index+1, v)
-        }
-         // Bind each parameter safely
-      }
+      val stmt = con.prepareStatement(built)
+      fb.bind(stmt, 1, obj)
+      stmt.executeUpdate()
+
       val rs = stmt.executeQuery()
 
       Iterator.continually(rs.next())
@@ -159,19 +155,20 @@ extension (con: java.sql.Connection)
     }
 
 
-  inline def insert[A <: Product, B<:Product](obj: A)(using sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B]): Iterator[B] =
+  inline def insert[A <: Product, B<:Product](obj: A)(using fb: FieldBinder[A], sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B]): Iterator[B] =
     val built = sqlInsert.insertReturning(obj)
-    val stmt = con.prepareStatement(built._1)
-    built._2.zipWithIndex.foreach { case (value, index) =>
-      value match {
-        case None => stmt.setObject(index + 1, null)
-        case Some(v)  if v == Nil => stmt.setObject(index+1, null)
-        case Some(v) => stmt.setObject(index+1, null)
-        case Nil => stmt.setObject(index +1, null)
-        case v => stmt.setObject(index + 1, v)
-      }
+    val stmt = con.prepareStatement(built)
+    fb.bind(stmt, 1, obj)
+    //built._2.zipWithIndex.foreach { case (value, index) =>
+     // value match {
+      //  case None => stmt.setObject(index + 1, null)
+       // case Some(v)  if v == Nil => stmt.setObject(index+1, null)
+       // case Some(v) => stmt.setObject(index+1, null)
+       // case Nil => stmt.setObject(index +1, null)
+       // case v => stmt.setObject(index + 1, v)
+     // }
       // Bind each parameter safely
-    }
+    //}
     val rs = stmt.executeQuery()
     Iterator.continually(rs.next())
       .takeWhile(identity)

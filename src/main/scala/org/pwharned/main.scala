@@ -12,6 +12,7 @@ import org.pwharned.route.Router.{Route, route}
 import org.pwharned.route.RoutingTable.RoutingTable
 import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection, sseConnection}
 import org.pwharned.server.HTTPServer
+import org.pwharned.database.FieldBinder.given 
 import org.pwharned.json.serialize
 import org.pwharned.openapi.{Schema, components, schema, server, given}
 

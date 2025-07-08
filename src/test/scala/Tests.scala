@@ -4,7 +4,7 @@ import org.pwharned.database.HKD.*
 import org.pwharned.database.*
 import org.pwharned.database.statements.{PostgresDialect, SqlDialect}
 import org.pwharned.json.serialize
-
+import org.pwharned.database.FieldBinder.*
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 given dial: SqlDialect = PostgresDialect
@@ -32,7 +32,8 @@ def getDbConnection(): java.sql.Connection = {
 def test:Unit =
   val conn = getDbConnection()
   import scala.language.implicitConversions
-  
+
+  given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
 
 
   // Ensure table exists (for testing)

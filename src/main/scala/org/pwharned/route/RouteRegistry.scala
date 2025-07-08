@@ -1,7 +1,7 @@
 package org.pwharned.route
 
 import org.pwharned.`lazy`.Lazy
-import org.pwharned.database.{Database, PrimaryKeyExtractor, PrimaryKeyFields, SqlInsert, SqlSelect, create, delete, retrieve, retrieveParameterized, update}
+import org.pwharned.database.{Database, FieldBinder, PrimaryKeyExtractor, PrimaryKeyFields, SqlInsert, SqlSelect, create, delete, retrieve, retrieveParameterized, update}
 import org.pwharned.database.HKD.*
 import org.pwharned.http.HttpMethod.{DELETE, GET, HttpMethod, PATCH, POST}
 import org.pwharned.http.{BodyEncoder, HttpRequest, HttpResponse, Protocal, Segment, SocketWriter, toPath}
@@ -14,7 +14,7 @@ import org.pwharned.openapi.given_Schema_Unit
 
 import java.nio.charset.StandardCharsets
 import scala.concurrent.Future
-import scala.compiletime.constValue
+import scala.compiletime.{constValue, summonInline}
 import scala.concurrent.ExecutionContext
 import scala.deriving.Mirror
 import scala.util.{Failure, Success, Try}
@@ -102,6 +102,7 @@ object RouteRegistry:
                                                  sw: SocketWriter[P],
                                                  ch: ConnectionHandler[P],
                                                  ec: ExecutionContext,
+                                            fb: FieldBinder[New[T]],
                                               jds: JsonDeserializer[New[T]],
                                                  m: Mirror.ProductOf[Persisted[T]],
                                             mr: Mirror.ProductOf[New[T]]
@@ -204,7 +205,6 @@ object RouteRegistry:
                                                       // Create-specific requirements
                                                       sqlC: SqlInsert[New[T]],
                                                       jdsNew: JsonDeserializer[New[T]],
-
                                                       // Update-specific requirements
                                                       jsdUpdated: JsonDeserializer[Updated[T]],
                                                       mUpdated: Mirror.ProductOf[Updated[T]],
@@ -213,7 +213,7 @@ object RouteRegistry:
                                                       queryDeserializer: QueryDeserializer[Optional[T]]
                                                      ): List[Route[P, ? <: HttpMethod,?, ?]] = {
 
-    // Generate all routes for this entity
+    given fb: FieldBinder[New[T]] = summonInline[FieldBinder[New[T]]]
     List(
       get[P, T], // GET /api/entity
       getWhere[P, T], // GET /api/entity/{id}
