@@ -37,34 +37,34 @@ trait JsonDeserializer[T]:
 object JsonDeserializer extends Parse:
 
 
-  inline given JsonDeserializer[String] with
+  given JsonDeserializer[String] with
     def deserialize: Parser[String] = Primitives.quotedString
 
-  inline given JsonDeserializer[Int] with
+  given JsonDeserializer[Int] with
     def deserialize: Parser[Int] = Primitives.intParser
 
-  inline given JsonDeserializer[Double] with
+  given JsonDeserializer[Double] with
     def deserialize: Parser[Double] = Primitives.doubleParser
-  inline given JsonDeserializer[Long] with
+  given JsonDeserializer[Long] with
     def deserialize: Parser[Long] = Primitives.longParser
-  inline given JsonDeserializer[Boolean] with
+  given JsonDeserializer[Boolean] with
     def deserialize: Parser[Boolean] = Primitives.boolParser
-  inline given JsonDeserializer[Float] with
+  given JsonDeserializer[Float] with
     def deserialize: Parser[Float] = Primitives.floatParser
-  inline given JsonDeserializer[java.util.UUID] with
+  given JsonDeserializer[java.util.UUID] with
     def deserialize: Parser[java.util.UUID] = Primitives.quotedString.map(x => java.util.UUID.fromString(x))
   // Wrap a parsed T into PrimaryKey[T]
-  inline given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[PrimaryKey[T]] with
+  given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[PrimaryKey[T]] with
     def deserialize: Parser[PrimaryKey[T]] =
       underlying.deserialize.map(PrimaryKey(_))
-  inline given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[Nullable[T]] with
+  given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[Nullable[T]] with
     def deserialize: Parser[Nullable[T]] =
       underlying.deserialize.map(Nullable(_))
 
 
 
 
-  inline given jsPrimitiveParser: JsonDeserializer[JsPrimitive] with
+  given jsPrimitiveParser: JsonDeserializer[JsPrimitive] with
     def deserialize: Parser[JsPrimitive] =
       summon[JsonDeserializer[String]].deserialize
         .alt(summon[JsonDeserializer[Int]].deserialize)
@@ -74,7 +74,7 @@ object JsonDeserializer extends Parse:
         .alt(summon[JsonDeserializer[Float]].deserialize)
 
   // For Option[T], first check for "null"; otherwise delegate.
-  inline given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[Option[T]] with
+  given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[Option[T]] with
     override def isOptional: Boolean = true
     def deserialize: Parser[Option[T]] = input =>
       val trimmed = input.trim
@@ -201,7 +201,7 @@ object JsonDeserializer extends Parse:
           }
 
 
-  inline given listDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[List[A]] =
+  given listDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[List[A]] =
     new JsonDeserializer[List[A]]:
       override def defaultValue: Option[List[A]] = Some(Nil)
 
@@ -243,7 +243,7 @@ object JsonDeserializer extends Parse:
               ))
 
 
-  inline given mapDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[Map[String, A]] with {
+  given mapDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[Map[String, A]] with {
     override def defaultValue: Option[Map[String, A]] = Some(Map.empty)
 
     def deserialize: Parser[Map[String, A]] =
@@ -278,7 +278,7 @@ object JsonDeserializer extends Parse:
         }
   }
 
-      inline given jsonAstDeserializer: JsonDeserializer[JsonAst] =
+  given jsonAstDeserializer: JsonDeserializer[JsonAst] =
     new JsonDeserializer[JsonAst] {
       override def deserialize: Parser[JsonAst] =
 
@@ -343,7 +343,7 @@ object JsonDeserializer extends Parse:
 
 
 
-  transparent inline given derived[T <: Product](using
+  inline given derived[T <: Product](using
                                                  m: Mirror.ProductOf[T]
                                                 ): JsonDeserializer[T] =
     new JsonDeserializer[T]:

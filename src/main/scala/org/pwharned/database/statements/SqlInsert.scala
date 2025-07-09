@@ -1,8 +1,10 @@
-package org.pwharned.database
+package org.pwharned.database.statements
 
-import org.pwharned.database.HKD.{PrimaryKey, Nullable, Default}
+import org.pwharned.database.HKD.{Default, Nullable, PrimaryKey}
+import org.pwharned.database.dialect.SqlDialect
+
 import scala.deriving.Mirror
-import scala.compiletime.{erasedValue, summonInline, constValue}
+import scala.compiletime.{constValue, erasedValue, summonInline}
 import java.sql.PreparedStatement
 
 
@@ -34,9 +36,10 @@ object InsertField:
 
 
 
-trait Insertable[CC]:
+trait SqlInsert[CC]:
   /** e.g. "users" for a `case class User[...]` */
   def tableName: String
+  def insertReturning(obj: CC): String
 
   /** e.g. ("insert into users(name) values(?)", 1) */
   def sql(cc: CC): String
@@ -44,14 +47,14 @@ trait Insertable[CC]:
   /** Bind only the included fields, in the same order as the placeholders. */
   def bind(cc: CC, stmt: PreparedStatement): Int
 
-object Insertable:
+object SqlInsert:
 
-  inline def apply[CC](using ins: Insertable[CC]): Insertable[CC] = ins
+  inline def apply[CC](using ins: SqlInsert[CC]): SqlInsert[CC] = ins
 
   inline given derived[CC <: Product](using
-                                      m: Mirror.ProductOf[CC]
-                                     ): Insertable[CC] =
-    new Insertable[CC]:
+                                      m: Mirror.ProductOf[CC], dialect:SqlDialect
+                                     ): SqlInsert[CC] =
+    new SqlInsert[CC]:
       // derive "users" from "User"
       override val tableName: String =
         constValue[m.MirroredLabel].toLowerCase + "s"
@@ -69,6 +72,13 @@ object Insertable:
           stmt,
           1
         )
+
+      def insertReturning(obj: CC): String =
+        val bareSql = sql(obj)
+    
+        val finalSql = dialect.insertReturning(tableName)
+        finalSql
+
 
   //–– Helpers to summon field‐names from the type‐level label tuple
   private inline def summonLabels[L <: Tuple]: List[String] =

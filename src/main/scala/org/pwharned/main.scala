@@ -1,26 +1,23 @@
 package org.pwharned
 import generated.*
-import org.pwharned.database.HKD.PrimaryKey
 import org.pwharned.`lazy`.Lazy
-import org.pwharned.database.statements.{PostgresDialect, SqlDialect}
-import org.pwharned.database.{ConnectionDetails, Database, DbTypeMapper, EnvLoader, FieldType, PostgresTypeMapper, SelectStatement, SqlSelect, UnionFields, UnionTypes, retrieve}
+import org.pwharned.database.HKD.PrimaryKey
+import org.pwharned.database.dialect.{PostgresDialect, SqlDialect}
+import org.pwharned.database.*
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
-import org.pwharned.openapi.{Schema, given_Schema_String, given_Schema_Unit, schema, toOpenApi}
-import org.pwharned.http.{Body, BodyEncoder, Headers, Http, HttpResponse, Protocal, SSE, Segment, asPath, httpWriter, jsonArrayEncoder, jsonIteratorEncoder, sseIteratorEncoder, sseWriter, textBodyEncoder, toPath}
 import org.pwharned.http.HttpRequest.HttpRequest
-import org.pwharned.route.Router.{Route, route}
-import org.pwharned.route.RoutingTable.RoutingTable
+import org.pwharned.http.*
+import org.pwharned.json.serialize
+import BodyEncoder.*
+import org.pwharned.http.SocketWriter.*
+import org.pwharned.openapi.*
+import org.pwharned.route.Router.Route
 import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection, sseConnection}
 import org.pwharned.server.HTTPServer
-import org.pwharned.database.FieldBinder.given 
-import org.pwharned.json.serialize
-import org.pwharned.openapi.{Schema, components, schema, server, given}
 
-import scala.concurrent.duration.DurationInt
-import scala.language.implicitConversions
 import java.util.concurrent.Executors
-import scala.compiletime.summonInline
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
+import scala.language.implicitConversions
 
 
 
@@ -34,15 +31,15 @@ def main(): Unit =
   given DbTypeMapper = PostgresTypeMapper
 
 
-  inline def health = route[SSE,GET, Unit, String](GET, "/health/ping".asPath, (req: HttpRequest[Unit]) => Future{ HttpResponse.ok("Ok")})
+  inline def health = Route[SSE,GET, Unit, String](GET, "/health/ping".asPath, (req: HttpRequest[Unit]) => Future{ HttpResponse.ok("Ok")})
 
-  inline def swagger = route[Http, GET, Unit, String](GET, "/doc/openapi".asPath, (req: HttpRequest[Unit]) => Future {
+  inline def swagger = Route[Http, GET, Unit, String](GET, "/doc/openapi".asPath, (req: HttpRequest[Unit]) => Future {
     val source = scala.io.Source.fromFile("static/index.html")
     HttpResponse(body = Body.text(source.getLines().mkString), headers = Headers(Map("content-type" -> "text/html")))
 
   })
 
-  inline def openapi = route[Http, GET, Unit, String](GET, "/doc/openapi.json".asPath, (req: HttpRequest[Unit]) => Future {
+  inline def openapi = Route[Http, GET, Unit, String](GET, "/doc/openapi.json".asPath, (req: HttpRequest[Unit]) => Future {
     val source = scala.io.Source.fromFile("static/openapi.json")
     HttpResponse(body = Body.text(source.getLines().mkString), headers = Headers(Map("content-type" -> "text/html")))
 
@@ -58,60 +55,47 @@ def main(): Unit =
 
   Database.createPool(connectionDetails)
 
-  lazy val actions_route = RouteRegistry.resourceRoutes[Http, actions]
+  lazy val actions_route = RouteRegistry.resourceRoutes[Http, actions]("actions")
 
-  lazy val asset_bookmarks_route = RouteRegistry.resourceRoutes[Http, asset_bookmarks]
+  lazy val asset_bookmarks_route = RouteRegistry.resourceRoutes[Http, asset_bookmarks]("asset_bookmarks")
 
-  lazy val asset_collection_route = RouteRegistry.resourceRoutes[Http, asset_collection]
+  lazy val asset_collection_route = RouteRegistry.resourceRoutes[Http, asset_collection]("asset_collection")
 
-  lazy val asset_product_route = RouteRegistry.resourceRoutes[Http, asset_product]
+  lazy val asset_product_route = RouteRegistry.resourceRoutes[Http, asset_product]("asset_product")
 
-  lazy val asset_ratings_route = RouteRegistry.resourceRoutes[Http, asset_ratings]
+  lazy val asset_ratings_route = RouteRegistry.resourceRoutes[Http, asset_ratings]("asset_rating")
 
-  lazy val asset_types_route = RouteRegistry.resourceRoutes[Http, asset_types]
+  lazy val asset_types_route = RouteRegistry.resourceRoutes[Http, asset_types]("asset_types")
 
-  lazy val assets_route = RouteRegistry.resourceRoutes[Http, assets]
+  lazy val assets_route = RouteRegistry.resourceRoutes[Http, assets]("assets")
+  lazy val attributes_route = RouteRegistry.resourceRoutes[Http, attributes]("attributes")
 
-  lazy val attributes_route = RouteRegistry.resourceRoutes[Http, attributes]
+  lazy val attributevalues_route = RouteRegistry.resourceRoutes[Http, attributevalues]("attributevalues")
 
-  lazy val attributevalues_route = RouteRegistry.resourceRoutes[Http, attributevalues]
+  lazy val brands_route = RouteRegistry.resourceRoutes[Http, brands]("brands")
 
-  lazy val brands_route = RouteRegistry.resourceRoutes[Http, brands]
+  lazy val collections_route = RouteRegistry.resourceRoutes[Http, collections]("collections")
 
-  lazy val collections_route = RouteRegistry.resourceRoutes[Http, collections]
+  lazy val comments_route = RouteRegistry.resourceRoutes[Http, comments]("comments")
 
-  lazy val comments_route = RouteRegistry.resourceRoutes[Http, comments]
+  lazy val entities_route = RouteRegistry.resourceRoutes[Http, entities]("entities_route")
 
-  lazy val entities_route = RouteRegistry.resourceRoutes[Http, entities]
+  lazy val entityattributes_route = RouteRegistry.resourceRoutes[Http, entityattributes]("entityattributes")
 
-  lazy val entityattributes_route = RouteRegistry.resourceRoutes[Http, entityattributes]
+  lazy val nominations_route = RouteRegistry.resourceRoutes[Http, nominations]("nominations")
 
-  lazy val nominations_route = RouteRegistry.resourceRoutes[Http, nominations]
+  lazy val offering_types_route = RouteRegistry.resourceRoutes[Http, offering_types]("offering_types")
 
-  lazy val offering_types_route = RouteRegistry.resourceRoutes[Http, offering_types]
+  lazy val parent_route = RouteRegistry.resourceRoutes[Http, parent]("parent")
 
-  lazy val parent_route = RouteRegistry.resourceRoutes[Http, parent]
+  lazy val practices_route = RouteRegistry.resourceRoutes[Http, practices]("practices")
 
-  lazy val practices_route = RouteRegistry.resourceRoutes[Http, practices]
+  lazy val products_route = RouteRegistry.resourceRoutes[Http, products]("products")
 
-  lazy val products_route = RouteRegistry.resourceRoutes[Http, products]
-
-  lazy val relationship_route = RouteRegistry.resourceRoutes[Http, relationship]
-
-
-  type IdHKD[T] = [F[_]] =>> T
+  lazy val relationship_route = RouteRegistry.resourceRoutes[Http, relationship]("relationship")
 
 
-  given [A](using sch: Schema[A]): Schema[PrimaryKey[A]] with
-    def labels = Nil
-
-    def `type` = sch.`type`
-
-    def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
-
-
-
-  def  routes: List[Route[Protocal, HttpMethod, ? ,?]] = List(
+  def routes: List[Route[Protocal, HttpMethod, ?, ?]] = List(
     actions_route,
     asset_bookmarks_route,
     asset_collection_route,
@@ -135,15 +119,7 @@ def main(): Unit =
 
 
 
-
-  import java.io.PrintWriter
-  println("Generating OPENAPI")
-  val pw = new PrintWriter("static/openapi.json") // opens (or creates) the file
-  try {
-    pw.write(routes.toOpenApi.serialize)
-  } finally {
-    pw.close() // always close to flush and free resources
-  }
+  OpenApiBuilder.write("static/openapi.json",routes.toOpenApi.serialize)
 
   println("building routing table")
   lazy val table  = RoutingTable.build(routes)

@@ -1,6 +1,6 @@
 package org.pwharned.server
 import org.pwharned.http.HttpMethod.HttpMethod
-import org.pwharned.http.{Http, HttpPath, HttpRequest, HttpResponse, Protocal, Segment, SocketWriter, asRequest, toPath, httpWriter}
+import org.pwharned.http.{Http, HttpPath, HttpRequest, HttpResponse, Protocal, Segment, SocketWriter, asRequest, toPath}
 import org.pwharned.route.*
 import org.pwharned.route.Router
 import org.pwharned.route.given

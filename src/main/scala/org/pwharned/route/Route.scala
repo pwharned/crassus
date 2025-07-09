@@ -3,19 +3,15 @@ package org.pwharned.route
 import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.HttpPath.HttpPath
 import org.pwharned.http.HttpRequest.HttpRequest
-import org.pwharned.http.{BodyReader, Http, HttpResponse, SSE, SocketWriter, httpWriter}
-import org.pwharned.openapi.{Schema, mediaType, operation, pathItem, request, response, schema}
-import org.pwharned.route.Router.Route
-
-import scala.compiletime.erasedValue
-import org.pwharned.macros.{extractEntityType, simpleTypeName, typeName, typeToString}
+import org.pwharned.http.*
+import org.pwharned.macros.{extractEntityType, simpleTypeName}
+import org.pwharned.openapi.*
 
 import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 import scala.compiletime.summonInline
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.Typeable
-import scala.reflect.TypeTest
 object Router:
 
 
@@ -29,7 +25,6 @@ object Router:
                                            pathItem:  pathItem
                                          )(using writer: SocketWriter[F], connection: ConnectionHandler[F], bodyReader: BodyReader[Req]) {
     type Out = Res
-    inline def responseSchema: schema = summonInline[Schema[Res]].toSchema
 
     def processRequest(socket: SocketChannel, request: HttpRequest[ByteBuffer])(using ec: ExecutionContext ): Future[Unit] = {
 
@@ -52,31 +47,24 @@ object Router:
 
 
 
-
-
-  // DSL for creating a route.
-  inline def route[F[_],T <: HttpMethod,Req: BodyReader, Res](method: T, path: HttpPath, f: HttpRequest[Req] => Future[HttpResponse[Res]])(using ec: ExecutionContext,s: SocketWriter[F], c: ConnectionHandler[F], ressch: Schema[Res], reqsch: Schema[Req]): Route[F, T, Req, Res] =
-    Route(method, path, f)
-
-  given [F[_], T <: HttpMethod, Req: BodyReader, Res](using SocketWriter[Http], ConnectionHandler[Http], Schema[Res], Schema[Req]): Conversion[Route[F, T, Req, Res], Route[Http, T, Req, Res]] =
-    route => Route(route.method, route.path, req => route.handler(req))
-
-
-  // Extensions to "unwrap" our opaque type so we can use it as a function and also access its metadata.
   object Route:
-    inline def apply[F[_], T <: HttpMethod, Req: BodyReader, Res](method: T, path: HttpPath, f: HttpRequest[Req] => Future[HttpResponse[Res]])(using t: Typeable[Res],  s: SocketWriter[F], c: ConnectionHandler[F], ressch: Schema[Res], reqsch: Schema[Req]): Route[F, T, Req, Res] = {
+    inline def apply[F[_], T <: HttpMethod, Req, Res](method: T, path: HttpPath, f: HttpRequest[Req] => Future[HttpResponse[Res]])(using t: Typeable[Res],  s: SocketWriter[F], c: ConnectionHandler[F], br: BodyReader[Req]): Route[F, T, Req, Res] = {
+
+      val reqSch: schema = summonInline[Schema[Req]].toSchema
+      val resSch: schema = summonInline[Schema[Res]].toSchema
+
 
       val m = simpleTypeName[T]
       val returnType = extractEntityType[Res]
       val summary = s"${m.toLowerCase} a ${returnType.toLowerCase}"
       val operationId= s"${m.toLowerCase}_${returnType.toLowerCase}"
-      val mediaType = new mediaType(schema = ressch.toSchema)
-      val req: Option[request] = reqsch.toSchema match {
+      val mediaType = new mediaType(schema = resSch)
+      val req: Option[request] = reqSch match {
         case x if x.`type`.isEmpty => {
           None
         }
         case x => {
-          Some(request(Some("A correctly formatted request"), headers = None,  Some(Map("application/json" ->  new mediaType(schema = reqsch.toSchema)))))
+          Some(request(Some("A correctly formatted request"), headers = None,  Some(Map("application/json" ->  new mediaType(schema = reqSch)))))
         }
       }
       val res = response("Successful operation", headers = None, content = Some(Map("application/json" -> mediaType )))
@@ -123,16 +111,6 @@ given httpConnection: ConnectionHandler[Http] with {
   socket.close()
   }
 }
-
-// Route automatically resolves the correct SocketWriter[F]
-
-// DSL for creating a Route with implicit resolution of SocketWriter and ConnectionHandler
-inline def route[F[_], T <: HttpMethod, Req: BodyReader, Res](
-                                         method: T,
-                                         path: HttpPath,
-                                         f: HttpRequest[Req] => Future[HttpResponse[Res]]
-                                       )(using s: SocketWriter[F] = httpWriter, c: ConnectionHandler[F] = httpConnection,ec: ExecutionContext, ressch: Schema[Res], reqsch: Schema[Req]): Route[F, T, Req, Res] =
-  Route(method, path, f)
 
 
 

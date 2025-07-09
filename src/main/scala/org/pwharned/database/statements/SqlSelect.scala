@@ -1,11 +1,12 @@
-package org.pwharned.database
+package org.pwharned.database.statements
 
+import org.pwharned.database.statements.{PrimaryKeyExtractor, PrimaryKeyFields, Rs, SelectStatement}
 import org.pwharned.database.summonFieldTypes
-import HKD.*
-import scala.language.implicitConversions
+
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.*
+import scala.language.implicitConversions
 
 trait SqlSelect[T] {
   def names: List[String]

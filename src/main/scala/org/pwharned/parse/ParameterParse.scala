@@ -151,6 +151,6 @@ object QueryDeserializer extends Parse:
         }
 
 extension (s: String)
-  def fromQuery[A <: Product](using j: QueryDeserializer[A]): Either[ParseError, A] = summon[QueryDeserializer[A]].deserialize(s)
+  inline def fromQuery[A <: Product]: Either[ParseError, A] = summonInline[QueryDeserializer[A]].deserialize(s)
 
 

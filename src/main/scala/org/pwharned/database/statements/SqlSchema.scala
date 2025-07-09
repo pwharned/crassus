@@ -1,9 +1,10 @@
-package org.pwharned.database
+package org.pwharned.database.statements
 
 import org.pwharned.database.{DbTypeMapper, mapToSqlTypes}
-import scala.language.implicitConversions
+
 import scala.compiletime.*
 import scala.deriving.Mirror
+import scala.language.implicitConversions
 
 trait SqlSchema[T]:
   def createTable(mapper: DbTypeMapper): String

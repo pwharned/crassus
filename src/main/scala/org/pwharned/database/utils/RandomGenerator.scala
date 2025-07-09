@@ -1,12 +1,14 @@
-package org.pwharned.database
+package org.pwharned.database.utils
+
 
 import org.pwharned.database.summonFieldTypes
 
 import scala.compiletime.*
 import scala.deriving.*
+import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.util.Random
-import scala.language.implicitConversions
+
 transparent inline def generateRandomValue[T]: T =
   inline erasedValue[T] match
     case _: String => Random.alphanumeric.take(10).mkString.asInstanceOf[T]

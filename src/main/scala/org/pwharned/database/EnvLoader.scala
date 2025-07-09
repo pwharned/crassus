@@ -3,6 +3,8 @@ import scala.io.Source
 import scala.util.{Try, Success, Failure}
 import java.io.File
 import scala.deriving.Mirror
+import scala.compiletime.constValueTuple
+
 import scala.compiletime.{erasedValue, summonInline, constValue}
 object EnvLoader {
 
@@ -10,7 +12,6 @@ object EnvLoader {
    * Helper inline method to get field names from a case class
    */
   inline def fieldNames[T](using m: Mirror.Of[T]): List[String] = {
-    import scala.compiletime.constValueTuple
 
     inline erasedValue[m.MirroredElemLabels] match {
       case _: (head *: tail) =>

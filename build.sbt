@@ -3,45 +3,25 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 libraryDependencies += "com.ibm.db2" % "jcc" % "11.5.8.0"
 libraryDependencies += "org.postgresql" % "postgresql" % "42.7.7"
 Compile / mainClass := Some("org.pwharned.main")
+Global / parallelExecution := true
 
 //enablePlugins(ScalaNativePlugin)
 //nativeMode:= "release-fast"
-enablePlugins(GraalVMNativeImagePlugin)
+//enablePlugins(GraalVMNativeImagePlugin)
+//graalVMNativeImageOptions ++= Seq(
+//  "--allow-incomplete-classpath",
+//  "-H:ResourceConfigurationFiles=../../resource-config.json",
+
+//)
 lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
   .settings(
     name := "caseClassGenerator",
     scalaVersion := "2.13.16",
     publish / skip := false
   )
-graalVMNativeImageOptions ++= Seq(
-  "--allow-incomplete-classpath",
-  "-H:ResourceConfigurationFiles=../../resource-config.json",
-
-)
-
-ThisBuild/ scalacOptions ++= Seq(
-  "-deprecation",
-  "-encoding", "UTF-8",
-  "-feature",
-  "-unchecked",
-  "-Ystatistics",
-)
 
 
-ThisBuild / scalacOptions ++= Seq(
-  // individual optimizations
-  "-opt","unreachable-code",
-  "-opt","simplify-jumps",
-  "-opt","compact-locals",
-  "-opt","copy-propagation",
-  "-opt","redundant-casts",
-  "-opt","box-unbox",
-  "-opt","nullness-tracking",
-  "-opt","closure-invocations",
-  "-opt","allow-skip-core-module-init",
-  "-opt","assume-modules-non-null",
-  "-opt","allow-skip-class-loading"
-)
+
 
 
 lazy val excludedPrefixes = Seq(
@@ -53,14 +33,30 @@ lazy val excludedPrefixes = Seq(
 lazy val root = project.in(file("."))
   .settings(
     name := "crassus",
-    scalaVersion := "3.7.0",
+    scalaVersion := "3.7.1",
     Compile / packageBin / mappings := {
       val original: Seq[(File, String)] = (Compile / packageBin / mappings).value
       original.filterNot { case (_, pathInJar) =>
         excludedPrefixes.exists(pathInJar.contains)
       }
     },
-    Compile / sourceGenerators += Def.task {
+    // in build.sbt
+    Compile / compile / fork := true,
+      Compile / compile / javaOptions ++= Seq(
+      "-Xms4G", "-Xmx8G", "-XX:+UseG1GC"
+    ),
+
+    scalacOptions ++= Seq(
+      "-deprecation",
+      "-encoding", "UTF-8",
+      "-feature",
+      "-unchecked",
+      "-Vprofile",
+      "-Xmax-inlines:100"
+    ),
+
+
+      Compile / sourceGenerators += Def.task {
       val outputDir = baseDirectory.value / "src/main/scala/org/pwharned/generated"
       val base      = baseDirectory.value
       // Ensure caseClassGenerator is compiled first

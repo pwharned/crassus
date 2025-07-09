@@ -1,0 +1,6 @@
+-Xms8G
+-Xmx8G
+-XX:+UseG1GC
+-XX:MaxMetaspaceSize=512M
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:+ExplicitGCInvokesConcurrent

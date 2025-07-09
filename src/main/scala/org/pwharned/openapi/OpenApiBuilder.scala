@@ -4,7 +4,7 @@ package org.pwharned.openapi
 import org.pwharned.route.Router.Route
 import org.pwharned.http.HttpMethod.{DELETE, GET, HttpMethod, PATCH, POST, PUT}
 import org.pwharned.http.Segment
-
+import org.pwharned.json.serialize
 import scala.compiletime.summonInline
 
 object OpenApiBuilder:
@@ -47,6 +47,20 @@ object OpenApiBuilder:
       paths      = paths,
       components = None
     )
+    
+  def write(p: String, api: String): Unit = {
+    import java.io.PrintWriter
+    println(s"Writing the openapispec to $p")
+    val pw = new PrintWriter(p) // opens (or creates) the file
+    try {
+      pw.write(api)
+    } finally {
+      pw.close() // always close to flush and free resources
+    }
+
+  }
+    
+  
 
 
 

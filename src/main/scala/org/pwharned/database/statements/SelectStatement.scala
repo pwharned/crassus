@@ -1,13 +1,12 @@
-package org.pwharned.database
+package org.pwharned.database.statements
 
-import org.pwharned.database.summonFieldTypes
-import HKD.*
-import org.pwharned.database.statements.SqlDialect
+import org.pwharned.database.dialect.SqlDialect
+import org.pwharned.database.statements.SelectStatement
 
-import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.*
+import scala.language.implicitConversions
 
 trait SelectStatement[T] {
   def select: String

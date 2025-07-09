@@ -1,9 +1,8 @@
-package org.pwharned.database
+package org.pwharned.database.statements
 
 import org.pwharned.database.HKD.*
-import org.pwharned.json.JsonString
-
-import org.pwharned.json.given_Conversion_String_JsonString
+import org.pwharned.database.statements.SqlWrap
+import org.pwharned.json.{JsonString, given_Conversion_String_JsonString}
 
 import java.sql.ResultSet
 import java.util.UUID

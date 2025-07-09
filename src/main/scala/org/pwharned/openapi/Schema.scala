@@ -54,84 +54,84 @@ object Schema:
         )
     }
 
-given Schema[Boolean] with
-  def labels = Nil
-
-  def `type` = Some("boolean")
-
-  def toSchema = schema(`type` = `type`)
-given Schema[Float] with
-  def labels = Nil
-
-  def `type` = Some("number")
-
-  def toSchema = schema(`type` = `type`, format = Some("float"))
-given Schema[Int] with
-  def labels = Nil
-  def `type`  = Some("integer")
-  override def format = Some("int32")
-  def toSchema = schema(`type` = `type`, format = format)
-
-given Schema[String] with
-  def labels = Nil
-  def `type`  = Some("string")
-  def toSchema = schema(`type` = `type`)
-
-given Schema[Unit] with
-  def labels = Nil
-
-  def `type` = None
-
-  def toSchema = schema(`type` = `type`)
-
-given Schema[ByteBuffer] with
-  def labels = Nil
-
-  def `type` = None
-
-  def toSchema = schema(`type` = `type`)
-
-given Schema[java.util.UUID] with
-  def labels = Nil
-
-  def `type` = Some("string")
-
-  def toSchema = schema(`type` = `type`, format = Some("UUID4"))
-
-given [A](using sch: Schema[A]): Schema[Iterator[A]] with
-  def labels = Nil
-  def `type`  = Some("array")
-  def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
-
-given [A](using sch: Schema[A]): Schema[List[A]] with
-  def labels = Nil
-
-  def `type` = Some("array")
-
-  def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
-
-given [A](using sch: Schema[A]): Schema[PrimaryKey[A]] with
-  def labels = Nil
-
-  def `type` = sch.`type`
-
-  def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
-
-given [A](using sch: Schema[A]): Schema[Option[A]] with
-  def labels = Nil
-
-  def `type` = sch.`type`
-
-  def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
-
-
-
-given [A](using sch: Schema[A]): Schema[Map[String, A]] with
-  def labels: List[String]           = Nil
-  def `type`: Option[String]         = Some("object")
-  override def toSchema: schema =
-    schema(
-      `type`                 = `type`,
-      additionalProperties   = Some(sch.toSchema)
-    )
-
+  given Schema[Boolean] with
+    def labels = Nil
+  
+    def `type` = Some("boolean")
+  
+    def toSchema = schema(`type` = `type`)
+  given Schema[Float] with
+    def labels = Nil
+  
+    def `type` = Some("number")
+  
+    def toSchema = schema(`type` = `type`, format = Some("float"))
+  given Schema[Int] with
+    def labels = Nil
+    def `type`  = Some("integer")
+    override def format = Some("int32")
+    def toSchema = schema(`type` = `type`, format = format)
+  
+  given Schema[String] with
+    def labels = Nil
+    def `type`  = Some("string")
+    def toSchema = schema(`type` = `type`)
+  
+  given Schema[Unit] with
+    def labels = Nil
+  
+    def `type` = None
+  
+    def toSchema = schema(`type` = `type`)
+  
+  given Schema[ByteBuffer] with
+    def labels = Nil
+  
+    def `type` = None
+  
+    def toSchema = schema(`type` = `type`)
+  
+  given Schema[java.util.UUID] with
+    def labels = Nil
+  
+    def `type` = Some("string")
+  
+    def toSchema = schema(`type` = `type`, format = Some("UUID4"))
+  
+  given [A](using sch: Schema[A]): Schema[Iterator[A]] with
+    def labels = Nil
+    def `type`  = Some("array")
+    def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
+  
+  given [A](using sch: Schema[A]): Schema[List[A]] with
+    def labels = Nil
+  
+    def `type` = Some("array")
+  
+    def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
+  
+  given [A](using sch: Schema[A]): Schema[PrimaryKey[A]] with
+    def labels = Nil
+  
+    def `type` = sch.`type`
+  
+    def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
+  
+  given [A](using sch: Schema[A]): Schema[Option[A]] with
+    def labels = Nil
+  
+    def `type` = sch.`type`
+  
+    def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
+  
+  
+  
+  given [A](using sch: Schema[A]): Schema[Map[String, A]] with
+    def labels: List[String]           = Nil
+    def `type`: Option[String]         = Some("object")
+    override def toSchema: schema =
+      schema(
+        `type`                 = `type`,
+        additionalProperties   = Some(sch.toSchema)
+      )
+  

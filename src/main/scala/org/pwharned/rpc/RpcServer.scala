@@ -1,10 +1,8 @@
 package org.pwharned.rpc
-import org.pwharned.rpc.listToCaseClass
 import org.pwharned.http.HttpResponse
-import org.pwharned.json.JsonDeserializer
-import org.pwharned.json.{JsonDeserializer, JsonSerializer, deserialize, serialize}
+import org.pwharned.json.{JsonDeserializer, JsonSerializer}
 import org.pwharned.parse.Parser
-import org.pwharned.http.textBodyEncoder
+
 import scala.compiletime.summonInline
 import scala.deriving.Mirror
 

@@ -1,4 +1,4 @@
-package org.pwharned.database
+package org.pwharned.database.statements
 
 import org.pwharned.database.HKD.PrimaryKey
 

@@ -1,4 +1,4 @@
-package org.pwharned
+package org.pwharned.rpc
 
 import org.pwharned.rpc.{RpcEndpoint, RpcSchema, RpcServer, listToCaseClass}
 

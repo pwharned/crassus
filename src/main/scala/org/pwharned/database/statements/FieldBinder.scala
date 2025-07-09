@@ -1,15 +1,16 @@
-package org.pwharned.database
+package org.pwharned.database.statements
 
 import org.pwharned.database.HKD.{Nullable, PrimaryKey}
+import org.pwharned.database.statements.{FieldBinder, JdbcArray}
 
-import scala.compiletime.error
 import java.sql.{DriverManager, PreparedStatement, Types}
 import java.util.UUID
-import scala.deriving.Mirror
-import scala.compiletime.{erasedValue, summonInline}
 import scala.Tuple.fromProductTyped
-import scala.reflect.ClassTag
+import scala.compiletime.{erasedValue, error, summonInline}
+import scala.deriving.Mirror
 import scala.language.implicitConversions
+import scala.reflect.ClassTag
+
 trait FieldBinder[T]:
   def bind(stmt: PreparedStatement, idx: Int, value: T): Int
 

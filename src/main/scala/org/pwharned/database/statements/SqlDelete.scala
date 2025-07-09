@@ -1,7 +1,7 @@
-package org.pwharned.database
+package org.pwharned.database.statements
 
-import org.pwharned.database.HKD._
-import org.pwharned.macros.{listToTuple}
+import org.pwharned.database.HKD.*
+import org.pwharned.macros.listToTuple
 
 import scala.compiletime.*
 import scala.deriving.*

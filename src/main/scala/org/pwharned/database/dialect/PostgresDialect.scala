@@ -1,4 +1,6 @@
-package org.pwharned.database.statements
+package org.pwharned.database.dialect
+
+import org.pwharned.database.dialect.SqlDialect
 
 object PostgresDialect extends SqlDialect:
   def select(table: String, cols: Seq[String]) =

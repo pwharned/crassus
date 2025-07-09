@@ -1,7 +1,7 @@
-package org.pwharned.database
+package org.pwharned.database.utils
 
-import scala.deriving.Mirror
 import scala.compiletime.constValueTuple
+import scala.deriving.Mirror
 
 type FieldsOf[T] =
   Tuple.Zip[

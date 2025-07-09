@@ -1,8 +1,9 @@
 package org.pwharned.http
 
+import org.pwharned.json.JsonDeserializer
+
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import org.pwharned.json.JsonDeserializer
 
 /** A purely compile‐time “how do I read A from the raw ByteBuffer body?” */
 trait BodyReader[A]:
