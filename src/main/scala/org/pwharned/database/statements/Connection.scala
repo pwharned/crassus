@@ -74,15 +74,12 @@ extension (con: java.sql.Connection)
     Iterator.continually(rs.next())
       .takeWhile(identity)
       .map(x => rs.as[B])
-  inline def query[A <: Product]: Iterator[A] =
-    given sql: SqlSelect[A] = summonInline[SqlSelect[A]]
+
+  def query[A <: Product](using sql: SqlSelect[A]): Iterator[A] =
     val stmt = con.prepareStatement(sql.select)
     val rs = stmt.executeQuery()
     Iterator.continually(rs.next()).takeWhile(identity).map(x => rs.as[A])
-
-  inline def query[A <: Product](a:PrimaryKeyFields[A]#Out): Iterator[A] =
-
-    given sql: SqlSelect[A] = summonInline[SqlSelect[A]]
+  def query[A <: Product](a:PrimaryKeyFields[A]#Out)(using sql: SqlSelect[A]): Iterator[A] =
     val stmt = con.prepareStatement(sql.selectWhere)
     val bindValues = sql.bindValues(a)
     bindValues.zipWithIndex.foreach { case (value, index) =>

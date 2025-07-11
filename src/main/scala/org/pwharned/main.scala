@@ -95,26 +95,7 @@ def main(): Unit =
 
 
   def routes: List[Route[Protocal, HttpMethod, ?, ?]] = List(
-    actions_route,
-    asset_bookmarks_route,
-    asset_collection_route,
-    asset_product_route,
-    asset_ratings_route,
-    asset_types_route,
-    assets_route,
-    attributes_route,
-    attributevalues_route,
-    brands_route,
-    collections_route,
-    comments_route,
-    entities_route,
-    entityattributes_route,
-    nominations_route,
-    offering_types_route,
-    parent_route,
-    practices_route,
-    products_route,
-    relationship_route).flatten ++ List(openapi, swagger)
+    actions_route).flatten
 
 
 
@@ -122,5 +103,6 @@ def main(): Unit =
 
   println("building routing table")
   lazy val table  = RoutingTable.build(routes)
+  println(table)
 
   HTTPServer.start(8080, table)

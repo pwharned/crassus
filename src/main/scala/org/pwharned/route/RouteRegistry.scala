@@ -41,7 +41,8 @@ object RouteRegistry:
                                           ec: ExecutionContext,
                                           m: Mirror.ProductOf[Persisted[T]],
                                    qp: QueryDeserializer[Optional[T]],
-                                                       sch: Schema[Persisted[T]]
+                                                       sch: Schema[Persisted[T]],
+                                                       sqls: SqlSelect[Persisted[T]]
                                          ): Route[P, GET,  Unit, Iterator[Persisted[T]]] =
 
     Route.apply(GET, s"/api/$entityName".toPath, (req: HttpRequest.HttpRequest[Unit]) =>
@@ -68,7 +69,8 @@ object RouteRegistry:
                                                 ch: ConnectionHandler[P],
                                                 ec: ExecutionContext,
                                                 m: Mirror.ProductOf[Persisted[T]],
-                                              sch: Schema[Persisted[T]]
+                                              sch: Schema[Persisted[T]],
+                                                              sqlSelect: SqlSelect[Persisted[T]]
   ): Route[P, GET, Unit, Iterator[Persisted[T]]] =
 
 
@@ -78,8 +80,16 @@ object RouteRegistry:
     val dynamicIndexes = path.segments.zipWithIndex.collect {
       case (dynamic: Segment.Dynamic, index) => index
     }
+
+    if(primaryKeys.length==0) {
+     return  Route.apply(GET, path, (req: HttpRequest.HttpRequest[Unit]) => {
+       Future(HttpResponse.notFound[Iterator[Persisted[T]]])
+      }
+      )
+    }
     Route.apply(GET, path, (req: HttpRequest.HttpRequest[Unit]) =>
     {
+      println("Getting")
       val keyStrings: List[String] =
         dynamicIndexes.map(req.path.segments.collect {
           case dynamic: Segment.Static => dynamic.segment.toString
@@ -195,7 +205,7 @@ object RouteRegistry:
 
     List(
       get[P, T](entityName), // GET /api/entity
-      getWhere[P, T](entityName), // GET /api/entity/{id}
+     // getWhere[P, T](entityName), // GET /api/entity/{id}
       post[P, T](entityName), // POST /api/entity
       delete[P, T](entityName), // DELETE /api/entity/{id}
       patch[P, T](entityName) // PATCH /api/entity/{id}
