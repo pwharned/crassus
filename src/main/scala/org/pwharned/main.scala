@@ -44,7 +44,6 @@ def main(): Unit =
     HttpResponse(body = Body.text(source.getLines().mkString), headers = Headers(Map("content-type" -> "text/html")))
 
   })
-  given Database.type = Database
 
   val connectionDetails = EnvLoader.loadFromEnvFile[ConnectionDetails](".env") match {
     case Right(details) => details
@@ -53,7 +52,7 @@ def main(): Unit =
       sys.exit(1)
   }
 
-  Database.createPool(connectionDetails)
+  given Database = Database(connectionDetails)
 
   lazy val actions_route = RouteRegistry.resourceRoutes[Http, actions]("actions")
 

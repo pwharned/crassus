@@ -1,7 +1,8 @@
 package org.pwharned.route
 
 import org.pwharned.`lazy`.Lazy
-import org.pwharned.database.{Database, create, delete, retrieve, retrieveParameterized, update}
+import org.pwharned.database.{Database}
+import org.pwharned.database.statements.*
 import org.pwharned.database.HKD.*
 import org.pwharned.database.statements.{PrimaryKeyExtractor, PrimaryKeyFields}
 import org.pwharned.http.HttpMethod.{DELETE, GET, HttpMethod, PATCH, POST}
@@ -33,7 +34,7 @@ object RouteRegistry:
 
 
   def get[P[_], T[_[_]]<: Product](entityName: String)(using // ← T now has correct kind
-                                          db: Database.type,
+                                          db: Database,
                                           enc: BodyEncoder[P, Iterator[Persisted[T]]],
                                           sw: SocketWriter[P],
                                           ch: ConnectionHandler[P],
@@ -51,8 +52,8 @@ object RouteRegistry:
 
       val q = queryString.stripMargin.fromQuery[Optional[T]]
       q match {
-        case Left(value) =>  toResponse(db.retrieve[Persisted[T]])(enc.apply)
-        case Right(value) => toResponse(db.retrieveParameterized[Optional[T], Persisted[T]](value))(enc.apply)
+        case Left(value) =>  toResponse(db.withConnection( x=> x.query[Persisted[T]]) )(enc.apply)
+        case Right(value) => toResponse(db.withConnection(x => x.queryParameterized[Optional[T], Persisted[T]](value)))(enc.apply)
 
 
       }
@@ -61,7 +62,7 @@ object RouteRegistry:
     )
 
   def getWhere[P[_], T[_[_]] <: Product](entityName: String )(using // ← T now has correct kind
-                                                db: Database.type,
+                                                db: Database,
                                                 enc: BodyEncoder[P, Iterator[Persisted[T]]],
                                                 sw: SocketWriter[P],
                                                 ch: ConnectionHandler[P],
@@ -88,11 +89,11 @@ object RouteRegistry:
       val b: PrimaryKeyFields[Persisted[T]]#Out =
         toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Persisted[T]]#Out]
 
-      toResponse(db.retrieve[Persisted[T]](b))(enc.apply)
+      toResponse(db.withConnection(x => x.query[Persisted[T]](b)))(enc.apply)
     }
     )
   inline def post[P[_], T[_[_]] <: Product](entityName: String)(using // ← T now has correct kind
-                                            db: Database.type,
+                                            db: Database,
                                             enc: BodyEncoder[P, Iterator[Persisted[T]]],
                                             sw: SocketWriter[P],
                                             ch: ConnectionHandler[P],
@@ -106,14 +107,14 @@ object RouteRegistry:
 
     Route.apply(POST, path, (req: HttpRequest.HttpRequest[New[T]]) => {
 
-      toResponse(db.create[New[T], Persisted[T]](req.body))(enc.apply)
+      toResponse(db.withConnection(x => x.insert[New[T], Persisted[T]](req.body)))(enc.apply)
 
 
     }
     )
 
   def delete[P[_], T[_[_]] <: Product](entityName: String)(using // ← T now has correct kind
-                                              db: Database.type,
+                                              db: Database,
                                               enc: BodyEncoder[P, Iterator[Persisted[T]]],
                                               sw: SocketWriter[P],
                                               ch: ConnectionHandler[P],
@@ -138,7 +139,7 @@ object RouteRegistry:
       val b: PrimaryKeyFields[Persisted[T]]#Out =
         toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Persisted[T]]#Out]
 
-      toResponse(db.delete[Persisted[T]](b))(enc.apply)
+      toResponse(db.withConnection( x=> x.delete[Persisted[T]](b)))(enc.apply)
 
 
     }
@@ -146,7 +147,7 @@ object RouteRegistry:
 
 
   inline def patch[P[_], T[_[_]] <: Product](entityName: String)(using // ← T now has correct kind
-                                             db: Database.type,
+                                             db: Database,
                                              enc: BodyEncoder[P, Iterator[Persisted[T]]],
                                              sw: SocketWriter[P],
                                              ch: ConnectionHandler[P],
@@ -171,14 +172,14 @@ object RouteRegistry:
       val b: PrimaryKeyFields[Updated[T]]#Out = toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Updated[T]]#Out]
 
 
-      toResponse(db.update[Updated[T], Persisted[T]](req.body,b))(enc.apply)
+      toResponse(db.withConnection( x=> x.update[Updated[T], Persisted[T]](req.body,b)))(enc.apply)
 
     }
     )
 
   inline def resourceRoutes[P[_], T[_[_]] <: Product](entityName: String)(using
                                                       // Common requirements
-                                                      db: Database.type,
+                                                      db: Database,
                                                       enc: BodyEncoder[P, Iterator[Persisted[T]]],
                                                       sw: SocketWriter[P],
                                                       ch: ConnectionHandler[P],
