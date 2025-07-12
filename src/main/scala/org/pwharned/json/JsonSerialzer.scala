@@ -6,7 +6,6 @@ import scala.compiletime.*
 import scala.deriving.Mirror
 import org.pwharned.`lazy`.Lazy
 import org.pwharned.`lazy`.Lazy.given
-
 // A type‐class that knows how to “unwrap” a wrapper type F[A] to A at runtime
 trait JsWrap[F[_], A]:
   def wrap(fa: F[A], serializeA: A => String): String
@@ -39,7 +38,7 @@ object JsonSerializer:
     makeProductSerializer(labels, lazySer)
 
   // 2) now a **non‐inline** given that calls that helper exactly once per T
-  given derivedProduct[T <: Product](using
+  inline given derivedProduct[T <: Product](using
                                      m: Mirror.ProductOf[T]
                                     ): JsonSerializer[T] =
   deriveProductImpl[T]
@@ -49,13 +48,19 @@ object JsonSerializer:
     inline erasedValue[Elems] match
       case _: EmptyTuple => Nil
       case _: (h *: t)   =>
-        // cast each Lazy[JsonSerializer[h]] → Lazy[JsonSerializer[Any]]
-        summonInline[Lazy[JsonSerializer[h]]]
-          .asInstanceOf[Lazy[JsonSerializer[Any]]] ::
-          summonAllLazy[t]
+        def headEnc =  summonInline[Lazy[JsonSerializer[h]]].asInstanceOf[Lazy[JsonSerializer[Any]]] 
+        def tail = summonAllLazy[t]
+        headEnc::tail
+        
 
   // The actual “tiny” serializer that only loops at runtime
   private def makeProductSerializer[T](
+                                        labels: List[String],
+                                        lazySer: List[Lazy[JsonSerializer[Any]]]
+                                      ): JsonSerializer[T] = new JsonSerializer[T]:
+    def serialize(obj: T): String = ""
+  // The actual “tiny” serializer that only loops at runtime
+  private def makeProductSerializerTest[T](
                                         labels: List[String],
                                         lazySer: List[Lazy[JsonSerializer[Any]]]
                                       ): JsonSerializer[T] = new JsonSerializer[T]:

@@ -45,7 +45,7 @@ object CaseClassGenerator  {
 
         System.out.println(value)
         s"""
-           |case class ${value._1.name}[F[_]] (${columns.map(x => x.toField).mkString(",")})""".stripMargin
+           |case class ${value._1.name}[F[_]] (${columns.map(x => x.toField).mkString(",\n")})""".stripMargin
     }
 
   }.mkString("\n")

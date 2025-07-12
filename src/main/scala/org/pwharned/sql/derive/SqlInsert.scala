@@ -48,83 +48,71 @@ trait SqlInsert[CC]:
   /** Bind only the included fields, in the same order as the placeholders. */
   def bind(cc: CC, stmt: PreparedStatement): Int
 
+
+final class DerivedSqlInsert[CC <: Product](
+                                             override val tableName: String,
+                                             labels: List[String],
+                                             getters: List[InsertField[Any]],
+                                             binders: List[FieldBinder[Any]],
+                                             dialect: SqlDialect
+                                           ) extends SqlInsert[CC]:
+  override def sql(cc: CC): String =
+    val prod = cc.asInstanceOf[Product]
+    val cols = labels.zip(getters).collect {
+      case (label, g) if g.get(prod.productElement(labels.indexOf(label))).isDefined =>
+        label
+    }
+    val ps = List.fill(cols.size)("?").mkString(", ")
+    s"insert into $tableName(${cols.mkString(", ")}) values($ps)"
+
+  override def bind(cc: CC, stmt: PreparedStatement): Int =
+    val prod = cc.asInstanceOf[Product]
+    var idx = 1
+
+    for i <- labels.indices do
+      val v = prod.productElement(i)
+      val getter = getters(i)
+      getter.get(v) match
+        case Some(value) =>
+          idx = binders(i).bind(stmt, idx, value.asInstanceOf)
+        case None => ()
+
+    idx
+
+  override def insertReturning(obj: CC): String =
+    dialect.insertReturning(tableName)
 object SqlInsert:
 
-  inline def apply[CC](using ins: SqlInsert[CC]): SqlInsert[CC] = ins
-
   inline given derived[CC <: Product](using
-                                      m: Mirror.ProductOf[CC], dialect:SqlDialect
+                                      m: Mirror.ProductOf[CC],
+                                      dialect: SqlDialect
                                      ): SqlInsert[CC] =
-    new SqlInsert[CC]:
-      // derive "users" from "User"
-      override val tableName: String =
-        constValue[m.MirroredLabel].toLowerCase + "s"
-
-      override def sql(cc: CC): String =
-        val elems  = Tuple.fromProductTyped(cc)
-        val labels = summonLabels[m.MirroredElemLabels]
-        val cols   = extractCols[ m.MirroredElemTypes ](elems, labels)
-        val ps      = List.fill(cols.size)("?").mkString(", ")
-        s"insert into $tableName(${cols.mkString(", ")}) values($ps)"
-
-      override def bind(cc: CC, stmt: PreparedStatement): Int =
-        bindLoop[ m.MirroredElemTypes ](
-          Tuple.fromProductTyped(cc),
-          stmt,
-          1
-        )
-
-      def insertReturning(obj: CC): String =
-        val bareSql = sql(obj)
-    
-        val finalSql = dialect.insertReturning(tableName)
-        finalSql
 
 
-  //–– Helpers to summon field‐names from the type‐level label tuple
+    val tn = constValue[m.MirroredLabel].toLowerCase + "s"
+    val lbs = summonLabels[m.MirroredElemLabels]
+    val gs = summonGetters[m.MirroredElemTypes]
+    val bs = summonBinders[m.MirroredElemTypes]
+
+    // instantiate our single, named class
+    new DerivedSqlInsert(tn, lbs, gs, bs, dialect)
+
+  //–– INLINE helpers to build the four Lists of metadata ––
+
   private inline def summonLabels[L <: Tuple]: List[String] =
     inline erasedValue[L] match
       case _: EmptyTuple    => Nil
-      case _: (h *: t) => constValue[h].toString :: summonLabels[t]
+      case _: (h *: t)      => constValue[h].toString :: summonLabels[t]
 
-  //–– Walk the product‐tuple & label‐list, collecting only Some → column
-  private inline def extractCols[Tup <: Tuple](
-                                                elems: Tup,
-                                                labels: List[String]
-                                              ): List[String] =
-    inline erasedValue[Tup] match
-      case _: EmptyTuple => Nil
-      case _: (h *: t)  =>
-        // head value + its label, then recurse
-        val cons      = elems.asInstanceOf[h *: t]
-        val head = cons.head
-        val tail = cons.tail
-        val lab        = labels.head
-        val restLabs   = labels.tail
+  private inline def summonGetters[T <: Tuple]: List[InsertField[Any]] =
+    inline erasedValue[T] match
+      case _: EmptyTuple    => Nil
+      case _: (h *: t)      =>
+        // we know InsertField[h] exists; cast to Any for storage
+        summonInline[InsertField[h]].asInstanceOf[InsertField[Any]] :: summonGetters[t]
 
-        val fld = summonInline[InsertField[h]]
-        fld.get(head) match
-          case Some(_) => lab :: extractCols[t](tail, restLabs)
-          case None    => extractCols[t](tail, restLabs)
-
-  //–– Walk & bind only the Some(...) fields in order
-  private inline def bindLoop[Tup <: Tuple](
-                                             elems: Tup,
-                                             stmt: PreparedStatement,
-                                             idx0: Int
-                                           ): Int =
-    inline erasedValue[Tup] match
-      case _: EmptyTuple => idx0
-      case _: (h *: t)  =>
-        val cons      = elems.asInstanceOf[h *: t]
-        val head = cons.head
-        val tail = cons.tail
-
-        val fld = summonInline[InsertField[h]]
-        fld.get(head) match
-          case Some(_) =>
-            val fb   = summonInline[FieldBinder[h]]
-            val next = fb.bind(stmt, idx0, head)
-            bindLoop[t](tail, stmt, next)
-          case None =>
-            bindLoop[t](tail, stmt, idx0)
+  private inline def summonBinders[T <: Tuple]: List[FieldBinder[Any]] =
+    inline erasedValue[T] match
+      case _: EmptyTuple    => Nil
+      case _: (h *: t)      =>
+        summonInline[FieldBinder[h]].asInstanceOf[FieldBinder[Any]] :: summonBinders[t]

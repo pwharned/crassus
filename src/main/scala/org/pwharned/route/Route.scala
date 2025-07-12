@@ -48,14 +48,14 @@ object Router:
 
 
   object Route:
-    inline def apply[F[_], T <: HttpMethod, Req, Res](method: T, path: HttpPath, f: HttpRequest[Req] => Future[HttpResponse[Res]])(using t: Typeable[Res],  s: SocketWriter[F], c: ConnectionHandler[F], br: BodyReader[Req]): Route[F, T, Req, Res] = {
+    def apply[F[_], T <: HttpMethod, Req: Schema, Res: Schema](method: T, path: HttpPath, f: HttpRequest[Req] => Future[HttpResponse[Res]])(using t: Typeable[Res],  s: SocketWriter[F], c: ConnectionHandler[F], br: BodyReader[Req]): Route[F, T, Req, Res] = {
 
-      val reqSch: schema = summonInline[Schema[Req]].toSchema
-      val resSch: schema = summonInline[Schema[Res]].toSchema
+      val reqSch: schema = summon[Schema[Req]].toSchema
+      val resSch: schema = summon[Schema[Res]].toSchema
 
 
-      val m = simpleTypeName[T]
-      val returnType = extractEntityType[Res]
+      val m = "GET" //extractEntityType[T]
+      val returnType = "asset" // extractEntityType[Res]
       val summary = s"${m.toLowerCase} a ${returnType.toLowerCase}"
       val operationId= s"${m.toLowerCase}_${returnType.toLowerCase}"
       val mediaType = new mediaType(schema = resSch)
