@@ -1,7 +1,7 @@
-package org.pwharned.database.statements
+package org.pwharned.sql.derive
 
-import org.pwharned.database.statements.{PrimaryKeyExtractor, PrimaryKeyFields, Rs, SelectStatement}
-import org.pwharned.database.summonFieldTypes
+import org.pwharned.sql.database.{Rs, summonFieldTypes}
+import org.pwharned.sql.statements.{ SelectStatement}
 
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -15,20 +15,14 @@ trait SqlSelect[T] {
   def selectWhere: String
   def selectWhere(ob:T): String
   def bindValuesOb(ob: T): Seq[Any]
-  def getClassesFieldType: List[String]
-  def fromResultSet(rs: java.sql.ResultSet): T
   def bindValues(a: PrimaryKeyFields[T]#Out): Seq[Any]
 }
 
 
 
 object SqlSelect:
-  private inline def summonAllUnwrapped[Elems <: Tuple]: List[Rs[?]] =
-    inline erasedValue[Elems] match
-      case _: EmptyTuple => Nil
-      case _: (h *: t) =>
-        summonInline[Rs[h]] :: summonAllUnwrapped[t]
-  transparent inline given derived[T <: Product](using m: Mirror.ProductOf[T]): SqlSelect[T] = {
+
+  inline given derived[T <: Product](using m: Mirror.ProductOf[T]): SqlSelect[T] = {
     new SqlSelect[T] {
       def name: String = constValue[m.MirroredLabel]
 
@@ -38,32 +32,6 @@ object SqlSelect:
       def select: String =   summonInline[SelectStatement[T]].select
 
 
-
-      def fromResultSet(rs: java.sql.ResultSet):T = {
-        val labels = constValueTuple[m.MirroredElemLabels].productIterator.toList.map(_.toString)
-        val readers = summonAllUnwrapped[m.MirroredElemTypes]
-        val zipped = labels.zip(getClassesFieldType)
-        //    reader.read(rs, label) returns the proper A or F[A] that Rs[_] knows how to do
-        val extracted: List[Any] =
-          labels.zip(readers).map { case (label, reader) =>
-            // we have to widen to Any at runtime,
-            // but type safety was enforced at compile time
-            reader.asInstanceOf[Rs[Any]].read(rs, label)
-          }
-
-        // 4) pack into a Tuple and let the Mirror build your case class
-        val tupled = Tuple.fromArray(extracted.toArray)
-        m.fromProduct(tupled)
-      }
-      def getClassesFieldType: List[String] = {
-        inline m match {
-          case m: Mirror.ProductOf[T] => {
-
-            summonFieldTypes[m.MirroredElemTypes]
-          }
-
-        }
-      }
 
       def selectWhere(obj: T): String =
         val tableName = constValue[m.MirroredLabel]
@@ -122,5 +90,4 @@ object SqlSelect:
 extension [T<:Product](entity: T)(using sql: SqlSelect[T])
   def fields: List[String] = summon[SqlSelect[T]].names
   def select: String = summon[SqlSelect[T]].select
-  def classFieldTypes: List[String] = summon[SqlSelect[T]].getClassesFieldType
 

@@ -13,7 +13,7 @@ import java.util.concurrent.{ExecutorService, Executors}
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
-import org.pwharned.database.HKD.~>.idToId
+import org.pwharned.sql.database.HKD.~>.idToId
 
 
 def sendResponseAsync(socket: Socket, response: Future[HttpResponse[?]])(using ec: ExecutionContext): Unit =

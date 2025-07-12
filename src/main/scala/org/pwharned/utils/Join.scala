@@ -1,4 +1,4 @@
-package org.pwharned.database.utils
+package org.pwharned.utils
 
 import scala.compiletime.constValueTuple
 import scala.deriving.Mirror

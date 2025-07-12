@@ -1,8 +1,6 @@
-package org.pwharned.database.utils
+package org.pwharned.utils
 
-
-import org.pwharned.database.summonFieldTypes
-
+import org.pwharned.sql.database.summonFieldTypes
 import scala.compiletime.*
 import scala.deriving.*
 import scala.language.implicitConversions
@@ -14,6 +12,8 @@ transparent inline def generateRandomValue[T]: T =
     case _: String => Random.alphanumeric.take(10).mkString.asInstanceOf[T]
     case _: Option[String] => Some(Random.alphanumeric.take(10).mkString).asInstanceOf[T]
     case _: Int  => Random.nextInt(100).asInstanceOf[T]
+    case _: java.util.UUID => java.util.UUID.randomUUID().asInstanceOf[T]
+    case _: Option[java.util.UUID] => java.util.UUID.randomUUID().asInstanceOf[T]
     case _: Integer  => Random.nextInt(100).asInstanceOf[T]
     case _: Option[Integer]  => Some(Random.nextInt(100)).asInstanceOf[T]
     case _: Option[Int] => Some(Random.nextInt(100)).asInstanceOf[T]

@@ -1,7 +1,7 @@
-package org.pwharned.database.statements
+package org.pwharned.sql.statements
 
-import org.pwharned.database.dialect.SqlDialect
-import org.pwharned.database.statements.SelectStatement
+import org.pwharned.sql.dialect.SqlDialect
+import org.pwharned.sql.statements.SelectStatement
 
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}

@@ -1,10 +1,9 @@
-package org.pwharned.database
+package org.pwharned.sql.database
 
-import org.pwharned.database.HKD.PrimaryKey
 import org.pwharned.json.{JsonDeserializer, deserialize}
+import org.pwharned.sql.database.HKD.PrimaryKey
 
-import scala.language.postfixOps
-import scala.language.implicitConversions
+import scala.language.{implicitConversions, postfixOps}
 
 object HKD:
  

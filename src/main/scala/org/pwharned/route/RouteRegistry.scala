@@ -1,23 +1,19 @@
 package org.pwharned.route
 
 import org.pwharned.`lazy`.Lazy
-import org.pwharned.database.{Database}
-import org.pwharned.database.statements.*
-import org.pwharned.database.HKD.*
-import org.pwharned.database.statements.{PrimaryKeyExtractor, PrimaryKeyFields}
-import org.pwharned.http.HttpMethod.{DELETE, GET, HttpMethod, PATCH, POST}
+import org.pwharned.http.HttpMethod.*
 import org.pwharned.http.{BodyEncoder, HttpRequest, HttpResponse, Protocal, Segment, SocketWriter, toPath}
-import org.pwharned.route.Router.Route
-import org.pwharned.json.{JsonDeserializer, JsonSerializer, deserialize}
+import org.pwharned.json.JsonDeserializer
 import org.pwharned.macros.toTuple
 import org.pwharned.openapi.Schema
 import org.pwharned.parse.{QueryDeserializer, fromQuery}
-import org.pwharned.openapi.Schema.*
+import org.pwharned.route.Router.Route
+import org.pwharned.sql.database.Connection.*
+import org.pwharned.sql.database.HKD.*
+import org.pwharned.sql.database.{Database, Row}
+import org.pwharned.sql.derive.*
 
-import java.nio.charset.StandardCharsets
-import scala.concurrent.Future
-import scala.compiletime.{constValue, summonInline}
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.Mirror
 import scala.util.{Failure, Success, Try}
 
@@ -39,10 +35,12 @@ object RouteRegistry:
                                           sw: SocketWriter[P],
                                           ch: ConnectionHandler[P],
                                           ec: ExecutionContext,
+                                                       row: Row[Persisted[T]],
                                           m: Mirror.ProductOf[Persisted[T]],
                                    qp: QueryDeserializer[Optional[T]],
                                                        sch: Schema[Persisted[T]],
-                                                       sqls: SqlSelect[Persisted[T]]
+                                                       sqls: SqlSelect[Persisted[T]],
+                                                       sqlo:SqlSelect[Optional[T]]
                                          ): Route[P, GET,  Unit, Iterator[Persisted[T]]] =
 
     Route.apply(GET, s"/api/$entityName".toPath, (req: HttpRequest.HttpRequest[Unit]) =>
@@ -69,6 +67,7 @@ object RouteRegistry:
                                                 ch: ConnectionHandler[P],
                                                 ec: ExecutionContext,
                                                 m: Mirror.ProductOf[Persisted[T]],
+                                                              row: Row[Persisted[T]],
                                               sch: Schema[Persisted[T]],
                                                               sqlSelect: SqlSelect[Persisted[T]]
   ): Route[P, GET, Unit, Iterator[Persisted[T]]] =
@@ -81,7 +80,7 @@ object RouteRegistry:
       case (dynamic: Segment.Dynamic, index) => index
     }
 
-    if(primaryKeys.length==0) {
+    if(primaryKeys.isEmpty) {
      return  Route.apply(GET, path, (req: HttpRequest.HttpRequest[Unit]) => {
        Future(HttpResponse.notFound[Iterator[Persisted[T]]])
       }
@@ -108,6 +107,7 @@ object RouteRegistry:
                                             sw: SocketWriter[P],
                                             ch: ConnectionHandler[P],
                                             ec: ExecutionContext,
+                                                                sqlInsert: SqlInsert[New[T]],
                                             m: Mirror.ProductOf[Persisted[T]],
                                             mr: Mirror.ProductOf[New[T]]
                                            ): Route[P, POST, New[T], Iterator[Persisted[T]]] =
@@ -130,7 +130,8 @@ object RouteRegistry:
                                               ch: ConnectionHandler[P],
                                               ec: ExecutionContext,
                                               m: Mirror.ProductOf[Persisted[T]],
-                                                           sch: Schema[Persisted[T]]
+                                                           sch: Schema[Persisted[T]],
+                                                           sqlDelete: SqlDelete[Persisted[T]],
 
   ): Route[P, DELETE, Unit, Iterator[Persisted[T]]] =
 
@@ -199,13 +200,16 @@ object RouteRegistry:
                                                       jdsNew: JsonDeserializer[New[T]],
                                                       jsdUpdated: JsonDeserializer[Updated[T]],
                                                       mUpdated: Mirror.ProductOf[Updated[T]],
+                                                                          row: Row[Persisted[T]],
+                                                                          sqlo: SqlSelect[Optional[T]],
+                                                                          sqlInsert: SqlInsert[New[T]],
 
                                                       queryDeserializer: QueryDeserializer[Optional[T]]
                                                      ): List[Route[P, ? <: HttpMethod,?, ?]] = {
 
     List(
       get[P, T](entityName), // GET /api/entity
-     // getWhere[P, T](entityName), // GET /api/entity/{id}
+      // getWhere[P, T](entityName), // GET /api/entity/{id}
       post[P, T](entityName), // POST /api/entity
       delete[P, T](entityName), // DELETE /api/entity/{id}
       patch[P, T](entityName) // PATCH /api/entity/{id}
@@ -213,10 +217,10 @@ object RouteRegistry:
   }
 
 
-  extension [P[_] <: Protocal[_], M <: HttpMethod, Req, Res](routes: List[Route[P, M, Req, Res]])
+  extension [P[_] <: Protocal[?], M <: HttpMethod, Req, Res](routes: List[Route[P, M, Req, Res]])
     inline def lazily: List[Lazy[Route[P, M, Req,Res]]] =
       routes.map(r => Lazy( () =>  r))
 
-  extension [R <: Route[_, _, _, _]](routes: List[R])
+  extension [R <: Route[?, ?, ?, ?]](routes: List[R])
     inline def lazily: List[Lazy[R]] =
       routes.map(r => new Lazy(() => r))

@@ -1,6 +1,6 @@
-package org.pwharned.database
+package org.pwharned.sql
 
-import org.pwharned.database.HKD.*
+import org.pwharned.sql.database.HKD.*
 
 // You’ll need the Insertable derived instance and the HKD/User definition in scope:
 object InsertableSqlTests:

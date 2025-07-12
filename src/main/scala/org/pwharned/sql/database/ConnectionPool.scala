@@ -1,4 +1,4 @@
-package org.pwharned.database
+package org.pwharned.sql.database
 
 import java.sql.{Connection, DriverManager, SQLException}
 import java.util.concurrent.TimeoutException

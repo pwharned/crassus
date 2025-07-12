@@ -1,11 +1,12 @@
-package org.pwharned.database.statements
+package org.pwharned.sql.derive
 
-import org.pwharned.database.HKD.{Default, Nullable, PrimaryKey}
-import org.pwharned.database.dialect.SqlDialect
+import org.pwharned.sql.database.FieldBinder
+import org.pwharned.sql.database.HKD.{Default, Nullable, PrimaryKey}
+import org.pwharned.sql.dialect.SqlDialect
 
-import scala.deriving.Mirror
-import scala.compiletime.{constValue, erasedValue, summonInline}
 import java.sql.PreparedStatement
+import scala.compiletime.{constValue, erasedValue, summonInline}
+import scala.deriving.Mirror
 
 
 trait InsertField[V]:

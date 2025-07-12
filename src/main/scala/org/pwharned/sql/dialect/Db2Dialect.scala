@@ -1,22 +1,20 @@
-package org.pwharned.database.dialect
+package org.pwharned.sql.dialect
 
-import org.pwharned.database.dialect.SqlDialect
+import org.pwharned.sql.dialect.SqlDialect
 
-object PostgresDialect extends SqlDialect:
+object Db2Dialect extends SqlDialect:
   def select(table: String, cols: Seq[String]) =
     s"SELECT ${cols.mkString(",")} FROM $table;"
 
   def insertReturning(table: String, cols: Seq[String]): String =
     val cs = cols.mkString(", ")
     val ps = List.fill(cols.size)("?").mkString(", ")
-    s"INSERT INTO $table ($cs) VALUES ($ps) RETURNING *;"
+    s"SELECT $cs FROM FINAL TABLE (INSERT INTO $table ($cs) VALUES ($ps))"
   
   def insertReturning(raw: String): String =
-    s"$raw RETURNING *;"
+    s"SELECT * FROM FINAL TABLE ($raw)"
 
   def insertNoReturn(table: String, cols: Seq[String]): String =
     val cs = cols.mkString(", ")
     val ps = List.fill(cols.size)("?").mkString(", ")
     s"INSERT INTO $table ($cs) VALUES ($ps);"
-
-

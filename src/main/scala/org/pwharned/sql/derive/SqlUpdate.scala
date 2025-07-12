@@ -1,6 +1,5 @@
-package org.pwharned.database.statements
+package org.pwharned.sql.derive
 
-import org.pwharned.database.statements.{PrimaryKeyExtractor, PrimaryKeyFields, SqlDelete}
 
 import scala.compiletime.*
 import scala.deriving.*

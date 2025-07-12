@@ -50,14 +50,3 @@ def toTuple(list: List[String]): Tuple = list match {
     EmptyTuple
 }
 
-inline def listToTupleT[A,T <: Tuple](list: List[A]): T = {
-  inline erasedValue[T] match
-    case _: EmptyTuple =>
-      EmptyTuple.asInstanceOf[T]
-    case _: (h *: t) =>
-      // Convert the head string to type h
-
-      // Recursively convert the remainder of the list to type t
-      val tail: t = listToTupleT[Any,t](list.tail)
-      (list.head *: tail).asInstanceOf[T]
-}

@@ -1,9 +1,9 @@
 package org.pwharned
 import generated.*
 import org.pwharned.`lazy`.Lazy
-import org.pwharned.database.HKD.PrimaryKey
-import org.pwharned.database.dialect.{PostgresDialect, SqlDialect}
-import org.pwharned.database.*
+import org.pwharned.sql.database.HKD.*
+import org.pwharned.sql.dialect.{PostgresDialect, SqlDialect}
+import org.pwharned.sql.*
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
 import org.pwharned.http.HttpRequest.HttpRequest
 import org.pwharned.http.*
@@ -14,24 +14,34 @@ import org.pwharned.openapi.*
 import org.pwharned.route.Router.Route
 import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection, sseConnection}
 import org.pwharned.server.HTTPServer
+import org.pwharned.sql.database.{ConnectionDetails, Database, DbTypeMapper, PostgresTypeMapper}
+import org.pwharned.utils.{EnvLoader, RandomGenerator}
 
 import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 
+object App:
 
-
-@main
-def main(): Unit =
-  
+  case class assets2[F[_]] ( asset_id: F[PrimaryKey[java.util.UUID]],
+                            asset_name: F[String],asset_owner: F[String],
+                             asset_description: F[String],
+                             asset_type: F[String],
+                             asset_link: F[String],
+                             created_at: F[Default[String]],
+                             updated_at: F[Nullable[String]])
+  lazy val assets_route = RouteRegistry.resourceRoutes[Http, assets2]("assets")
   given dialect: SqlDialect = PostgresDialect
 
 
   given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
+
   given DbTypeMapper = PostgresTypeMapper
 
 
-  inline def health = Route[SSE,GET, Unit, String](GET, "/health/ping".asPath, (req: HttpRequest[Unit]) => Future{ HttpResponse.ok("Ok")})
+  inline def health = Route[SSE, GET, Unit, String](GET, "/health/ping".asPath, (req: HttpRequest[Unit]) => Future {
+    HttpResponse.ok("Ok")
+  })
 
   inline def swagger = Route[Http, GET, Unit, String](GET, "/doc/openapi".asPath, (req: HttpRequest[Unit]) => Future {
     val source = scala.io.Source.fromFile("static/index.html")
@@ -54,55 +64,20 @@ def main(): Unit =
 
   given Database = Database(connectionDetails)
 
-  lazy val actions_route = RouteRegistry.resourceRoutes[Http, actions]("actions")
-
-  lazy val asset_bookmarks_route = RouteRegistry.resourceRoutes[Http, asset_bookmarks]("asset_bookmarks")
-
-  lazy val asset_collection_route = RouteRegistry.resourceRoutes[Http, asset_collection]("asset_collection")
-
-  lazy val asset_product_route = RouteRegistry.resourceRoutes[Http, asset_product]("asset_product")
-
-  lazy val asset_ratings_route = RouteRegistry.resourceRoutes[Http, asset_ratings]("asset_rating")
-
-  lazy val asset_types_route = RouteRegistry.resourceRoutes[Http, asset_types]("asset_types")
-
-  lazy val assets_route = RouteRegistry.resourceRoutes[Http, assets]("assets")
-  lazy val attributes_route = RouteRegistry.resourceRoutes[Http, attributes]("attributes")
-
-  lazy val attributevalues_route = RouteRegistry.resourceRoutes[Http, attributevalues]("attributevalues")
-
-  lazy val brands_route = RouteRegistry.resourceRoutes[Http, brands]("brands")
-
-  lazy val collections_route = RouteRegistry.resourceRoutes[Http, collections]("collections")
-
-  lazy val comments_route = RouteRegistry.resourceRoutes[Http, comments]("comments")
-
-  lazy val entities_route = RouteRegistry.resourceRoutes[Http, entities]("entities_route")
-
-  lazy val entityattributes_route = RouteRegistry.resourceRoutes[Http, entityattributes]("entityattributes")
-
-  lazy val nominations_route = RouteRegistry.resourceRoutes[Http, nominations]("nominations")
-
-  lazy val offering_types_route = RouteRegistry.resourceRoutes[Http, offering_types]("offering_types")
-
-  lazy val parent_route = RouteRegistry.resourceRoutes[Http, parent]("parent")
-
-  lazy val practices_route = RouteRegistry.resourceRoutes[Http, practices]("practices")
-
-  lazy val products_route = RouteRegistry.resourceRoutes[Http, products]("products")
-
-  lazy val relationship_route = RouteRegistry.resourceRoutes[Http, relationship]("relationship")
-
-
   def routes: List[Route[Protocal, HttpMethod, ?, ?]] = List(
-    actions_route).flatten
+    assets_route).flatten
+
+
+@main
+def main(): Unit =
+  
 
 
 
-  OpenApiBuilder.write("static/openapi.json",routes.toOpenApi.serialize)
+
+  OpenApiBuilder.write("static/openapi.json",App.routes.toOpenApi.serialize)
 
   println("building routing table")
-  lazy val table  = RoutingTable.build(routes)
-  println(table)
+  lazy val table  = RoutingTable.build(App.routes)
 
   HTTPServer.start(8080, table)

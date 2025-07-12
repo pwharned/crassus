@@ -1,8 +1,8 @@
 package org.pwharned.openapi
 
 
-import org.pwharned.database.HKD.PrimaryKey
-import org.pwharned.database.summonFieldTypes
+import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.database.summonFieldTypes
 
 import java.nio.ByteBuffer
 import scala.language.implicitConversions
@@ -21,7 +21,7 @@ trait Schema[T] {
 
 object Schema:
 
-  private inline def summonAll[Elems <: Tuple]: List[Schema[_]] =
+  private inline def summonAll[Elems <: Tuple]: List[Schema[?]] =
     inline erasedValue[Elems] match
       case _: EmptyTuple => Nil
       case _: (h *: t) => summonInline[Schema[h]] :: summonAll[t]
@@ -38,7 +38,7 @@ object Schema:
       // build a Map[name -> childSchema]
       def toSchema: schema =
         // 1) get a Schema[_] for each field
-        val childSchemas: List[Schema[_]] = summonAll[m.MirroredElemTypes]
+        val childSchemas: List[Schema[?]] = summonAll[m.MirroredElemTypes]
 
         // 2) ask each to produce its `schema`
         val props: Map[String, schema] =

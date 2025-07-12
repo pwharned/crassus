@@ -46,15 +46,16 @@ lazy val root = project.in(file("."))
       "-Xms4G", "-Xmx8G", "-XX:+UseG1GC"
     ),
 
-    scalacOptions ++= Seq(
+    Compile / scalacOptions ++= Seq(
       "-deprecation",
       "-encoding", "UTF-8",
       "-feature",
       "-unchecked",
-      "-Vprofile",
-      "-Xmax-inlines:100"
+      "-Ystop-after:inlining",
+      "-Yprofile:inlining",
+      //"-Vprint:all",
+"-Yprofile:typer"
     ),
-
 
       Compile / sourceGenerators += Def.task {
       val outputDir = baseDirectory.value / "src/main/scala/org/pwharned/generated"
@@ -80,7 +81,7 @@ lazy val root = project.in(file("."))
       val code  =
         s"""
            |package generated
-           |import org.pwharned.database.HKD._
+           |import org.pwharned.sql.database.HKD._
            |import java.sql.Timestamp
            |
            |$generatedCode

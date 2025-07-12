@@ -1,6 +1,6 @@
-package org.pwharned.database.statements
+package org.pwharned.sql.derive
 
-import org.pwharned.database.{DbTypeMapper, mapToSqlTypes}
+import org.pwharned.sql.database.{DbTypeMapper, mapToSqlTypes}
 
 import scala.compiletime.*
 import scala.deriving.Mirror

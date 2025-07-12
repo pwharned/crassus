@@ -1,5 +1,9 @@
 package org.pwharned.rpc
 
+import org.pwharned.json.JsonSerializer
+import org.pwharned.json.JsonSerializer.given
+
+
 import org.pwharned.rpc.{RpcEndpoint, RpcSchema, RpcServer, listToCaseClass}
 
 case class SubtractOne(args: List[Int])
@@ -8,7 +12,7 @@ case class SubtractOneArgs(a: Int, b: Int)
 
 case class SubtractOneResult(r: Int)
 
-inline given SubtractOneEndpoint: RpcEndpoint[SubtractOneArgs, SubtractOneResult]:
+given SubtractOneEndpoint: RpcEndpoint[SubtractOneArgs, SubtractOneResult]:
   val name = "subtractOne"
 
   def call(p: SubtractOneArgs): SubtractOneResult = SubtractOneResult(p.a - p.b)

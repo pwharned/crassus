@@ -1,11 +1,10 @@
-package org.pwharned.database
-import scala.io.Source
-import scala.util.{Try, Success, Failure}
-import java.io.File
-import scala.deriving.Mirror
-import scala.compiletime.constValueTuple
+package org.pwharned.utils
 
-import scala.compiletime.{erasedValue, summonInline, constValue}
+import java.io.File
+import scala.compiletime.{constValue, constValueTuple, erasedValue, summonInline}
+import scala.deriving.Mirror
+import scala.io.Source
+import scala.util.{Failure, Success, Try}
 object EnvLoader {
 
   /**

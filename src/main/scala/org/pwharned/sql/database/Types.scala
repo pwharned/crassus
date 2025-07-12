@@ -1,6 +1,6 @@
-package org.pwharned.database
+package org.pwharned.sql.database
 
-import org.pwharned.database.HKD.*
+import org.pwharned.sql.database.HKD.*
 import org.pwharned.macros.typeName
 import scala.quoted.*
 import scala.compiletime.*
@@ -49,10 +49,10 @@ transparent inline def mapToSqlTypes[A <: Tuple](mapper: DbTypeMapper): List[Str
 
 
 transparent inline def summonFieldTypes[A <: Tuple]: List[String] =
-    inline erasedValue[A] match {
-      case _: EmptyTuple => Nil
-      case _: (head *: tail) => unwrappedType[head] :: summonFieldTypes[tail]
-    }
+  inline erasedValue[A] match {
+    case _: EmptyTuple => Nil
+    case _: (head *: tail) => unwrappedType[head] :: summonFieldTypes[tail]
+  }
 //
 //
 //
@@ -87,7 +87,7 @@ def unwrappedTypeImpl[T: Type](using Quotes): Expr[String] = {
       if t.typeSymbol.name == "Id" ||
         t.typeSymbol.name == "PrimaryKey" ||
         t.typeSymbol.name == "Nullable" =>
-        t.typeSymbol.name == "PersistedField"
+      t.typeSymbol.name == "PersistedField"
       loop(arg)
 
     case other =>

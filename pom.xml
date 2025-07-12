@@ -1,107 +1,116 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.pwharned</groupId>
-    <artifactId>crassus-assembly-0</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
+  <groupId>org.pwharned</groupId>
+  <artifactId>tel-tal-api-rust-assembly-0</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
 
-    <name>SBT Assembly with Maven</name>
-    <description>Maven project that uses SBT for assembly</description>
+  <name>SBT Assembly with Maven</name>
+  <description>Maven project that uses SBT for assembly</description>
 
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-    </properties>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
 
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>3.0.0</version>
-                <executions>
-                    <execution>
-                        <id>copy-sbt-assembly-jar</id>
-                        <phase>package</phase>
-                        <goals><goal>run</goal></goals>
-                        <configuration>
-                            <target>
-                                <copy
-                                        file="${project.basedir}/target/scala-3.7.0/${project.artifactId}.${project.version}.jar"
-                                        tofile="${project.build.directory}/${project.build.finalName}.jar"
-                                        overwrite="true"/>
-                            </target>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <!-- Plugin to download and install SBT -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <!-- Execution to check if SBT is installed -->
-                    <execution>
-                        <id>check-sbt</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>sh</executable>
-                            <arguments>
-                                <argument>-c</argument>
-                                <argument>command -v sbt || echo "SBT not found"</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
+    <!-- tweak these as needed -->
+    <sbt.version>1.10.10</sbt.version>
+    <scala.binary.version>3.7.0</scala.binary.version>
+  </properties>
 
-                    <!-- Execution to install SBT if not present -->
-                    <execution>
-                        <id>install-sbt</id>
-                        <phase>initialize</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>sh</executable>
-                            <arguments>
-                                <argument>-c</argument>
-                                <argument>
-                                    if [[ "${sbtCheckResult}" == "SBT not found" ]]; then
-                                    echo "Installing SBT...";
-                                    curl -sL "https://github.com/sbt/sbt/releases/download/v1.10.10/sbt-1.10.10.tgz" > sbt-1.10.10.tgz
-                                    tar -xcvf sbt-1.10.10.tgz
-                                    export PATH=$(pwd):$PATH
-                                    echo "SBT already installed";
-                                    fi
-                                </argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
+  <build>
+    <plugins>
 
-                    <!-- Execution to run sbt assembly -->
-                    <execution>
-                        <id>run-sbt-assembly</id>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>sbt</executable>
-                            <arguments>
-                                <argument>assembly</argument>
-                            </arguments>
-                            <workingDirectory>${project.basedir}</workingDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
+      <!-- 1) Run shell commands: check, install, then invoke sbt -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+
+          <!-- Capture whether `sbt` is on PATH -->
+          <execution>
+            <id>check-sbt</id>
+            <phase>validate</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <executable>bash</executable>
+              <arguments>
+                <argument>-c</argument>
+                <argument>
+                  command -v sbt || echo "SBT not found"
+                </argument>
+              </arguments>
+              <captureOutput>true</captureOutput>
+              <outputProperty>sbtCheckResult</outputProperty>
+            </configuration>
+          </execution>
+
+          <!-- If missing, download and unpack SBT locally -->
+          <execution>
+            <id>install-sbt</id>
+            <phase>initialize</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <executable>bash</executable>
+              <arguments>
+                <argument>-c</argument>
+                <argument>
+                  echo "Installing sbt ${sbt.version}…";
+                  curl -sL "https://github.com/sbt/sbt/releases/download/v${sbt.version}/sbt-${sbt.version}.tgz" \
+                  -o sbt.tgz;
+                  tar xzf sbt.tgz;
+                  export PATH=$(pwd)/sbt/bin:$PATH;
+                </argument>
+              </arguments>
+            </configuration>
+          </execution>
+
+          <!-- Always run sbt assembly -->
+          <execution>
+            <id>run-sbt-assembly</id>
+            <phase>compile</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <executable>./sbt/bin/sbt</executable>
+              <arguments>
+                <argument>clean</argument>
+                <argument>assembly</argument>
+              </arguments>
+              <workingDirectory>${project.basedir}</workingDirectory>
+            </configuration>
+          </execution>
+
+        </executions>
+      </plugin>
+
+      <!-- 2) After assembly, copy the fat-jar into Maven's target -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <id>copy-sbt-assembly-jar</id>
+            <phase>package</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <copy todir="${project.build.directory}">
+                  <fileset dir="${project.basedir}/target/scala-${scala.binary.version}">
+                    <include name="*assembly*.jar"/>
+                  </fileset>
+                </copy>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
 </project>

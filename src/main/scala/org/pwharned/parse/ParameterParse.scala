@@ -1,6 +1,6 @@
 package org.pwharned.parse
 
-import org.pwharned.database.HKD.{Nullable, PrimaryKey}
+import org.pwharned.sql.database.HKD.{Nullable, PrimaryKey}
 import org.pwharned.json.JsonString
 import org.pwharned.json.given_Conversion_String_JsonString
 import org.pwharned.parse.{Parse, ParseError, Primitives}

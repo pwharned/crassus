@@ -1,9 +1,9 @@
 package org.pwharned.json
 
-import org.pwharned.database.statements.Rs
 import org.pwharned.openapi.{Schema, schema}
 import org.pwharned.parse.{Parser, Primitives}
 import org.pwharned.parse.QueryDeserializer.QueryFieldDeserializer
+import org.pwharned.sql.database.Rs
 
 opaque type JsonString = String
 

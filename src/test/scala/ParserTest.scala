@@ -6,7 +6,7 @@ import org.pwharned.parse.fromQuery
 
 import scala.language.implicitConversions
 import java.nio.ByteBuffer
-import org.pwharned.database.HKD.PrimaryKey
+import org.pwharned.sql.database.HKD.PrimaryKey
 import org.pwharned.json.JsonDeserializer.jsonAstDeserializer
 import org.pwharned.json.{JsonAst, JsonDeserializer, deserialize}
 import org.pwharned.parse.Primitives.whitespace
@@ -30,8 +30,8 @@ def testParse(): Unit =
       println(s"Test 1 Failed: Error -> $error")
 
 
-  import org.pwharned.database.HKD.*
-  import org.pwharned.database.HKD.Conversions.given 
+  import org.pwharned.sql.database.HKD.*
+  import org.pwharned.sql.database.HKD.Conversions.given 
   import org.pwharned.json.deserialize
   case class User[F[_]](
                          id: F[PrimaryKey[Int]],

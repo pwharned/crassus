@@ -1,7 +1,6 @@
-package org.pwharned.database.statements
+package org.pwharned.sql.derive
 
-import org.pwharned.database.HKD.*
-import org.pwharned.macros.listToTuple
+import org.pwharned.sql.database.HKD.*
 
 import scala.compiletime.*
 import scala.deriving.*
@@ -44,7 +43,18 @@ trait SqlDelete[T<:Product]:
   def values(l: List[String]): PrimaryKeyFields[T]#Out
   
 object SqlDelete:
-  inline given derive[T <: Product](using m: Mirror.ProductOf[T]): SqlDelete[T] =
+  inline def listToTuple[A, T <: Tuple](list: List[A]): T = {
+    inline erasedValue[T] match
+      case _: EmptyTuple =>
+        EmptyTuple.asInstanceOf[T]
+      case _: (h *: t) =>
+        // Convert the head string to type h
+
+        // Recursively convert the remainder of the list to type t
+        val tail: t = listToTuple[Any, t](list.tail)
+        (list.head *: tail).asInstanceOf[T]
+  }
+  transparent inline given derived[T <: Product](using m: Mirror.ProductOf[T]): SqlDelete[T] =
     new SqlDelete[T]:
       def values(l:List[String]):PrimaryKeyFields[T]#Out = listToTuple(l).asInstanceOf[PrimaryKeyFields[T]#Out]
       def deleteStatement: String =

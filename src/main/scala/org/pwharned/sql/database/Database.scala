@@ -1,8 +1,9 @@
-package org.pwharned.database
+package org.pwharned.sql.database
 
-import org.pwharned.database.dialect.SqlDialect
-import org.pwharned.database.statements.{FieldBinder, PrimaryKeyFields, SqlDelete, SqlInsert, SqlSchema, SqlSelect, SqlUpdate}
 import org.pwharned.json.JsonSerializer
+import org.pwharned.sql.database.{ConnectionPool, FieldBinder}
+import org.pwharned.sql.dialect.SqlDialect
+import org.pwharned.sql.statements.*
 
 import java.sql.Connection
 import scala.compiletime.summonInline

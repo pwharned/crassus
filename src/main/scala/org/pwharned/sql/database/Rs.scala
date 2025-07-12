@@ -1,8 +1,7 @@
-package org.pwharned.database.statements
+package org.pwharned.sql.database
 
-import org.pwharned.database.HKD.*
-import org.pwharned.database.statements.SqlWrap
 import org.pwharned.json.{JsonString, given_Conversion_String_JsonString}
+import HKD.*
 
 import java.sql.ResultSet
 import java.util.UUID
@@ -27,7 +26,6 @@ object SqlWrap:
 
 // you could also
 object Rs:
-  
 
   // 2) your leaf instances
   given Rs[String]  with

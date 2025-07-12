@@ -1,12 +1,13 @@
 package org.pwharned
 
-import org.pwharned.database.HKD.*
-import org.pwharned.database.*
+import org.pwharned.sql.database.HKD.*
+import org.pwharned.sql.*
 import org.pwharned.json.serialize
-import org.pwharned.database.statements.FieldBinder.*
-import org.pwharned.database.dialect.{PostgresDialect, SqlDialect}
-import org.pwharned.database.statements.PrimaryKeyFields
-import org.pwharned.database.utils.RandomGenerator
+import org.pwharned.sql.database.{Db2TypeMapper, DbTypeMapper}
+import org.pwharned.sql.database.FieldBinder.*
+import org.pwharned.sql.derive.PrimaryKeyFields
+import org.pwharned.sql.dialect.{PostgresDialect, SqlDialect}
+import org.pwharned.utils.RandomGenerator
 
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext

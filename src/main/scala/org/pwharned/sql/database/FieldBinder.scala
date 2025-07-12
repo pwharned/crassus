@@ -1,7 +1,6 @@
-package org.pwharned.database.statements
+package org.pwharned.sql.database
 
-import org.pwharned.database.HKD.{Nullable, PrimaryKey}
-import org.pwharned.database.statements.{FieldBinder, JdbcArray}
+import HKD.{Nullable, PrimaryKey}
 
 import java.sql.{DriverManager, PreparedStatement, Types}
 import java.util.UUID

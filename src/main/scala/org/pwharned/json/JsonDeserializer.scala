@@ -1,12 +1,12 @@
 package org.pwharned.json
 
-import org.pwharned.database.HKD.{Nullable, PrimaryKey}
+import org.pwharned.sql.database.HKD.{Nullable, PrimaryKey}
 import org.pwharned.parse.{Parse, ParseError, Parser, Primitives}
 
 import scala.compiletime.*
 import scala.deriving.*
 import scala.quoted.*
-import org.pwharned.database.HKD.~>.idToId
+import org.pwharned.sql.database.HKD.~>.idToId
 import org.pwharned.json
 
 import  org.pwharned.`lazy`.Lazy
