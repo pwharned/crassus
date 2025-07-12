@@ -54,8 +54,8 @@ object Router:
       val resSch: schema = summon[Schema[Res]].toSchema
 
 
-      val m = "GET" //extractEntityType[T]
-      val returnType = "asset" // extractEntityType[Res]
+      val m = extractEntityType[T]
+      val returnType =  extractEntityType[Res]
       val summary = s"${m.toLowerCase} a ${returnType.toLowerCase}"
       val operationId= s"${m.toLowerCase}_${returnType.toLowerCase}"
       val mediaType = new mediaType(schema = resSch)

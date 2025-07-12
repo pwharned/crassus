@@ -51,10 +51,8 @@ lazy val root = project.in(file("."))
       "-encoding", "UTF-8",
       "-feature",
       "-unchecked",
-      "-Ystop-after:inlining",
-      "-Yprofile:inlining",
-      //"-Vprint:all",
-"-Yprofile:typer"
+"-Xmax-inlines", "64",
+     // "-Xprint-suspension",
     ),
 
       Compile / sourceGenerators += Def.task {
