@@ -25,19 +25,24 @@ trait JsonSerializer[T]:
 object JsonSerializer:
 
   // === 1) Derivation for case‐classes / products ===
-  inline given  derivedProduct[T <: Product](using
-                                                   m: Mirror.ProductOf[T]
-                                                  ): JsonSerializer[T] =
+  private inline def deriveProductImpl[T <: Product](using
+                                                     m: Mirror.ProductOf[T]
+                                                    ): JsonSerializer[T] =
     // field names
-    val labels  = constValueTuple[m.MirroredElemLabels]
-      .toList
-      .map(_.toString)
+    val labels = constValueTuple[m.MirroredElemLabels]
+      .toList.map(_.toString)
 
     // summon each field‐serializer *lazily* into a homogeneous List
     val lazySer = summonAllLazy[m.MirroredElemTypes]
 
-    // build the runtime serializer
+    // build the runtime (small!) serializer
     makeProductSerializer(labels, lazySer)
+
+  // 2) now a **non‐inline** given that calls that helper exactly once per T
+  given derivedProduct[T <: Product](using
+                                     m: Mirror.ProductOf[T]
+                                    ): JsonSerializer[T] =
+  deriveProductImpl[T]
 
   // Summon a List of Lazy[JsonSerializer[Any]] from Tuple types
   private inline def summonAllLazy[Elems <: Tuple]: List[Lazy[JsonSerializer[Any]]] =

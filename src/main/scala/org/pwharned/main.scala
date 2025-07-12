@@ -30,7 +30,7 @@ object App:
                              asset_link: F[String],
                              created_at: F[Default[String]],
                              updated_at: F[Nullable[String]])
-  lazy val assets_route = RouteRegistry.resourceRoutes[Http, assets2]("assets")
+  lazy val assets_route = RouteRegistry.resourceRoutes[Http, assets2]("assets2")
   given dialect: SqlDialect = PostgresDialect
 
 
