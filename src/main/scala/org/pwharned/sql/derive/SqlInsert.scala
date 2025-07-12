@@ -89,7 +89,7 @@ object SqlInsert:
                                      ): SqlInsert[CC] =
 
 
-    val tn = constValue[m.MirroredLabel].toLowerCase + "s"
+    val tn = constValue[m.MirroredLabel].toLowerCase 
     val lbs = summonLabels[m.MirroredElemLabels]
     val gs = summonGetters[m.MirroredElemTypes]
     val bs = summonBinders[m.MirroredElemTypes]
