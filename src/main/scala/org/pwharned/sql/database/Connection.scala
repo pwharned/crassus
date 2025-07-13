@@ -1,10 +1,9 @@
 package org.pwharned.sql.database
 
-import org.pwharned.sql.derive.{PrimaryKeyFields, SqlDelete, SqlInsert, SqlSelect, SqlUpdate}
-
-import scala.compiletime.summonInline
-import scala.concurrent.{ExecutionContext, Future}
 import org.pwharned.sql.database.Row
+import org.pwharned.sql.derive.*
+
+import scala.concurrent.{ExecutionContext, Future}
 
 object Connection:
   extension (con: java.sql.Connection)
@@ -18,74 +17,77 @@ object Connection:
         .takeWhile(identity)
         .map(x => row.fromRs(rs) ).grouped(batchSize)
     }
-    def update[A <: Product: Row](obj: A)(using sqlSelect: SqlSelect[A], sqlUpdate: SqlUpdate[A], row:Row[A]): Iterator[A] =
-  
-      val stmt = con.prepareStatement(sqlUpdate.updateStatement(obj))
-      sqlUpdate.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
-        stmt.setObject(index + 1, value) // Bind each parameter safely
-      }
+
+    def update[A <: Product, B <: Product : Row](obj: A)(using sqlUpdate: SqlUpdate[A], fb: UpdateBinder[A], pkb: PrimaryKeyBinder[A], sqlSelect: SqlSelect[B], row: Row[B]): Iterator[B] =
+
+      val sql = sqlUpdate.sql(obj)
+      println(sql)
+      val stmt = con.prepareStatement(sql)
+
+      val end = fb.bind(stmt, 1, obj)
+
+      val rs = stmt.executeQuery()
+      Iterator.continually(rs.next())
+        .takeWhile(identity)
+        .map(x => row.fromRs(rs))
+
+    def update[A <: Product, B<:Product: Row](obj: A, b: PrimaryKeyFields[A]#Out)(using sqlUpdate: SqlUpdate[A],fb: UpdateBinder[A], pkb: PrimaryKeyBinder[A], row: Row[B]): Iterator[B] =
+
+      val sql = sqlUpdate.sql(obj)
+      val stmt = con.prepareStatement(sql)
+      val end = fb.bind(stmt, 1, obj)
+      val end2 = pkb.bind(stmt, end, b)
       val rs = stmt.executeQuery()
       Iterator.continually(rs.next())
         .takeWhile(identity)
         .map(x => row.fromRs(rs) )
-  
-    def update[A <: Product, B<:Product: Row](obj: A, b: PrimaryKeyFields[A]#Out)(using sqlUpdate: SqlUpdate[A], sqlSelect: SqlSelect[B], row: Row[B]): Iterator[B] =
-      
-      val stmt = con.prepareStatement(sqlUpdate.updateStatement(obj))
-      sqlUpdate.bindValues(obj, b).zipWithIndex.foreach { case (value, index) =>
-        stmt.setObject(index + 1, value) // Bind each parameter safely
-      }
+
+
+
+    def delete[A <: Product: Row](obj: PrimaryKeyFields[A]#Out)(using row: Row[A], sqlDelete: SqlDelete[A],pkb: PrimaryKeyBinder[A]): Iterator[A] =
+
+      val sql = sqlDelete.sql
+      val stmt = con.prepareStatement(sql)
+      val end2 = pkb.bind(stmt, 1, obj)
       val rs = stmt.executeQuery()
       Iterator.continually(rs.next())
         .takeWhile(identity)
-        .map(x => row.fromRs(rs) )  
-  
-  
-  
-    def delete[A <: Product](obj: PrimaryKeyFields[A]#Out)(using sqlDelete: SqlDelete[A]): Iterator[A] =
-  
-     
-      val stmt = con.prepareStatement(sqlDelete.deleteStatement)
-      sqlDelete.bindValues(obj).zipWithIndex.foreach { case (value, index) =>
-        stmt.setObject(index + 1, value) // Bind each parameter safely
-      }
-      val rs = stmt.executeUpdate()
-      Iterator.empty
-  
+        .map(x => row.fromRs(rs))
+
   
   
     def insert[A <: Product, B<:Product](obj: A)(using fb: FieldBinder[A],sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B],row: Row[B]): Iterator[B] =
-  
-      
-  
-      val built = sqlInsert.insertReturning(obj)
+      val built = sqlInsert.sql(obj)
       val stmt = con.prepareStatement(built)
-      fb.bind(stmt, 1, obj)
-  
+      val bound = fb.bind(stmt, 1, obj)
       val rs = stmt.executeQuery()
+
       Iterator.continually(rs.next())
         .takeWhile(identity)
         .map(x => row.fromRs(rs) )
-  
+
     def query[A <: Product](using sql: SqlSelect[A], row:Row[A]): Iterator[A] =
       val stmt = con.prepareStatement(sql.select)
       val rs = stmt.executeQuery()
       Iterator.continually(rs.next()).takeWhile(identity).map(x => row.fromRs(rs) )
-    def query[A <: Product](a:PrimaryKeyFields[A]#Out)(using sql: SqlSelect[A], row: Row[A]): Iterator[A] =
-      val stmt = con.prepareStatement(sql.selectWhere)
-      val bindValues = sql.bindValues(a)
-      bindValues.zipWithIndex.foreach { case (value, index) =>
-        stmt.setObject(index + 1, value) // Bind each parameter safely
-      }
-      val rs = stmt.executeQuery()
-      Iterator.continually(rs.next()).takeWhile(identity).map(x => row.fromRs(rs) )
-    def queryParameterized[A <: Product,B<:Product](a:A )(using sqlSelect: SqlSelect[A], row: Row[B]): Iterator[B] =
+    def query[A <: Product](a:PrimaryKeyFields[A]#Out)(using pkb: PrimaryKeyBinder[A],sql: SqlSelect[A], row: Row[A]): Iterator[A] =
 
-      val stmt = con.prepareStatement(sqlSelect.selectWhere (a) )
-      val bindValues = sqlSelect.bindValuesOb(a)
-      bindValues.zipWithIndex.foreach { case (value, index) =>
-        stmt.setObject(index + 1, value) // Bind each parameter safely
-      }
+      val stmt = con.prepareStatement(sql.selectWhere)
+      val bindValues = pkb.bind(stmt, 1, a)
+
       val rs = stmt.executeQuery()
       Iterator.continually(rs.next()).takeWhile(identity).map(x => row.fromRs(rs) )
-  
+    def queryParameterized[A <: Product,B<:Product: Row](obj:A )(using sqlSelect: SqlSelect[A],fb:FieldBinder[A], row: Row[B]): Iterator[B] =
+      val sql = sqlSelect.selectWhere(obj)
+
+      val stmt = con.prepareStatement(sql )
+      val end = fb.bind(stmt, 1, obj)
+
+      val rs = stmt.executeQuery()
+      Iterator.continually(rs.next()).takeWhile(identity).map(x => row.fromRs(rs) )
+
+    def createTable[A <: Product](using schema: SqlSchema[A], ec: ExecutionContext, db: DbTypeMapper): Unit =
+
+      val stmt = con.prepareStatement(schema.createTable(db))
+
+      stmt.executeUpdate()

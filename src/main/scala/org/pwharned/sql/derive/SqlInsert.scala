@@ -1,118 +1,69 @@
 package org.pwharned.sql.derive
 
-import org.pwharned.sql.database.FieldBinder
-import org.pwharned.sql.database.HKD.{Default, Nullable, PrimaryKey}
-import org.pwharned.sql.dialect.SqlDialect
-
-import java.sql.PreparedStatement
 import scala.compiletime.{constValue, erasedValue, summonInline}
 import scala.deriving.Mirror
+import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.dialect.SqlDialect
 
+import scala.ValueOf
 
 trait InsertField[V]:
-  /**
-   * If Some(x), we emit a `?` + column, and bind x.
-   * If None, we drop this column entirely.
-   */
   def get(v: V): Option[Any]
 
 object InsertField:
+  given skipPk[T]: InsertField[PrimaryKey[T]] with
+    def get(pk: PrimaryKey[T]) = None
 
-  // 1) New‐style Optional PK: Option[PrimaryKey[T]] → unwrap & include only if Some
-  given pkOpt[T]: InsertField[Option[PrimaryKey[T]]] with
-    def get(opt: Option[PrimaryKey[T]]) = opt.map(_.value)
+  given skipOptPk[T]: InsertField[Option[PrimaryKey[T]]] with
+    def get(opt: Option[PrimaryKey[T]]) = None
 
-  // 2) Direct PK: always include
-  given pkAlways[T]: InsertField[PrimaryKey[T]] with
-    def get(pk: PrimaryKey[T]) = Some(pk.value)
-
-  // 3) Any other Option[T] (covers New‐Default, New‐Nullable): include only if Some
   given optAny[T]: InsertField[Option[T]] with
     def get(opt: Option[T]) = opt
 
-  // 4) Everything else: always include
   given plain[T]: InsertField[T] with
     def get(v: T) = Some(v)
 
+/**
+ * Produces a List of (columnName, "?") for every field
+ * your InsertField says “include me.”
+ */
+trait SqlInsert[T]:
+  def sql(orig: T): String
 
-
-
-trait SqlInsert[CC]:
-  /** e.g. "users" for a `case class User[...]` */
-  def tableName: String
-  def insertReturning(obj: CC): String
-
-  /** e.g. ("insert into users(name) values(?)", 1) */
-  def sql(cc: CC): String
-
-  /** Bind only the included fields, in the same order as the placeholders. */
-  def bind(cc: CC, stmt: PreparedStatement): Int
-
-
-final class DerivedSqlInsert[CC <: Product](
-                                             override val tableName: String,
-                                             labels: List[String],
-                                             getters: List[InsertField[Any]],
-                                             binders: List[FieldBinder[Any]],
-                                             dialect: SqlDialect
-                                           ) extends SqlInsert[CC]:
-  override def sql(cc: CC): String =
-    val prod = cc.asInstanceOf[Product]
-    val cols = labels.zip(getters).collect {
-      case (label, g) if g.get(prod.productElement(labels.indexOf(label))).isDefined =>
-        label
-    }
-    val ps = List.fill(cols.size)("?").mkString(", ")
-    s"insert into $tableName(${cols.mkString(", ")}) values($ps)"
-
-  override def bind(cc: CC, stmt: PreparedStatement): Int =
-    val prod = cc.asInstanceOf[Product]
-    var idx = 1
-
-    for i <- labels.indices do
-      val v = prod.productElement(i)
-      val getter = getters(i)
-      getter.get(v) match
-        case Some(value) =>
-          idx = binders(i).bind(stmt, idx, value.asInstanceOf)
-        case None => ()
-
-    idx
-
-  override def insertReturning(obj: CC): String =
-    dialect.insertReturning(tableName)
 object SqlInsert:
 
-  inline given derived[CC <: Product](using
-                                      m: Mirror.ProductOf[CC],
-                                      dialect: SqlDialect
-                                     ): SqlInsert[CC] =
+  inline private def loop[
+    Elems  <: Tuple,      // the field‐types tuple
+    Labels <: Tuple       // the field‐names tuple
+  ](orig: Product, idx: Int): List[(String, String)] =
+    inline erasedValue[(Elems, Labels)] match
+      case _: (EmptyTuple, EmptyTuple) =>
+        Nil
 
+      case _: (h *: t, l *: ls) =>
+        // 1) pull out the runtime value
+        val value = orig.productElement(idx).asInstanceOf[h]
 
-    val tn = constValue[m.MirroredLabel].toLowerCase 
-    val lbs = summonLabels[m.MirroredElemLabels]
-    val gs = summonGetters[m.MirroredElemTypes]
-    val bs = summonBinders[m.MirroredElemTypes]
+        // 2) decide if we include it
+        val included = summonInline[InsertField[h]].get(value)
 
-    // instantiate our single, named class
-    new DerivedSqlInsert(tn, lbs, gs, bs, dialect)
+        // 3) summon the compile‐time label for this field
+        val colName = summonInline[ValueOf[l]].value.toString
 
-  //–– INLINE helpers to build the four Lists of metadata ––
+        // 4) recurse to the tail
+        val tail    = loop[t, ls](orig, idx + 1)
 
-  private inline def summonLabels[L <: Tuple]: List[String] =
-    inline erasedValue[L] match
-      case _: EmptyTuple    => Nil
-      case _: (h *: t)      => constValue[h].toString :: summonLabels[t]
+        // 5) if InsertField said Some(_), prepend (colName, "?")
+        included.fold(tail)(_ => (colName, s"?") :: tail)
 
-  private inline def summonGetters[T <: Tuple]: List[InsertField[Any]] =
-    inline erasedValue[T] match
-      case _: EmptyTuple    => Nil
-      case _: (h *: t)      =>
-        // we know InsertField[h] exists; cast to Any for storage
-        summonInline[InsertField[h]].asInstanceOf[InsertField[Any]] :: summonGetters[t]
+  /** summon a derived instance */
 
-  private inline def summonBinders[T <: Tuple]: List[FieldBinder[Any]] =
-    inline erasedValue[T] match
-      case _: EmptyTuple    => Nil
-      case _: (h *: t)      =>
-        summonInline[FieldBinder[h]].asInstanceOf[FieldBinder[Any]] :: summonBinders[t]
+  inline given derived[T <: Product](using m: Mirror.ProductOf[T], dial: SqlDialect): SqlInsert[T] =
+    new SqlInsert[T]:
+      def sql(orig: T): String = {
+        val name: String = constValue[m.MirroredLabel]
+
+        // build and then reverse so we keep original order
+        val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0).reverse
+        dial.insertReturning( f"insert into $name (${namesAndPlaceHoldesr.map(_._1).mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) ")
+      }

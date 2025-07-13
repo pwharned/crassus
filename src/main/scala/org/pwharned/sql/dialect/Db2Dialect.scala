@@ -10,10 +10,13 @@ object Db2Dialect extends SqlDialect:
     val cs = cols.mkString(", ")
     val ps = List.fill(cols.size)("?").mkString(", ")
     s"SELECT $cs FROM FINAL TABLE (INSERT INTO $table ($cs) VALUES ($ps))"
-  
+
   def insertReturning(raw: String): String =
     s"SELECT * FROM FINAL TABLE ($raw)"
-
+  def updateReturning(raw: String): String =
+    s"SELECT * FROM FINAL TABLE ($raw)"
+  def deleteReturning(raw: String): String =
+    s"SELECT * FROM FINAL TABLE($raw)"
   def insertNoReturn(table: String, cols: Seq[String]): String =
     val cs = cols.mkString(", ")
     val ps = List.fill(cols.size)("?").mkString(", ")

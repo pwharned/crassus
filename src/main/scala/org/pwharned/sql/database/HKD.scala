@@ -3,6 +3,7 @@ package org.pwharned.sql.database
 import org.pwharned.json.{JsonDeserializer, deserialize}
 import org.pwharned.sql.database.HKD.PrimaryKey
 
+import scala.deriving.Mirror
 import scala.language.{implicitConversions, postfixOps}
 
 object HKD:
@@ -24,9 +25,9 @@ object HKD:
     def value: X
 
   object Nullable:
-    def apply[X](x: X): Nullable[X] = x
+    def apply[X](x: X): Nullable[X] = Nullable(x)
 
-    given [T]: Conversion[T, Nullable[T]] = x => Nullable(x)
+//    given [T]: Conversion[T, Nullable[T]] = x => Nullable(x)
     given [T]: Conversion[Nullable[T], T] = x => x.value
 
   sealed trait Default[X]:
@@ -58,7 +59,7 @@ object HKD:
 
   
   type NewField[A] = A match
-    case PrimaryKey[t] => Option[PrimaryKey[t]]
+    case PrimaryKey[t] => Option[PrimaryKey[None.type]]
     case Nullable[t] => Option[t]
     case Default[t] => Option[t]
     case _ => A

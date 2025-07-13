@@ -19,6 +19,5 @@ object SqlSchema:
 
         val columns = fieldNames.zip(fieldTypes).map { case (name, sqlType) => s"$name $sqlType" }
         val table = s"CREATE TABLE IF NOT EXISTS $tableName (\n  ${columns.mkString(",\n  ")}\n);"
-        println(table)
         table
 extension[T: SqlSchema] (t: T) def createTableStatement(using db:DbTypeMapper): String = summon[SqlSchema[T]].createTable(db)

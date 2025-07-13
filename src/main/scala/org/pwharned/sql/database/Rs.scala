@@ -22,7 +22,7 @@ object SqlWrap:
   given SqlWrap[Id] with
     def wrap[A](value: A): Id[A] = value
   given SqlWrap[Nullable] with
-    def wrap[A](value: A): Nullable[A] = value
+    def wrap[A](value: A): Nullable[A] = Nullable(value)
 
 // you could also
 object Rs:

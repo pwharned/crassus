@@ -4,7 +4,7 @@ import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.HttpPath.HttpPath
 import org.pwharned.http.HttpRequest.HttpRequest
 import org.pwharned.http.*
-import org.pwharned.macros.{extractEntityType, simpleTypeName}
+import org.pwharned.macros.{extractEntityType, simpleTypeName, typeName, typeToString}
 import org.pwharned.openapi.*
 
 import java.nio.ByteBuffer
@@ -48,15 +48,15 @@ object Router:
 
 
   object Route:
-    def apply[F[_], T <: HttpMethod, Req: Schema, Res: Schema](method: T, path: HttpPath, f: HttpRequest[Req] => Future[HttpResponse[Res]])(using t: Typeable[Res],  s: SocketWriter[F], c: ConnectionHandler[F], br: BodyReader[Req]): Route[F, T, Req, Res] = {
+    inline def apply[F[_], T <: HttpMethod:Typeable, Req: Schema, Res: Schema](method: T, path: HttpPath, f: HttpRequest[Req] => Future[HttpResponse[Res]])(using t: Typeable[Res],  s: SocketWriter[F], c: ConnectionHandler[F], br: BodyReader[Req]): Route[F, T, Req, Res] = {
 
       val reqSch: schema = summon[Schema[Req]].toSchema
       val resSch: schema = summon[Schema[Res]].toSchema
 
 
-      val m = extractEntityType[T]
-      val returnType =  extractEntityType[Res]
-      val summary = s"${m.toLowerCase} a ${returnType.toLowerCase}"
+      val m = simpleTypeName[T]
+      val returnType =  simpleTypeName[Res] // magic code
+      val summary = s"${m.toLowerCase} a ${path.segments(1).toString}"
       val operationId= s"${m.toLowerCase}_${returnType.toLowerCase}"
       val mediaType = new mediaType(schema = resSch)
       val req: Option[request] = reqSch match {

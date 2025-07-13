@@ -131,9 +131,23 @@ object RoutingTable:
         case Nil => None
 
 
+  def printReadable[P[_] <: Protocal[_]](table: RoutingTable[HttpMethod, P]): Unit = {
+    def printNode(node: Node[P, ?, ?], indent: String): Unit =
+      println(s"$indent- ${node.id}" + node.route.map(r => s" [Route for ${r.method} ${r.path}]").getOrElse(""))
+      node.children.foreach { case (_, child) => printNode(child, indent + "  ") }
+
+    table.foreach { case (method, branch) =>
+      println(s"$method:")
+      branch.foreach { case (_, node) =>
+        printNode(node, indent = "  ")
+      }
+      println()
+    }
+  }
+
+
 
 
 end RoutingTable
-
 
 

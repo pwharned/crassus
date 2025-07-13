@@ -1,10 +1,12 @@
 package org.pwharned.sql.database
 
 import HKD.{Nullable, PrimaryKey}
+import org.postgresql.core.ParameterList
 
 import java.sql.{DriverManager, PreparedStatement, Types}
 import java.util.UUID
 import scala.Tuple.fromProductTyped
+import scala.annotation.tailrec
 import scala.compiletime.{erasedValue, error, summonInline}
 import scala.deriving.Mirror
 import scala.language.implicitConversions
@@ -42,13 +44,39 @@ object FieldBinder:
   // 2. Case-class derivation
   //--------------------------------------------------------------------------
 
+  //–– recursive helper over an element‐type tuple
+
+  private inline def bindProduct[Types <: Tuple](
+                                                  stmt: PreparedStatement,
+                                                  idx0: Int,
+                                                  cc: Product,
+                                                  offset: Int
+                                                ): Int =
+    inline erasedValue[Types] match
+      // no more fields
+      case _: EmptyTuple =>
+        idx0
+
+      // bind head, then tail
+      case _: (h *: t) =>
+        val fbH = summonInline[FieldBinder[h]]
+        val headValue = cc.productElement(offset).asInstanceOf[h]
+        val nextIdx = fbH.bind(stmt, idx0, headValue)
+        bindProduct[t](stmt, nextIdx, cc, offset + 1)
+
+
+  //–– single derivedProduct that walks each element directly
   inline given derivedProduct[CC <: Product](using
-                                             m: Mirror.ProductOf[CC],
-                                             fb: FieldBinder[m.MirroredElemTypes]
+                                             m: Mirror.ProductOf[CC]
                                             ): FieldBinder[CC] =
     new FieldBinder[CC]:
-      def bind(stmt: PreparedStatement, idx: Int, cc: CC): Int =
-        fb.bind(stmt, idx, fromProductTyped(cc))
+      def bind(
+                stmt: PreparedStatement,
+                idx: Int,
+                cc: CC
+              ): Int =
+        // start recursion at element‐index 0
+        bindProduct[m.MirroredElemTypes](stmt, idx, cc, 0)
 
 
   given FieldBinder[Int] with
@@ -63,7 +91,7 @@ object FieldBinder:
       idx + 1
   given [T](using fb: FieldBinder[T]): FieldBinder[PrimaryKey[T]] with
     def bind(stmt: PreparedStatement, idx: Int, v: PrimaryKey[T]): Int =
-      fb.bind(stmt,idx,v)
+      fb.bind(stmt,idx,v.value)
 
   given FieldBinder[Boolean] with
     def bind(stmt: PreparedStatement, idx: Int, v: Boolean): Int =
@@ -79,9 +107,8 @@ object FieldBinder:
       idx + 1
   given FieldBinder[java.util.UUID] with
     def bind(stmt: PreparedStatement, idx: Int, v: java.util.UUID): Int =
-      stmt.setObject(idx, v)
+      stmt.setObject(idx, v, java.sql.Types.OTHER)
       idx + 1
-  // Option[T]: Some → bind, None → null
   given [T](using fb: FieldBinder[T]): FieldBinder[Option[T]] with
     def bind(stmt: PreparedStatement, idx: Int, opt: Option[T]): Int =
       opt match
@@ -98,7 +125,6 @@ object FieldBinder:
         idx + 1
       else
         fb.bind(stmt, idx, v)
-
 
 
 

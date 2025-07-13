@@ -13,7 +13,8 @@ object PostgresDialect extends SqlDialect:
   
   def insertReturning(raw: String): String =
     s"$raw RETURNING *;"
-
+  def deleteReturning(raw: String): String  = s"$raw RETURNING *"
+  override def updateReturning(raw: String): String = s"$raw RETURNING *"
   def insertNoReturn(table: String, cols: Seq[String]): String =
     val cs = cols.mkString(", ")
     val ps = List.fill(cols.size)("?").mkString(", ")

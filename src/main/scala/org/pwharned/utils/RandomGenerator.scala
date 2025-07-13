@@ -1,85 +1,100 @@
 package org.pwharned.utils
 
-import org.pwharned.sql.database.summonFieldTypes
-import scala.compiletime.*
-import scala.deriving.*
-import scala.language.implicitConversions
-import scala.reflect.ClassTag
+import org.pwharned.sql.database.HKD.{PrimaryKey, Nullable, PersistedField, UpdatedField}
+import scala.deriving.Mirror
+import scala.compiletime.{erasedValue, summonInline}
 import scala.util.Random
 
-transparent inline def generateRandomValue[T]: T =
-  inline erasedValue[T] match
-    case _: String => Random.alphanumeric.take(10).mkString.asInstanceOf[T]
-    case _: Option[String] => Some(Random.alphanumeric.take(10).mkString).asInstanceOf[T]
-    case _: Int  => Random.nextInt(100).asInstanceOf[T]
-    case _: java.util.UUID => java.util.UUID.randomUUID().asInstanceOf[T]
-    case _: Option[java.util.UUID] => java.util.UUID.randomUUID().asInstanceOf[T]
-    case _: Integer  => Random.nextInt(100).asInstanceOf[T]
-    case _: Option[Integer]  => Some(Random.nextInt(100)).asInstanceOf[T]
-    case _: Option[Int] => Some(Random.nextInt(100)).asInstanceOf[T]
-    case _: Boolean => Random.nextBoolean().asInstanceOf[T]
-    case _: Option[Boolean] => Some(Random.nextBoolean()).asInstanceOf[T]
-    case _: Double => Random.nextDouble().asInstanceOf[T]
-    case _: Option[Double] => Some(Random.nextDouble()).asInstanceOf[T]
-    case _: Float => Random.nextFloat().asInstanceOf[T]
-    case _: Option[Float] => Some(Random.nextFloat()).asInstanceOf[T]
-    case _: Long => Random.nextLong().asInstanceOf[T]
-    case _: Option[Long] => Some(Random.nextLong()).asInstanceOf[T]
-    case _ =>
-      val typeName = summonInline[scala.reflect.ClassTag[T]].runtimeClass.getSimpleName
-      error(s"⚠️ Unsupported type: $typeName")
-      throw new UnsupportedOperationException(s"Cannot generate random value for type $typeName")
-
-trait RandomGenerator[T<:Product]:
+/**
+ * A typeclass that knows how to produce a random T. 
+ * You can summon it for primitives, options, PrimaryKey[T], nullable, or any
+ * Product (i.e. case‐class) whose fields themselves have RandomValue instances.
+ */
+trait RandomValue[T]:
   def generate: T
 
+object RandomValue:
+  /** summon helper */
+  def apply[T](using rv: RandomValue[T]): RandomValue[T] = rv
+
+  //–– 1) Base instances for “plain” types
+  given RandomValue[String] with
+    def generate = Random.alphanumeric.take(10).mkString
+
+  given RandomValue[Int] with
+    def generate = Random.nextInt(100)
+
+  given RandomValue[Long] with
+    def generate = Random.nextLong()
+
+  given RandomValue[Double] with
+    def generate = Random.nextDouble()
+
+  given RandomValue[Float] with
+    def generate = Random.nextFloat()
+
+  given RandomValue[Boolean] with
+    def generate = Random.nextBoolean()
+
+  given RandomValue[java.util.UUID] with
+    def generate = java.util.UUID.randomUUID()
+
+  //–– 2) Wrapper‐type instances for HKD
+  given [T](using rv: RandomValue[T]): RandomValue[Option[T]] with
+    def generate = Some(rv.generate)
+
+  given [T](using rv: RandomValue[T]): RandomValue[PrimaryKey[T]] with
+    def generate = PrimaryKey(rv.generate)
+
+  given [T](using rv: RandomValue[T]): RandomValue[Nullable[T]] with
+    def generate = Nullable(rv.generate)
+
+  // If you need PersistedField or UpdatedField, uncomment / copy‐in:
+  // given [T](using rv: RandomValue[T]): RandomValue[PersistedField[T]] with
+  //   def generate = PersistedField(rv.generate)
+  //
+  // given [T](using rv: RandomValue[T]): RandomValue[UpdatedField[T]] with
+  //   def generate = UpdatedField(rv.generate)
+
+
+  //–– 3) Tuple‐level recursion (for case‐class elements)
+  inline given derivedTuple[X <: Tuple]: RandomValue[X] =
+    (
+      inline erasedValue[X] match
+        case _: EmptyTuple =>
+          new RandomValue[EmptyTuple]:
+            def generate = EmptyTuple
+
+        case _: (h *: t) =>
+          val headGen = summonInline[RandomValue[h]]
+          val tailGen = summonInline[RandomValue[t]]
+          new RandomValue[h *: t]:
+            def generate = headGen.generate *: tailGen.generate
+      ).asInstanceOf[RandomValue[X]] // <= cast
+
+  //–– 4) Case‐class (Product) derivation
+  inline given derivedProduct[CC <: Product](using
+                                             m: Mirror.ProductOf[CC],
+                                             rv: RandomValue[m.MirroredElemTypes]
+                                            ): RandomValue[CC] =
+    new RandomValue[CC]:
+      def generate: CC =
+        // generate the tuple of all fields…
+        val elems = rv.generate
+        // …then build the case‐class
+        m.fromProduct(elems)
+
+
+/**
+ * A tiny shim if you really want to keep your `RandomGenerator[T<:Product]`
+ * name and interface. It simply delegates to RandomValue[T].
+ */
+trait RandomGenerator[T <: Product]:
+  def generate: T
 
 object RandomGenerator:
-  transparent inline given derived[T <: Product](using m: Mirror.ProductOf[T], tag: ClassTag[T]): RandomGenerator[T] = {
-    new RandomGenerator[T] {
-     
+  def apply[T <: Product](using rg: RandomValue[T]): RandomValue[T] = rg
 
-      def generate: T = {
-        val labels = constValueTuple[m.MirroredElemLabels].productIterator.toList.map(_.toString)
-        val zipped = labels.zip(getClassesFieldType)
-        val extractedValues = zipped.map {
-          case (label, "String") => Random.alphanumeric.take(10).mkString
-          case (label, "Option[String]") => Some(Random.alphanumeric.take(10).mkString)
-          case (label, "Int") => Random.nextInt(100)
-          case (label, "Option[Int]") => Some(Random.nextInt(100))
-          case (label, "Integer") => Random.nextInt(100)
-          case (label, "Option[Integer]") => Some(Random.nextInt(100))
-          case (label, "Boolean") => Random.nextBoolean()
-          case (label, "Option[Boolean]") => Some(Random.nextBoolean())
-          case (label, "Option[Double]") => Some(Random.nextDouble())
-          case (label, "Double") => Random.nextDouble()
-          case (label, "Option[Float]") => Some(Random.nextFloat())
-          case (label, "Float") => Random.nextFloat()
-          case (label, "Long") => Random.nextLong()
-          case (label, "Option[Long]") => Random.nextLong()
-          case (label, _) => throw new IllegalArgumentException(s"Unsupported field type: $label")
-        }
-
-        // Convert to Tuple for Mirror's apply method
-        val valuesTuple = Tuple.fromArray(extractedValues.toArray)
-        println(valuesTuple)
-
-        // Use Mirror to instantiate case class
-        m.fromProduct(valuesTuple)
-      }
-
-
-
-      def getClassesFieldType: List[String] = {
-        inline m match {
-          case m: Mirror.ProductOf[T] => {
-
-            summonFieldTypes[m.MirroredElemTypes]
-          }
-
-        }
-      }
-
-    }
-  }
-
+  inline given derived[T <: Product](using rv: RandomValue[T]): RandomGenerator[T] =
+    new RandomGenerator[T]:
+      def generate = rv.generate

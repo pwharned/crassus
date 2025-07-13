@@ -10,8 +10,9 @@ import org.pwharned.parse.{QueryDeserializer, fromQuery}
 import org.pwharned.route.Router.Route
 import org.pwharned.sql.database.Connection.*
 import org.pwharned.sql.database.HKD.*
-import org.pwharned.sql.database.{Database, Row}
+import org.pwharned.sql.database.{Database, FieldBinder, Row}
 import org.pwharned.sql.derive.*
+import org.pwharned.sql.dialect.SqlDialect
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.Mirror
@@ -40,7 +41,8 @@ object RouteRegistry:
                                    qp: QueryDeserializer[Optional[T]],
                                                        sch: Schema[Persisted[T]],
                                                        sqls: SqlSelect[Persisted[T]],
-                                                       sqlo:SqlSelect[Optional[T]]
+                                                       sqlo:SqlSelect[Optional[T]],
+                                                       fb: FieldBinder[Optional[T]]
                                          ): Route[P, GET,  Unit, Iterator[Persisted[T]]] =
 
     Route.apply(GET, s"/api/$entityName".toPath, (req: HttpRequest.HttpRequest[Unit]) =>
@@ -60,7 +62,7 @@ object RouteRegistry:
 
     )
 
-  def getWhere[P[_], T[_[_]] <: Product](entityName: String )(using // ← T now has correct kind
+  inline def getWhere[P[_], T[_[_]] <: Product](entityName: String )(using // ← T now has correct kind
                                                 db: Database,
                                                 enc: BodyEncoder[P, Iterator[Persisted[T]]],
                                                 sw: SocketWriter[P],
@@ -71,34 +73,21 @@ object RouteRegistry:
                                               sch: Schema[Persisted[T]],
                                                               sqlSelect: SqlSelect[Persisted[T]]
   ): Route[P, GET, Unit, Iterator[Persisted[T]]] =
-
-
-    // Use PrimaryKeyExtractor on T[Id], which is your Persisted[T]
     val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[Persisted[T]].map(x => s"{$x}").mkString("/")
     val path = s"/api/$entityName/$primaryKeys".toPath
     val dynamicIndexes = path.segments.zipWithIndex.collect {
       case (dynamic: Segment.Dynamic, index) => index
     }
+    val parseKeys = PrimaryKeyParser.makeParser[Persisted[T]]
 
-    if(primaryKeys.isEmpty) {
-     return  Route.apply(GET, path, (req: HttpRequest.HttpRequest[Unit]) => {
-       Future(HttpResponse.notFound[Iterator[Persisted[T]]])
-      }
-      )
-    }
     Route.apply(GET, path, (req: HttpRequest.HttpRequest[Unit]) =>
     {
-      println("Getting")
       val keyStrings: List[String] =
         dynamicIndexes.map(req.path.segments.collect {
           case dynamic: Segment.Static => dynamic.segment.toString
         })
-
-      // If PrimaryKeyFields is defined for the persisted type, make sure the type uses T[Id]
-      val b: PrimaryKeyFields[Persisted[T]]#Out =
-        toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Persisted[T]]#Out]
-
-      toResponse(db.withConnection(x => x.query[Persisted[T]](b)))(enc.apply)
+      val keyTuple: PrimaryKeyFields[Persisted[T]]#Out = parseKeys(keyStrings)
+      toResponse(db.withConnection(x => x.query[Persisted[T]](keyTuple)))(enc.apply)
     }
     )
   inline def post[P[_], T[_[_]] <: Product](entityName: String)(using // ← T now has correct kind
@@ -123,7 +112,7 @@ object RouteRegistry:
     }
     )
 
-  def delete[P[_], T[_[_]] <: Product](entityName: String)(using // ← T now has correct kind
+  inline def delete[P[_], T[_[_]] <: Product](entityName: String)(using // ← T now has correct kind
                                               db: Database,
                                               enc: BodyEncoder[P, Iterator[Persisted[T]]],
                                               sw: SocketWriter[P],
@@ -131,8 +120,7 @@ object RouteRegistry:
                                               ec: ExecutionContext,
                                               m: Mirror.ProductOf[Persisted[T]],
                                                            sch: Schema[Persisted[T]],
-                                                           sqlDelete: SqlDelete[Persisted[T]],
-
+                                                           sqlDelete: SqlDelete[Persisted[T]]
   ): Route[P, DELETE, Unit, Iterator[Persisted[T]]] =
 
     val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[Persisted[T]].map(x => s"{$x}").mkString("/")
@@ -164,8 +152,7 @@ object RouteRegistry:
                                              ch: ConnectionHandler[P],
                                              ec: ExecutionContext,
                                              m: Mirror.ProductOf[Updated[T]],
-                                             pm: Mirror.ProductOf[Persisted[T]]
-
+                                             pm: Mirror.ProductOf[Persisted[T]],
                                             ): Route[P, PATCH, Updated[T], Iterator[Persisted[T]]] =
 
     val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[Updated[T]].map(x => s"{$x}").mkString("/")
@@ -173,12 +160,19 @@ object RouteRegistry:
     val dynamicIndexes = path.segments.zipWithIndex.collect {
       case (dynamic: Segment.Dynamic, index) => index
     }
+    given dial: SqlDialect = db.dial
 
     Route.apply(PATCH, path, (req: HttpRequest.HttpRequest[Updated[T]]) => {
 
-      val keyStrings: List[String] = dynamicIndexes.map(req.path.segments.collect {
-        case dynamic: Segment.Static => dynamic.segment.toString
-      })
+      val keyStrings: List[String] =
+        dynamicIndexes.map(i =>
+          req.path.segments(i) match {
+            case Segment.Dynamic(value) => value.toString
+            case other =>
+              throw new IllegalArgumentException(s"Expected dynamic segment at $i, got $other")
+          }
+        )
+
 
       val b: PrimaryKeyFields[Updated[T]]#Out = toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Updated[T]]#Out]
 
@@ -203,13 +197,14 @@ object RouteRegistry:
                                                                           row: Row[Persisted[T]],
                                                                           sqlo: SqlSelect[Optional[T]],
                                                                           sqlInsert: SqlInsert[New[T]],
-
+                                                                          sqlDelete: SqlDelete[Persisted[T]],
+                                                                          fb: FieldBinder[Optional[T]],
                                                       queryDeserializer: QueryDeserializer[Optional[T]]
                                                      ): List[Route[P, ? <: HttpMethod,?, ?]] = {
 
     List(
       get[P, T](entityName), // GET /api/entity
-      // getWhere[P, T](entityName), // GET /api/entity/{id}
+      getWhere[P, T](entityName), // GET /api/entity/{id}
       post[P, T](entityName), // POST /api/entity
       delete[P, T](entityName), // DELETE /api/entity/{id}
       patch[P, T](entityName) // PATCH /api/entity/{id}

@@ -14,8 +14,7 @@ trait SqlSelect[T] {
   def select: String
   def selectWhere: String
   def selectWhere(ob:T): String
-  def bindValuesOb(ob: T): Seq[Any]
-  def bindValues(a: PrimaryKeyFields[T]#Out): Seq[Any]
+
 }
 
 
@@ -54,35 +53,12 @@ object SqlSelect:
 
         val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T].map(x => s" $x = ? ").mkString(" AND ")
 
-        val sql = s"SELECT ${fields.mkString(",")} from $tableName WHERE $primaryKey ;"
+        val sql = s"SELECT ${fields.mkString(",")} from $tableName WHERE $primaryKey"
         sql
 
       }
 
-      def bindValuesOb(a: T): Seq[Any] = {
-        val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
 
-        val values = a.productIterator.toSeq
-
-        (values) collect {
-          ///case None => null // Handle Option[None] correctly
-          case Some(v) => v // Extract value from Option[T]
-          case other if other != None => other // Use raw value for primitives, excluding nulls
-        }
-
-      }
-      def bindValues(a: PrimaryKeyFields[T]#Out): Seq[Any] = {
-        val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
-
-        val primaryKeyValue = a.productIterator.toSeq
-
-        (primaryKeyValue) collect {
-          //case None => null // Handle Option[None] correctly
-          case Some(v) => v // Extract value from Option[T]
-          case other if other != None => other // Use raw value for primitives, excluding nulls
-        }
-
-      }
 
     }
   }

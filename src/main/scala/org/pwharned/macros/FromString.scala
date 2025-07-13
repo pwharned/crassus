@@ -1,9 +1,10 @@
 package org.pwharned.macros
 
+import org.pwharned.sql.database.HKD.PrimaryKey
+
 import scala.compiletime.{erasedValue, summonInline}
-
 import scala.util.Try
-
+import scala.language.implicitConversions
 trait FromString[A]:
   def parse(s: String): A
 
@@ -15,6 +16,10 @@ object FromString:
     def parse(s: String): String = s
   given FromString[java.util.UUID] with
     def parse(s: String): java.util.UUID = java.util.UUID.fromString(s)
+
+  given [T](using underlying: FromString[T]): FromString[PrimaryKey[T]] with
+     def parse(s: String): PrimaryKey[T] = underlying.parse(s)
+
 
 inline def listToTuple[T <: Tuple](list: List[String]): T = {
   inline erasedValue[T] match

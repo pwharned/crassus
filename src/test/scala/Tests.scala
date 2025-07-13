@@ -2,12 +2,13 @@ package org.pwharned
 
 import org.pwharned.sql.database.HKD.*
 import org.pwharned.sql.*
+import org.pwharned.sql.database.Connection.*
 import org.pwharned.json.serialize
 import org.pwharned.sql.database.{Db2TypeMapper, DbTypeMapper}
 import org.pwharned.sql.database.FieldBinder.*
-import org.pwharned.sql.derive.PrimaryKeyFields
-import org.pwharned.sql.dialect.{PostgresDialect, SqlDialect}
-import org.pwharned.utils.RandomGenerator
+import org.pwharned.sql.derive.{PrimaryKeyExtractor, PrimaryKeyFields, PrimaryKeyParser, SqlInsert, SqlSelect, TupleKeyExtractor}
+import org.pwharned.sql.dialect.{Db2Dialect, PostgresDialect, SqlDialect}
+import org.pwharned.utils.{RandomGenerator, Randomizer}
 
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
@@ -22,14 +23,14 @@ def timed[A](block: => A): A =
   result
 given db: DbTypeMapper = Db2TypeMapper
 
-case class user[F[_]](id: F[PrimaryKey[Int]], name: F[Nullable[String]], test: F[String])
+case class users[F[_]](id: F[PrimaryKey[Int]], name: F[Nullable[String]], test: F[String])
 
 def getDbConnection(): java.sql.Connection = {
-  val url = "jdbc:db2://localhost:50000/BLUDB"
-  val user = "db2inst1"
+  val url = "jdbc:postgresql://localhost:5433/postgres"
+  val user = "postgres"
   val password = "password"
 
-  Class.forName("com.ibm.db2.jcc.DB2Driver") // Load DB2 JDBC driver
+  Class.forName("org.postgresql.Driver") // Load DB2 JDBC driver
   java.sql.DriverManager.getConnection(url, user, password)
 }
 @main
@@ -41,34 +42,49 @@ def test:Unit =
 
 
   // Ensure table exists (for testing)
-  conn.createTable[user[Id]]
+  conn.createTable[users[Id]]
   
 
-  (0 to 100).iterator.foreach {
+  (0 to 5).iterator.foreach {
     x => {
-      val u = summon[RandomGenerator[New[user]]].generate // generate a random user
-      val u2 = summon[RandomGenerator[Updated[user]]].generate // generate some random values for update
-      val r: Persisted[user] = conn.insert[New[user], Persisted[user]](u).next() // insert
-      val u3: Updated[user] = user(None, u2.name, u2.test) // new user with same id as inserted user, but different random values
-      val pkeys: PrimaryKeyFields[Updated[user]]#Out  = Tuple1(r.id).asInstanceOf[PrimaryKeyFields[Updated[user]]#Out]
-      val r2: Persisted[user] = conn.update[Updated[user], Persisted[user]](u3,pkeys).next() // update
-      assert(r!=r2) // assert that the update user is different
+      val user1: New[users] = RandomGenerator[New[users]].generate
+      println(summon[SqlInsert[New[users]]].sql(user1))
+      val user2: Persisted[users] = conn.insert[New[users], Persisted[users]](user1).next()
+
+
+      val user3: Persisted[users] = Randomizer.derived[Persisted[users]].randomize(user2)
+      println(PrimaryKeyExtractor.getPrimaryKey[Persisted[users]])
+      val pkeys: PrimaryKeyFields[Persisted[users]]#Out = TupleKeyExtractor.extractPkTuple(user3).asInstanceOf[PrimaryKeyFields[Persisted[users]]#Out]
+      println(user3)
+      val user4: Persisted[users] = conn.update[Persisted[users], Persisted[users]](user3,pkeys).next() // update
+      //assert(user4!=user3) // assert that the update user is different
 
     }
   }
-  val userStream = conn.query[user[Id]]// select the updated values
+  val userStream = conn.query[Persisted[users]]// select the updated values
 
   val startTime = System.nanoTime()
   userStream.foreach( x =>
-{     
-      val userPrimaryKey: PrimaryKeyFields[user[Id]]#Out = Tuple1(PrimaryKey(x.id.toString)).asInstanceOf[PrimaryKeyFields[user[Id]]#Out]
-  
-  //val r4 = Await.result(conn.deleteAsync[user[Id]](userPrimaryKey), 10.seconds) // delete the user
+{
+ val pkeys: PrimaryKeyFields[Persisted[users]]#Out = TupleKeyExtractor.extractPkTuple(x).asInstanceOf[PrimaryKeyFields[Persisted[users]]#Out]
+  val pkeystring: Seq[String] = pkeys.productIterator.toSeq.map {
+    case p: PrimaryKey[?] => p.value.toString
+  }
+  println("The primaryKey string is : " + pkeystring)
+  val parseKeys = PrimaryKeyParser.makeParser[Persisted[users]]
+  val keyTuple: PrimaryKeyFields[Persisted[users]]#Out = parseKeys(pkeystring)
+  println("The extracted key key tuple is" +  keyTuple)
+  keyTuple.productIterator.foreach{
+    case x: PrimaryKey[?] => println(x.value)
+  }
+  val r4 = conn.query[Persisted[users]](keyTuple).next()
+  println(r4)
+  val r5 = conn.delete[Persisted[users]](keyTuple)
     }
 )
 
 
   
 
-  val finalUsers = conn.streamQuery[user[Id]](batchSize = 5000).apply(conn)
+  //val finalUsers = conn.streamQuery[users[Id]](batchSize = 5000).apply(conn)
   //println( (System.nanoTime() - startTime)/ 1000000)

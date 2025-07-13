@@ -22,6 +22,7 @@ class Database(using sqlDial: SqlDialect, mapper: DbTypeMapper) {
     Class.forName(con.cls) // Load DB2 JDBC driver
     java.sql.DriverManager.getConnection(url, user, password)
   }
+  val dial = sqlDial
   var pool: ConnectionPool = null;
 
   def createPool(con: ConnectionDetails): Unit = {

@@ -1,74 +1,55 @@
 package org.pwharned.sql.derive
 
-import org.pwharned.sql.database.HKD.*
+import scala.compiletime.{constValue, erasedValue, summonInline}
+import scala.deriving.Mirror
+import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.dialect.SqlDialect
 
-import scala.compiletime.*
-import scala.deriving.*
-import scala.util.Try
+import scala.ValueOf
 
-trait PrimaryKeyFields[T] {
-  type Out <: Tuple
-}
+trait SqlDelete[T]:
+  def sql: String
 
+trait DeleteKey[V]:
+  def get(v: String): Option[String]
 
-given [T](using m: Mirror.ProductOf[T]): PrimaryKeyFields[T] with {
-  type Out = Tuple.Filter[m.MirroredElemTypes, [X] =>> X match {
-    case PrimaryKey[t] => true
-    case _ => false
-  }]
-  
-}
+object DeleteKey:
+  given skipPk[T]: DeleteKey[PrimaryKey[T]] with
+    def get(v: String) = Some(v)
 
-trait PrimaryKeyFieldLength[T] {
-  type Out
-}
+  given plain[T]: DeleteKey[T] with
+    def get(v: String) = None
 
 
-given [T](using m: Mirror.ProductOf[T]): PrimaryKeyFieldLength[T] with {
-  type Out = Tuple.Size[m.MirroredElemTypes ]
-
-}
-
-
-
-// Additional instances for other types
-
-
-
-
-
-trait SqlDelete[T<:Product]:
-  def deleteStatement: String
-  def bindValues(pkValues: PrimaryKeyFields[T]#Out): Seq[Any] // Extract values separately
-  def values(l: List[String]): PrimaryKeyFields[T]#Out
-  
 object SqlDelete:
-  inline def listToTuple[A, T <: Tuple](list: List[A]): T = {
-    inline erasedValue[T] match
-      case _: EmptyTuple =>
-        EmptyTuple.asInstanceOf[T]
-      case _: (h *: t) =>
-        // Convert the head string to type h
+  inline private def pkeys[
+    Elems <: Tuple, // the field‐types tuple
+    Labels <: Tuple // the field‐names tuple
+  ]: List[(String, String)] =
+    inline erasedValue[(Elems, Labels)] match
+      case _: (EmptyTuple, EmptyTuple) =>
+        Nil
 
-        // Recursively convert the remainder of the list to type t
-        val tail: t = listToTuple[Any, t](list.tail)
-        (list.head *: tail).asInstanceOf[T]
-  }
-  transparent inline given derived[T <: Product](using m: Mirror.ProductOf[T]): SqlDelete[T] =
+      case _: (h *: t, l *: ls) =>
+
+
+        val colName = summonInline[ValueOf[l]].value.toString
+        val included = summonInline[DeleteKey[h]].get(colName)
+
+
+        val tail = pkeys[t, ls]
+        included.fold(tail)(_ => (colName, s"?") :: tail)
+
+
+  inline given derived[T <: Product](using m: Mirror.ProductOf[T], dial: SqlDialect): SqlDelete[T] =
     new SqlDelete[T]:
-      def values(l:List[String]):PrimaryKeyFields[T]#Out = listToTuple(l).asInstanceOf[PrimaryKeyFields[T]#Out]
-      def deleteStatement: String =
-        val tableName = constValue[m.MirroredLabel]
-
-        val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T].map( x => s""" $x = ? """).mkString(" AND ")
-
-        s"DELETE FROM $tableName WHERE $primaryKey"
-
-      def bindValues(pkValues: PrimaryKeyFields[T]#Out): Seq[Any] =
-        pkValues match {
-          case tuple: Tuple => tuple.toList
-          case singleValue  => Seq(singleValue) // Handles cases where there's only one primary key
-        }
+      def sql: String = {
+        val name: String = constValue[m.MirroredLabel]
+        val keys = pkeys[m.MirroredElemTypes, m.MirroredElemLabels].reverse.map(
+          x => s"${x._1} = ${x._2} "
+        ).mkString(" AND ")
+        // build and then reverse so we keep original order
 
 
-
+        dial.updateReturning( f"delete from  $name  where $keys ")
+      }

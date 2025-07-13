@@ -55,11 +55,10 @@ trait Parse:
             // start the loop with the first element
             loop(List(head), rest0)
         }
-
-    inline def flatMap[B](f: A => Parser[B]): Parser[B] = input =>
+    def flatMap[B](f: A => Parser[B]): Parser[B] = input =>
       p(input).flatMap { case (value, rest) => f(value)(rest) }
 
-    inline def map[B](f: A => B): Parser[B] = input =>
+    def map[B](f: A => B): Parser[B] = input =>
       p(input).map { case (value, rest) => (f(value), rest) }
 
     def many: Parser[List[A]] = input =>
@@ -69,12 +68,12 @@ trait Parse:
         case Left(_) => Right((Nil, input))
 
 
-    inline def optional: Parser[Option[A]] = input =>
+    def optional: Parser[Option[A]] = input =>
       p(input) match
         case Right((value, rest)) => Right((Some(value), rest))
         case Left(_) => Right((None, input))
 
-    inline def alt(pAlt: Parser[A]): Parser[A] = input =>
+    def alt(pAlt: Parser[A]): Parser[A] = input =>
       p(input).orElse(pAlt(input))
 
     def or[B >: A](other: Parser[B]): Parser[B] = new Parser[B]:
@@ -101,26 +100,26 @@ trait Parse:
         _ <- whitespace
       } yield a
 
-  inline def char(c: Char): Parser[Char] = input =>
+  def char(c: Char): Parser[Char] = input =>
     input.headOption match
       case Some(value) if value == c => Right((value, input.tail))
       case Some(value) => Left(ParseError(0, input, s"Expected '$c', found '$value'"))
       case None => Left(ParseError(0, input, s"Unexpected end of input, expected '$c'"))
 
 
-  inline def string(s: String): Parser[String] = input =>
+  def string(s: String): Parser[String] = input =>
     if input.startsWith(s) then Right((s, input.drop(s.length)))
     else Left(ParseError(0, input, s"Expected '$s'"))
 
-  inline def stringInsensitive(s: String): Parser[String] = input =>
+  def stringInsensitive(s: String): Parser[String] = input =>
     if input.toLowerCase.startsWith(s.toLowerCase) then Right((s, input.drop(s.length)))
     else Left(ParseError(0, input, s"Expected '$s'"))
 
-  inline def whitespace: Parser[String] = input =>
+  def whitespace: Parser[String] = input =>
     val spaces = input.takeWhile( x=> x.isWhitespace || x == '\n')
     Right((spaces, input.drop(spaces.length)))
 
-  inline def comma: Parser[Unit] = input =>
+  def comma: Parser[Unit] = input =>
     if input.startsWith(",") then Right(((), input.drop(1).dropWhile(_.isWhitespace)))
     else Left(ParseError(0, input, "Expected ',' separator"))
 
@@ -172,16 +171,16 @@ object Primitives extends Parse:
       s <- stringInline
       _ <- char('"')
     } yield s
-  inline def stringNoAmpersand: Parser[String] = input =>
+  def stringNoAmpersand: Parser[String] = input =>
     val id = input.takeWhile(c => c!= '&')
     Right((id, input.drop(id.length)))
 
-  inline def nullParser[T]: Parser[Option[T]] =
+  def nullParser[T]: Parser[Option[T]] =
     for {
       s <- string("null")
     } yield Some(null).asInstanceOf[Option[T]]
 
-  inline def intParser: Parser[Int] =
+  def intParser: Parser[Int] =
     input =>
       val neg = if input.startsWith("-") then "-" else ""
       val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
@@ -194,7 +193,7 @@ object Primitives extends Parse:
         } catch {
           case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
         }
-  inline def longParser: Parser[Long] =
+  def longParser: Parser[Long] =
     input =>
       val neg = if input.startsWith("-") then "-" else ""
       val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
@@ -207,7 +206,7 @@ object Primitives extends Parse:
         } catch {
           case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
         }
-  inline def doubleParser: Parser[Double] =
+  def doubleParser: Parser[Double] =
     input =>
       val neg = if input.startsWith("-") then "-" else ""
       val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
@@ -220,13 +219,13 @@ object Primitives extends Parse:
         } catch {
           case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
         }
-  inline def boolParser: Parser[Boolean] =
+  def boolParser: Parser[Boolean] =
     input =>
       if input.startsWith("true") then Right((true, input.drop("true".length)))
       else if input.startsWith("false") then Right((false, input.drop("false".length)))
       else Left(ParseError(0, input, s"Expected boolean, found $input"))
 
-  inline def floatParser: Parser[Float] =
+  def floatParser: Parser[Float] =
     input =>
       if input.head.isDigit then {
         val digit = input.takeWhile(x => x.isDigit || x =='.')

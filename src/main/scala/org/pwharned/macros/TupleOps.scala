@@ -61,3 +61,4 @@ object TupleMacros:
           report.errorAndAbort(s"Unsupported conversion from String to type ${targetType.show}")
       case _ =>
         report.errorAndAbort("Expected a string literal")
+  
