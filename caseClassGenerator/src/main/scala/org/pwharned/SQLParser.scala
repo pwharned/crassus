@@ -14,8 +14,8 @@ object SQLParser extends Parse {
 
       // Add annotation for primary key fields
       column.primary_key match {
-        case Some(true) => s" ${column.name}: F[PrimaryKey[${column.dataType.scalaType}]]"
-        case _ => s"${column.name}: F[$typeStr]"
+        case Some(true) => s" `${column.name}`: F[PrimaryKey[${column.dataType.scalaType}]]"
+        case _ => s"`${column.name}`: F[$typeStr]"
       }
     }
   }

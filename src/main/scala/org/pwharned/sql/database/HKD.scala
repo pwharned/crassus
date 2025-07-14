@@ -27,7 +27,7 @@ object HKD:
   object Nullable:
     def apply[X](x: X): Nullable[X] = Nullable(x)
 
-//    given [T]: Conversion[T, Nullable[T]] = x => Nullable(x)
+    given [T]: Conversion[T, Nullable[T]] = x => Nullable(x)
     given [T]: Conversion[Nullable[T], T] = x => x.value
 
   sealed trait Default[X]:
@@ -57,12 +57,14 @@ object HKD:
       def apply[A](a: A): Option[A] = Some(a)
   }
 
-  
+
   type NewField[A] = A match
-    case PrimaryKey[t] => Option[PrimaryKey[None.type]]
+    case PrimaryKey[t] => Option[t]
     case Nullable[t] => Option[t]
     case Default[t] => Option[t]
     case _ => A
+  
+  
   type OptionalField[A] = A match
     case PrimaryKey[t] => Option[t]
     case Nullable[t] => Option[t]
@@ -70,7 +72,7 @@ object HKD:
     case Option[t] => Option[t]
     case _ => Option[A]
   type UpdatedField[A] = A match
-    case PrimaryKey[t] => Option[PrimaryKey[t]]
+    case PrimaryKey[t] => Option[t]
     case Nullable[t] => Option[t]
     case Default[t] => Option[t]
     case _ => Option[A]
@@ -88,6 +90,10 @@ object HKD:
   object Conversions:
     given [A]: Conversion[A, Option[A]] = (a: A) => Some(a)
 
+
 end HKD
 
 
+
+
+// …and so on for Default, PrimaryKey, etc.

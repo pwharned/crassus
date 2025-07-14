@@ -56,6 +56,32 @@ object EnvLoader {
       case Failure(exception) => Left(s"Failed to load instance: ${exception.getMessage}")
     }
   }
+  
+    // ... keep your existing fieldNames and loadFromEnvFile functions
+
+    inline def loadFromSystemEnv[T](using m: Mirror.ProductOf[T]): Either[String, T] = {
+      val fields = fieldNames[T]
+
+      Try {
+        val fieldValues = fields.map { fieldName =>
+          val envVarName = fieldName.toUpperCase
+          sys.env.getOrElse(envVarName,
+            throw new RuntimeException(s"Missing $envVarName in system environment"))
+        }
+
+        m.fromProduct(Tuple.fromArray(fieldValues.toArray))
+      } match {
+        case Success(instance) => Right(instance)
+        case Failure(exception) => Left(s"Failed to load from system environment: ${exception.getMessage}")
+      }
+    }
+
+    inline def loadFromFileOrEnv[T](filePath: String)(using m: Mirror.ProductOf[T]): Either[String, T] = {
+      loadFromEnvFile[T](filePath) match {
+        case Right(instance) => Right(instance)
+        case Left(_) => loadFromSystemEnv[T]
+      }
+    }
 }
 // Usage example
 

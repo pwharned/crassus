@@ -25,7 +25,7 @@ lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
 
 
 lazy val excludedPrefixes = Seq(
-  "generated"
+  "generated","main"
 )
 
 

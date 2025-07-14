@@ -1,6 +1,6 @@
 package org.pwharned.json
 
-import org.pwharned.sql.database.HKD.{Nullable, PrimaryKey}
+import org.pwharned.sql.database.HKD.{NewField, Nullable, PrimaryKey}
 import org.pwharned.parse.{Parse, ParseError, Parser, Primitives}
 
 import scala.compiletime.*
@@ -8,8 +8,7 @@ import scala.deriving.*
 import scala.quoted.*
 import org.pwharned.sql.database.HKD.~>.idToId
 import org.pwharned.json
-
-import  org.pwharned.`lazy`.Lazy
+import org.pwharned.`lazy`.Lazy
 
 type JsPrimitive = String | Int | Boolean | Long | Null | Double | Float
 
@@ -60,9 +59,6 @@ object JsonDeserializer extends Parse:
   given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[Nullable[T]] with
     def deserialize: Parser[Nullable[T]] =
       underlying.deserialize.map(Nullable(_))
-
-
-
 
   given jsPrimitiveParser: JsonDeserializer[JsPrimitive] with
     def deserialize: Parser[JsPrimitive] =
