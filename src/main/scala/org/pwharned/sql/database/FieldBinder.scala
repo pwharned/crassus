@@ -86,6 +86,8 @@ object FieldBinder:
 
   given [T](using ja: JdbcArray[T]): FieldBinder[List[T]] with
     def bind(stmt: PreparedStatement, idx: Int, v: List[T]): Int =
+      println(v)
+      println(idx)
       val arr = stmt.getConnection.createArrayOf(ja.sqlType, ja.toArray(v))
       stmt.setArray(idx, arr)
       idx + 1
@@ -113,9 +115,9 @@ object FieldBinder:
     def bind(stmt: PreparedStatement, idx: Int, opt: Option[T]): Int =
       opt match
         case Some(v) => fb.bind(stmt, idx, v)
-        case None    =>
-          stmt.setNull(idx, Types.VARCHAR)
-          idx + 1
+        case None    => idx
+          //stmt.setNull(idx, Types.VARCHAR)
+          //idx + 1
 
   // Nullable marker trait
   given [T](using fb: FieldBinder[T]): FieldBinder[Nullable[T]] with

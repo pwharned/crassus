@@ -58,6 +58,8 @@ object Connection:
   
     def insert[A <: Product, B<:Product](obj: A)(using fb: FieldBinder[A],sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B],row: Row[B]): Iterator[B] =
       val built = sqlInsert.sql(obj)
+      println(obj)
+      print(built)
       val stmt = con.prepareStatement(built)
       val bound = fb.bind(stmt, 1, obj)
       val rs = stmt.executeQuery()

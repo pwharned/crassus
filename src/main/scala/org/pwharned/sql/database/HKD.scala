@@ -8,7 +8,8 @@ import scala.language.{implicitConversions, postfixOps}
 
 object HKD:
  
-  sealed trait PrimaryKey[A]:
+  sealed trait Sql
+  sealed trait PrimaryKey[A] extends Sql:
     def value: A
 
   object PrimaryKey:
@@ -21,7 +22,7 @@ object HKD:
 
     given [A]: Conversion[A, PrimaryKey[A]] = (pk: A) => PrimaryKey(pk)
 
-  sealed trait  Nullable[X]:
+  sealed trait  Nullable[X] extends Sql:
     def value: X
 
   object Nullable:
@@ -63,8 +64,8 @@ object HKD:
     case Nullable[t] => Option[t]
     case Default[t] => Option[t]
     case _ => A
-  
-  
+
+
   type OptionalField[A] = A match
     case PrimaryKey[t] => Option[t]
     case Nullable[t] => Option[t]

@@ -128,18 +128,17 @@ object RouteRegistry:
     val dynamicIndexes = path.segments.zipWithIndex.collect {
       case (dynamic: Segment.Dynamic, index) => index
     }
+    val parseKeys = PrimaryKeyParser.makeParser[Persisted[T]]
+
 
     Route.apply(DELETE, path, (req: HttpRequest.HttpRequest[Unit]) => {
       val keyStrings: List[String] =
         dynamicIndexes.map(req.path.segments.collect {
           case dynamic: Segment.Static => dynamic.segment.toString
         })
-      // If PrimaryKeyFields is defined for the persisted type, make sure the type uses T[Id]
-      val b: PrimaryKeyFields[Persisted[T]]#Out =
-        toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Persisted[T]]#Out]
+      val keyTuple: PrimaryKeyFields[Persisted[T]]#Out = parseKeys(keyStrings)
 
-      toResponse(db.withConnection( x=> x.delete[Persisted[T]](b)))(enc.apply)
-
+      toResponse(db.withConnection( x=> x.delete[Persisted[T]](keyTuple)))(enc.apply)
 
     }
     )
@@ -155,29 +154,26 @@ object RouteRegistry:
                                              pm: Mirror.ProductOf[Persisted[T]],
                                             ): Route[P, PATCH, Updated[T], Iterator[Persisted[T]]] =
 
-    val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[Updated[T]].map(x => s"{$x}").mkString("/")
+    val primaryKeys = PrimaryKeyExtractor.getPrimaryKey[Persisted[T]].map(x => s"{$x}").mkString("/")
     val path = s"/api/$entityName/$primaryKeys".toPath
     val dynamicIndexes = path.segments.zipWithIndex.collect {
       case (dynamic: Segment.Dynamic, index) => index
     }
+    val parseKeys = PrimaryKeyParser.makeParser[Updated[T]]
+
+
     given dial: SqlDialect = db.dial
 
     Route.apply(PATCH, path, (req: HttpRequest.HttpRequest[Updated[T]]) => {
 
+      
       val keyStrings: List[String] =
-        dynamicIndexes.map(i =>
-          req.path.segments(i) match {
-            case Segment.Dynamic(value) => value.toString
-            case other =>
-              throw new IllegalArgumentException(s"Expected dynamic segment at $i, got $other")
-          }
-        )
+        dynamicIndexes.map(req.path.segments.collect {
+          case dynamic: Segment.Static => dynamic.segment.toString
+        })
+      val keyTuple: PrimaryKeyFields[Updated[T]]#Out = parseKeys(keyStrings)
 
-
-      val b: PrimaryKeyFields[Updated[T]]#Out = toTuple(keyStrings).asInstanceOf[PrimaryKeyFields[Updated[T]]#Out]
-
-
-      toResponse(db.withConnection( x=> x.update[Updated[T], Persisted[T]](req.body,b)))(enc.apply)
+      toResponse(db.withConnection( x=> x.update[Updated[T], Persisted[T]](req.body,keyTuple)))(enc.apply)
 
     }
     )

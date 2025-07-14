@@ -54,9 +54,7 @@ object SqlInsert:
         val tail    = loop[t, ls](orig, idx + 1)
 
         // 5) if InsertField said Some(_), prepend (colName, "?")
-        included.fold(tail)(_ => (colName, s"?") :: tail)
-
-  /** summon a derived instance */
+        included.fold(tail)(_ => tail :+ (colName -> "?"))
 
   inline given derived[T <: Product](using m: Mirror.ProductOf[T], dial: SqlDialect): SqlInsert[T] =
     new SqlInsert[T]:
@@ -64,6 +62,6 @@ object SqlInsert:
         val name: String = constValue[m.MirroredLabel]
 
         // build and then reverse so we keep original order
-        val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0).reverse
-        dial.insertReturning( f"insert into $name (${namesAndPlaceHoldesr.map(_._1).mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) ")
+        val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
+        dial.insertReturning( f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) ")
       }
