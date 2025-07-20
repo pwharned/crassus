@@ -2,6 +2,7 @@ package org.pwharned.sql.database
 
 import HKD.{Nullable, PrimaryKey}
 import org.postgresql.core.ParameterList
+import org.pwharned.json.JsonString
 
 import java.sql.{DriverManager, PreparedStatement, Types}
 import java.util.UUID
@@ -106,6 +107,11 @@ object FieldBinder:
   given FieldBinder[String] with
     def bind(stmt: PreparedStatement, idx: Int, v: String): Int =
       stmt.setString(idx, v)
+      idx + 1
+
+  given FieldBinder[JsonString] with
+    def bind(stmt: PreparedStatement, idx: Int, v: JsonString): Int =
+      stmt.setString(idx, v.toString)
       idx + 1
   given FieldBinder[java.util.UUID] with
     def bind(stmt: PreparedStatement, idx: Int, v: java.util.UUID): Int =

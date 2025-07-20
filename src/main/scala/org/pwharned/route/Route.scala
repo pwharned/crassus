@@ -4,9 +4,9 @@ import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.HttpPath.HttpPath
 import org.pwharned.http.HttpRequest.HttpRequest
 import org.pwharned.http.*
+import org.pwharned.http.Headers.Headers
 import org.pwharned.macros.{extractEntityType, simpleTypeName, typeName, typeToString}
 import org.pwharned.openapi.*
-
 import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 import scala.compiletime.summonInline
@@ -22,7 +22,8 @@ object Router:
                                            method: T,
                                            path: HttpPath,
                                            handler:  HttpRequest[Req] => Future[HttpResponse[Res]],
-                                           pathItem:  pathItem
+                                           pathItem:  pathItem,
+                                           var extraHeaders: Headers = Headers.empty
                                          )(using writer: SocketWriter[F], connection: ConnectionHandler[F], bodyReader: BodyReader[Req]) {
     type Out = Res
 
@@ -35,16 +36,23 @@ object Router:
           writer.write(socket, bad)
             .map(_ => connection.handleConnection(socket))
 
-        // Parsed OK → invoke user handler then write & close
         case Right(typedReq) =>
           handler(typedReq)
+            .map(resp => resp.withHeaders(extraHeaders))
             .flatMap(resp => writer.write(socket, resp))
             .map(_ => connection.handleConnection(socket))
+
       }
 
     }
+
+
+
   }
 
+  extension [F[_], T <: HttpMethod, Req, Res](route: Route[F, T, Req, Res])
+    def withHeaders(additional: Headers):Unit =
+      route.extraHeaders = route.extraHeaders.merge(additional)
 
 
   object Route:

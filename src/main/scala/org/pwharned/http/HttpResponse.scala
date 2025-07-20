@@ -11,6 +11,12 @@ case class HttpResponse[T](
                             headers: Headers = Headers.empty,
                             body: Body
                           )
+{
+  def withHeaders(additional: Headers): HttpResponse[T] = {
+
+    copy(headers = this.headers.merge(additional))
+  }
+}
 
 object HttpResponse:
   /** build a JSON-encoded “200 OK” from any `T` with a `BodyEncoder[Http,T]` */
@@ -20,6 +26,9 @@ object HttpResponse:
       headers = Headers.empty,
       body = Body.text(message)
     )
+
+
+
 
   def notFound[T]: HttpResponse[T] =
     HttpResponse(

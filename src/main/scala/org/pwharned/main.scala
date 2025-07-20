@@ -1,13 +1,14 @@
 package org.pwharned
 import generated.*
+import org.pwharned.App.{corsHeaders, given_ExecutionContext}
 import org.pwharned.`lazy`.Lazy
-import org.pwharned.http.*
+import org.pwharned.http.{Body, Header, Headers, Http, HttpResponse, asPath}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
 import org.pwharned.http.HttpRequest.HttpRequest
 import org.pwharned.json.serialize
 import org.pwharned.openapi.*
 import org.pwharned.route.Router.Route
-import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection, sseConnection}
+import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection}
 import org.pwharned.server.HTTPServer
 import org.pwharned.sql.*
 import org.pwharned.sql.database.{ConnectionDetails, Database, DbTypeMapper, PostgresTypeMapper}
@@ -19,6 +20,10 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 
 object App:
+  val corsHeaders = Headers.empty
+    .add(Header.AccessControlAllowOrigin, "*")
+    .add(Header.AccessControlAllowMethods, "GET, POST, DELETE, PUT, PATCH, OPTIONS")
+
 
 
   lazy val actions_route = RouteRegistry.resourceRoutes[Http, actions]("actions")
@@ -69,7 +74,7 @@ object App:
   given DbTypeMapper = PostgresTypeMapper
 
 
-  inline def health = Route[SSE, GET, Unit, String](GET, "/health/ping".asPath, (req: HttpRequest[Unit]) => Future {
+  inline def health = Route[Http, GET, Unit, String](GET, "/health/ping".asPath, (req: HttpRequest[Unit]) => Future {
     HttpResponse.ok("Ok")
   })
 
@@ -94,7 +99,7 @@ object App:
 
   given Database = Database(connectionDetails)
 
-   val routes = List(
+   val routes = (List(
 
     actions_route,
 
@@ -134,7 +139,9 @@ object App:
 
     products_route,
 
-    relationship_route).flatten ++ List(openapi, swagger)
+    relationship_route).flatten ++ List(openapi, swagger))
+   
+   routes.foreach( x=> x.withHeaders(corsHeaders))
 
 
   OpenApiBuilder.write("static/openapi.json",routes.toOpenApi.serialize)
