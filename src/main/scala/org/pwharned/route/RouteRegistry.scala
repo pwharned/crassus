@@ -18,7 +18,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.Mirror
 import scala.util.{Failure, Success, Try}
 
-private def toResponse[A](fa: Future[Try[A]])
+def toResponse[A](fa: Future[Try[A]])
                          (encode: A => HttpResponse[A])
                          (using ExecutionContext): Future[HttpResponse[A]  ]  =
 
