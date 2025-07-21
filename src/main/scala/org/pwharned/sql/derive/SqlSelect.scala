@@ -31,20 +31,15 @@ object SqlSelect:
       def select: String =   summonInline[SelectStatement[T]].select
 
 
-
       def selectWhere(obj: T): String =
-        val tableName = constValue[m.MirroredLabel]
-        val fields = constValueTuple[m.MirroredElemLabels].toList.map(_.toString)
-        // Extract values using productIterator
         val values = obj.productIterator.toList
-
         // Filter out fields with None or null values
-        val where = fields.zip(values).collect {
+        val where = names.zip(values).collect {
           case (name, value) if value != None => s"$name = ?"
         }.mkString(" and ")
 
 
-        val sql = s"SELECT ${fields.mkString(",")} from $tableName where $where  ;"
+        val sql = s"$select where $where  ;"
         sql
 
       def selectWhere: String = {
