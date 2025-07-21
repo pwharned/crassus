@@ -24,6 +24,19 @@ trait JsonSerializer[T]:
   def serialize(obj: T): String
 
 object JsonSerializer:
+  def escapeJsonString(s: String): String =
+    s.flatMap {
+      case '"' => "\\\""
+      case '\\' => "\\\\"
+      case '\n' => "\\n"
+      case '\r' => "\\r"
+      case '\t' => "\\t"
+      case '\b' => "\\b"
+      case '\f' => "\\f"
+      case c if c < ' ' => f"\\u${c.toInt}%04x"
+      case c => c.toString
+    }
+
   inline given derived[T <: Product](using m: Mirror.ProductOf[T]): JsonSerializer[T] =
     new JsonSerializer[T]:
       def serialize(obj: T): String =
@@ -47,7 +60,7 @@ object JsonSerializer:
 
   given JsonSerializer[String] with
     def serialize(ob: String): String = {
-      if ob == null then "null" else s"\"${ob}\""
+      if ob == null then "null" else s"\"${escapeJsonString(ob)}\""
     }
 
   given unionSerializer[A, B](using
