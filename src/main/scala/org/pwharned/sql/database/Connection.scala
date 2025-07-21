@@ -1,7 +1,7 @@
 package org.pwharned.sql.database
 
 import org.pwharned.sql.database.Row
-import org.pwharned.sql.derive.*
+import org.pwharned.sql.derive.{SqlSelect, SqlDelete, SqlUpdate, PrimaryKeyBinder, PrimaryKeyFields, UpdateBinder, SqlInsert, SqlSchema}
 
 import scala.concurrent.{ExecutionContext, Future}
 

@@ -53,7 +53,7 @@ def testParse(): Unit =
   }
 
   val newUserWithAllField = """
-                                          |{"name":"test""test":"test"}
+                                          |{"name":"test","test":"test"}
                                           |""".stripMargin.deserialize[New[User]]
   newUserWithAllField match {
     case Left(value) => throw Exception(value.message)
@@ -149,4 +149,12 @@ def testParse(): Unit =
 
   whitespace("\n") match {
     case Right(value) => println("Found the following whitespace"+ value._2.length)
+  }
+  case class asset_collections(collection_id: String, asset_id: String, collection_name: String, created_at: String, updated_at: String, collection_description: String, collection_owner_name: String, collection_owner: String)
+
+  val assetCollections =
+    """?asset_id=1""".stripMargin.fromQuery[Optional[IdHKD[asset_collections]]]
+  assetCollections match {
+    case Left(value) => throw Exception("This should not have failed, " + value.message + " " + value.input + " " + value.position)
+    case Right(value) => println("Successful parsing")
   }

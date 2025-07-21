@@ -94,4 +94,4 @@ lazy val root = project.in(file("."))
       Seq(file)
     }.taskValue
   )
-  .dependsOn(caseClassGenerator)
+  .dependsOn(caseClassGenerator )
