@@ -49,15 +49,22 @@ object RouteRegistry:
 
     {
 
-      val queryString = req.path.query.value
-
-      val q = queryString.stripMargin.fromQuery[Optional[T]]
-      q match {
-        case Left(value) =>  toResponse(db.withConnection( x=> x.query[Persisted[T]]) )(enc.apply)
-        case Right(value) => toResponse(db.withConnection(x => x.queryParameterized[Optional[T], Persisted[T]](value)))(enc.apply)
-
-
+      val maybeQuery: Option[String] = Option(req.path.query.value).map(_.stripMargin) match {
+        case Some(value) => value match {
+          case "" => None
+          case _ => Some(value)
+        }
+        case None => None
       }
+
+      maybeQuery match {
+        case Some(value) => value.fromQuery[Optional[T]] match {
+          case Left(value) => Future(HttpResponse.error(s"Bad Request: invalid query $value"))
+          case Right(value) => toResponse(db.withConnection(x => x.queryParameterized[Optional[T], Persisted[T]](value)))(enc.apply)
+        }
+        case None => toResponse(db.withConnection( x=> x.query[Persisted[T]]) )(enc.apply)
+      }
+
     }
 
     )
