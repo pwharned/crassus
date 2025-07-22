@@ -35,11 +35,11 @@ object SqlSelect:
         val values = obj.productIterator.toList
         // Filter out fields with None or null values
         val where = names.zip(values).collect {
-          case (name, value) if value != None => s"$name = ?"
+          case (name, value) if value != None => s" $name = ? "
         }.mkString(" and ")
 
 
-        val sql = s"$select where $where  ;"
+        val sql = s"$select where $where  "
         sql
 
       def selectWhere: String = {

@@ -4,7 +4,7 @@ import org.pwharned.sql.dialect.SqlDialect
 
 object Db2Dialect extends SqlDialect:
   def select(table: String, cols: Seq[String]) =
-    s"SELECT ${cols.mkString(",")} FROM $table;"
+    s"SELECT ${cols.mkString(",")} FROM $table"
 
   def insertReturning(table: String, cols: Seq[String]): String =
     val cs = cols.mkString(", ")
@@ -20,4 +20,4 @@ object Db2Dialect extends SqlDialect:
   def insertNoReturn(table: String, cols: Seq[String]): String =
     val cs = cols.mkString(", ")
     val ps = List.fill(cols.size)("?").mkString(", ")
-    s"INSERT INTO $table ($cs) VALUES ($ps);"
+    s"INSERT INTO $table ($cs) VALUES ($ps)"

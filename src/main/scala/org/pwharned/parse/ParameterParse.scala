@@ -4,10 +4,12 @@ import org.pwharned.sql.database.HKD.{Nullable, PrimaryKey}
 import org.pwharned.json.JsonString
 import org.pwharned.json.given_Conversion_String_JsonString
 import org.pwharned.parse.{Parse, ParseError, Primitives}
+
 import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.deriving.*
 import scala.quoted.*
+import scala.util.Try
 
 
 trait QueryDeserializer[T]:
@@ -28,7 +30,29 @@ object QueryDeserializer extends Parse:
       def parser: Parser[Float] = Primitives.floatParser
 
     given QueryFieldDeserializer[java.util.UUID] with
-      def parser: Parser[java.util.UUID] = Primitives.stringNoAmpersand.map( x=> java.util.UUID.fromString(x))
+      def parser: Parser[java.util.UUID] = { input =>
+        // first parse out the raw string up to the &-delimiter
+        Primitives.stringNoAmpersand(input) match {
+          case Left(err) =>
+            // if the string parser itself failed, keep that error
+            Left(err)
+
+          case Right((raw, rest)) =>
+            // now turn raw into a UUID, catching bad formats
+            Try(java.util.UUID.fromString(raw))
+              .toEither
+              .left.map { ex =>
+                // build your ParseError however you like
+                ParseError(
+                  position = 0,
+                  input = raw,
+                  message = s"'$raw' is not a valid UUID: ${ex.getMessage}"
+                )
+              }
+              .map(uuid => (uuid, rest))
+        }
+      }
+
 
     given QueryFieldDeserializer[Boolean] with
       def parser: Parser[Boolean] = Primitives.boolParser
