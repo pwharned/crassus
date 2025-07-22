@@ -45,9 +45,10 @@ object SqlDelete:
     new SqlDelete[T]:
       def sql: String = {
         val name: String = constValue[m.MirroredLabel]
-        val keys = pkeys[m.MirroredElemTypes, m.MirroredElemLabels].reverse.map(
+        val keys = pkeys[m.MirroredElemTypes, m.MirroredElemLabels].map(
           x => s"${x._1} = ${x._2} "
         ).mkString(" AND ")
+        println(keys)
         // build and then reverse so we keep original order
 
 
