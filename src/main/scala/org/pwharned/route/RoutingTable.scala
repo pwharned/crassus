@@ -1,17 +1,13 @@
 package org.pwharned.route
 
+import org.pwharned.`lazy`.Lazy
 import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.HttpPath.HttpPath
 import org.pwharned.http.{HttpPath, Protocal, Segment}
-import org.pwharned.openapi.{Schema, schema}
 import org.pwharned.route.Router
 import org.pwharned.route.Router.Route
-import org.pwharned.route.RoutingTable.RoutingTable
-import org.pwharned.`lazy`.Lazy
 
 import scala.annotation.tailrec
-import scala.compiletime.summonInline
-import scala.reflect.ClassTag
 
 
 
@@ -66,6 +62,13 @@ object RoutingTable:
     // Insert the final element in the path. We want to attach the route at the last node.
     def insertFinal(path: List[Segment], route: Route[P,HttpMethod,?, ?]): Branch[P] =
       path match
+        case (head @ Segment.WildCard(name)) :: Nil =>
+          val wildcardNode: Node[P, ?,?] = Node(
+            id       = head,
+            route    = Some(route),
+            children = Map.empty
+          )
+          b.updated(head, wildcardNode)
         case head :: Nil =>
           val updatedNode: Node[P, ?,?] = lookup(head) match
             case Some(existingNode) => existingNode.copy(route = Some(route))
@@ -110,25 +113,32 @@ object RoutingTable:
       table.get(m).flatMap(branch => findNode(branch, p.segments  ))
 
     @tailrec
-    private def findNode(branch: Branch[P], path: List[Segment] ): Option[Node[P,?,?]] =
+    private def findNode(branch: Branch[P], path: List[Segment]): Option[Node[P, ?, ?]] =
       path match
         case head :: next =>
-          // Try an exact match first.
-          branch.get(head) match {
+          // 1. Static match
+          branch.get(head) match
             case someNode@Some(node) =>
-              if (next.isEmpty) someNode else findNode(node.children, next)
+              if next.isEmpty then
+                someNode
+              else
+                findNode(node.children, next)
+
             case None =>
-              // If no exact match, see if there is a dynamic parameter match,
-              // i.e. a key that is an Identifier.
-              branch.collectFirst {
-                case (Segment.Dynamic(key), node)  => node
-              } match {
+              // 2. Dynamic-parameter match
+              branch.collectFirst { case (Segment.Dynamic(_), node) => node } match
                 case Some(node) =>
-                  if (next.isEmpty) Some(node) else findNode(node.children, next)
-                case None => None
-              }
-          }
-        case Nil => None
+                  if next.isEmpty then
+                    Some(node)
+                  else
+                    findNode(node.children, next)
+
+                case None =>
+                  // 3. WildCard match: short-circuit, consume all remaining segments
+                  branch.collectFirst { case (Segment.WildCard(_), node) => node }
+
+        case Nil =>
+          None
 
 
   def printReadable[P[_] <: Protocal[_]](table: RoutingTable[HttpMethod, P]): Unit = {

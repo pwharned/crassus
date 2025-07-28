@@ -33,6 +33,7 @@ sealed trait Segment
 object Segment:
   final case class Static(segment: PathSegment.PathSegment) extends Segment
   final case class Dynamic(segment: Identifier.Identifier[PathSegment.PathSegment]) extends Segment
+  final case class WildCard(segment: Identifier.Identifier[PathSegment.PathSegment]) extends Segment
 
 // The HttpPath is simply a List of Segments.
 object HttpPath:
@@ -52,6 +53,9 @@ object HttpPath:
         if segment.startsWith("{") && segment.endsWith("}") then
           val id = segment.substring(1, segment.length - 1)
           Segment.Dynamic(Identifier(toPathSegment(id)))
+        if segment.endsWith("**") then
+          val id = segment.substring(0,segment.length-2 )
+          Segment.WildCard(Identifier(toPathSegment(id)))
         else
           Segment.Static(toPathSegment(segment))
       }
@@ -86,6 +90,9 @@ object HttpPath:
               val id = segment.substring(1, segment.length - 1)
               // Now use our helper `toPathSegment` which is in scope.
               '{ Segment.Dynamic(Identifier(toPathSegment(${ Expr(id) }))) }
+            if segment.endsWith("**") then 
+              val id = segment.substring(0, segment.length-2)
+              '{Segment.WildCard(Identifier(toPathSegment(${Expr(id)})))}
             else
               '{ Segment.Static(toPathSegment(${ Expr(segment) })) }
           }

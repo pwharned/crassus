@@ -9,7 +9,7 @@ import org.pwharned.json.serialize
 import org.pwharned.openapi.*
 import org.pwharned.route.Router.Route
 import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection}
-import org.pwharned.server.HTTPServer
+import org.pwharned.server.{FileServer, HTTPServer}
 import org.pwharned.sql.*
 import org.pwharned.sql.database.{ConnectionDetails, Database, DbTypeMapper, PostgresTypeMapper}
 import org.pwharned.sql.dialect.{PostgresDialect, SqlDialect}
@@ -84,6 +84,9 @@ object App:
 
   })
 
+
+  inline def files = Route[Http, GET, Unit, String](GET, "/static/**".asPath, FileServer.apply("static/"))
+
   inline def openapi = Route[Http, GET, Unit, String](GET, "/doc/openapi.json".asPath, (req: HttpRequest[Unit]) => Future {
     val source = scala.io.Source.fromFile("static/openapi.json")
     HttpResponse(body = Body.text(source.getLines().mkString), headers = Headers(Map("content-type" -> "text/html")))
@@ -139,7 +142,7 @@ object App:
 
     products_route,
 
-    relationship_route).flatten ++ List(openapi, swagger))
+    relationship_route).flatten ++ List(openapi, swagger, files))
    
    routes.foreach( x=> x.withHeaders(corsHeaders))
 

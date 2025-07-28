@@ -20,6 +20,8 @@ object OpenApiBuilder:
         x.path.segments.map {
           case Segment.Static(segment) => "/" + segment.value.toString
           case Segment.Dynamic(segment) => "/" + segment.value.toString
+          case Segment.WildCard(segment) => "/" + segment.value.toString
+
         }.mkString("")
       } }.map(x=> {
       val get=  x._2.find( x=> x.method==GET).flatMap(x => x.pathItem.get)
