@@ -4,6 +4,7 @@ import org.pwharned.App.{corsHeaders, given_ExecutionContext}
 import org.pwharned.`lazy`.Lazy
 import org.pwharned.http.{Body, Header, Headers, Http, HttpResponse, asPath}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
+import org.pwharned.http.HttpPath.HttpPath
 import org.pwharned.http.HttpRequest.HttpRequest
 import org.pwharned.json.serialize
 import org.pwharned.openapi.*
@@ -85,7 +86,7 @@ object App:
   })
 
 
-  inline def files = Route[Http, GET, Unit, String](GET, "/static/**".asPath, FileServer.apply("static/"))
+  inline def files = Route[Http, GET, Unit, String](GET, "/static/**".asPath, FileServer.apply("/static/".asPath, "./static"))
 
   inline def openapi = Route[Http, GET, Unit, String](GET, "/doc/openapi.json".asPath, (req: HttpRequest[Unit]) => Future {
     val source = scala.io.Source.fromFile("static/openapi.json")
@@ -163,4 +164,5 @@ def main(): Unit =
   println("building routing table")
   lazy val table  = RoutingTable.build(App.routes)
   RoutingTable.printReadable(table)
+
   HTTPServer.start(8080, table.asInstanceOf)
