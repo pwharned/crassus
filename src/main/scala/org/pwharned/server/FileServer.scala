@@ -7,10 +7,45 @@ import org.pwharned.http.{Body, Headers, HttpResponse, Segment}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
-import java.io.{File, InputStream}
+import java.io.{ByteArrayInputStream, File, InputStream}
 import java.nio.file.{Files, Paths}
 import scala.io.Source
 import scala.util.Try
+
+
+sealed trait FileSystem
+
+sealed trait FS extends FileSystem
+
+sealed trait Resource extends FileSystem
+
+trait FileReader[F <: FileSystem] {
+  def readFile(path: String): Option[Array[Byte]]
+}
+
+
+object FileReader:
+
+  given FileReader[FS] with {
+  def readFile(path: String): Option[Array[Byte]] = {
+    val filePath = Paths.get(path)
+    if (Files.exists(filePath)) Some(Files.readAllBytes(filePath))
+    else None
+  }
+}
+
+  given FileReader[Resource] with {
+  def readFile(path: String): Option[Array[Byte]] = {
+    val sourceOpt = Try(Source.fromResource(path.stripPrefix("/"))).toOption
+    sourceOpt.map { source =>
+      val content = source.getLines().mkString("\n")
+      source.close()
+      content.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+    }
+  }
+}
+end FileReader
+
 
 object FileServer {
   inline private def mimeTypes = Map(
@@ -60,42 +95,26 @@ object FileServer {
   }
 
 
-  inline def apply(mountPath: HttpPath, resourceRoot: String): HttpRequest[Unit] => Future[HttpResponse[String]] = { req =>
+  def apply[F <: FileSystem](mountPath: HttpPath, resourceRoot: String)(using reader: FileReader[F]): HttpRequest[Unit] => Future[HttpResponse[String]] = { req =>
     Future {
-      // Reconstruct the raw URI the client asked for, e.g. "/static/index.js"
-
       val relSegments = normalize(req.path, mountPath)
         .collect { case Segment.Static(ps) => ps.value }
 
-      val requestPath = relSegments.mkString("", "/", "")
+      val requestPath = relSegments.mkString("/", "/", "")
+      val fullPath = resourceRoot.stripSuffix("/") + requestPath
 
-
-      // Try to open it from the classloader
-      Try(Paths.get(resourceRoot.stripSuffix("/") + "/" + requestPath.stripPrefix("/"))).map{
-        
-        stream => {
-          val bytes = Files.readAllBytes(stream)
-          // Derive extension and lookup mime
-          val ext = requestPath
-            .split("\\.")
-            .lastOption
-            .getOrElse("")
-            .toLowerCase
+      reader.readFile(fullPath) match {
+        case Some(bytes) =>
+          val ext = requestPath.split("\\.").lastOption.getOrElse("").toLowerCase
           val contentType = mimeTypes.getOrElse(ext, "application/octet-stream")
 
-          // Build a 200 OK with Content-Type
           HttpResponse[String](
             status = 200,
             headers = Headers(Map("Content-Type" -> contentType)),
             body = Body.Strict(bytes)
           )
-        }
-      }.toOption match {
-        case Some(response) => response
-
 
         case None =>
-          // Not found in JAR
           HttpResponse(
             status = 404,
             headers = Headers.empty,
@@ -103,7 +122,7 @@ object FileServer {
           )
       }
     }
-
-
   }
+
+  
 }

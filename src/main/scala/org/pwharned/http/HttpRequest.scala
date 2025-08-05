@@ -1,6 +1,8 @@
 package org.pwharned.http
 
+import org.pwharned.http.Headers.Headers
 import org.pwharned.http.HttpMethod
+import org.pwharned.http.HttpMethod.HttpMethod
 import org.pwharned.http.HttpPath.HttpPath
 
 import java.nio.ByteBuffer
@@ -21,6 +23,13 @@ object HttpRequest:
         HttpRequest(req._1, req._2, req._3, b)
       }
   object HttpRequest:
+    def apply[B](
+                  method: HttpMethod,
+                  path: HttpPath,
+                  headers: Headers,
+                  body: B
+                ): HttpRequest[B] =
+      (ByteBuffer.wrap(method.getBytes), ByteBuffer.wrap(path.getBytes), ByteBuffer.wrap(headers.getBytes), body)
     // Construct an HttpRequest from its parts.
     def apply[B](
                method: ByteBuffer,

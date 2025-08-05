@@ -108,5 +108,6 @@ object HttpPath:
 
 extension (inline s: String) inline def asPath: HttpPath = HttpPath.literal(s)
 extension ( s: String)  def toPath: HttpPath = HttpPath(s)
-
+extension(p: HttpPath)
+  def getBytes = (p.segments.mkString("/") + "?" + p.query.value).getBytes
 // Use the runtime classifier on each segment:

@@ -19,4 +19,7 @@ object HttpMethod:
 
   def apply(method:  String): HttpMethod = method
 
-  extension (m: HttpMethod) def asString: String =m.toString
+  extension (m: HttpMethod) 
+    def asString: String =m.toString
+    def getBytes: Array[Byte] = m.getBytes
+  

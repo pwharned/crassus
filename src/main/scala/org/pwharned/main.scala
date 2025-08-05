@@ -1,6 +1,7 @@
 package org.pwharned
 import generated.*
 import org.pwharned.App.{corsHeaders, given_ExecutionContext}
+import org.pwharned.server.FileReader.given
 import org.pwharned.`lazy`.Lazy
 import org.pwharned.http.{Body, Header, Headers, Http, HttpResponse, asPath}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
@@ -10,7 +11,7 @@ import org.pwharned.json.serialize
 import org.pwharned.openapi.*
 import org.pwharned.route.Router.Route
 import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection}
-import org.pwharned.server.{FileServer, HTTPServer}
+import org.pwharned.server.{FileServer, HTTPServer, Resource}
 import org.pwharned.sql.*
 import org.pwharned.sql.database.{ConnectionDetails, Database, DbTypeMapper, PostgresTypeMapper}
 import org.pwharned.sql.dialect.{PostgresDialect, SqlDialect}
@@ -86,7 +87,7 @@ object App:
   })
 
 
-  inline def files = Route[Http, GET, Unit, String](GET, "/static/**".asPath, FileServer.apply("/static/".asPath, "./static"))
+  inline def files = Route[Http, GET, Unit, String](GET, "/static/**".asPath, FileServer.apply[Resource]("/static/".asPath, "./static"))
 
   inline def openapi = Route[Http, GET, Unit, String](GET, "/doc/openapi.json".asPath, (req: HttpRequest[Unit]) => Future {
     val source = scala.io.Source.fromFile("static/openapi.json")

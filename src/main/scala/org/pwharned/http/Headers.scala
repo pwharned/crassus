@@ -34,3 +34,4 @@ object Headers:
     def update(key: Header, value: String): Headers = update(key.name, value)
     def asMap: Map[String, String] = h
     def merge(other: Headers): Headers = h ++ other.toMap
+    def getBytes: Array[Byte] = h.map(x => s"${x._1}: ${x._2}" ).mkString("\n").getBytes 
