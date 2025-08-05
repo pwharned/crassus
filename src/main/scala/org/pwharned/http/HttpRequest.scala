@@ -146,11 +146,12 @@ object HttpRequest:
     /** Renders the request in an HTTP-style, human-readable form */
     def pretty: String =
       // 1. Extract method & path
-      val m = req.method.toString
-      val p = req.path.toString
+      val m = new String(req.method.getBytes, StandardCharsets.UTF_8)
+      val p = new String(req.path.getBytes, StandardCharsets.UTF_8)
 
       // 2. Use raw headers block
-      val h = req.headers
+      val h = new String(req.headers.getBytes, StandardCharsets.UTF_8) // uses your extension
+
 
       // 3. Render body: if it's a ByteBuffer, decode as UTF-8; else .toString
       val b = req.body match

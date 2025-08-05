@@ -1,5 +1,7 @@
 package org.pwharned.http
 
+import java.nio.charset.StandardCharsets
+
 enum Header(val name: String):
   case ContentType extends Header("Content-Type")
   case ContentLength extends Header("Content-Length")
@@ -19,7 +21,7 @@ object Headers:
 
   // Constructor to create a Headers instance from a Map.
   def apply(headers: Map[String, String]): Headers = headers
-  
+
 
   // Provide an empty headers value.
   def empty: Headers = Map.empty
@@ -34,4 +36,12 @@ object Headers:
     def update(key: Header, value: String): Headers = update(key.name, value)
     def asMap: Map[String, String] = h
     def merge(other: Headers): Headers = h ++ other.toMap
-    def getBytes: Array[Byte] = h.map(x => s"${x._1}: ${x._2}" ).mkString("\n").getBytes 
+    def string: String = h.map(x => s"${x._1}: ${x._2}" ).mkString("\n")
+    def getBytes: Array[Byte] = string.getBytes
+
+
+
+@main
+def main: Unit =
+  val hdrs = Headers(Map("Host" -> "example.com", "Accept" -> "application/json"))
+  println(new String(hdrs.getBytes, StandardCharsets.UTF_8 ))// uses your extension
