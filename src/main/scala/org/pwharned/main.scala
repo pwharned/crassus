@@ -29,6 +29,7 @@ object App:
 
 
   lazy val actions_route = RouteRegistry.resourceRoutes[Http, actions]("actions")
+  lazy val embeddings_route = RouteRegistry.resourceRoutes[Http, embeddings]("embeddings")
 
   lazy val asset_bookmarks_route = RouteRegistry.resourceRoutes[Http, asset_bookmarks]("asset_bookmarks")
 
@@ -107,6 +108,7 @@ object App:
    val routes = (List(
 
     actions_route,
+     embeddings_route,
 
     asset_bookmarks_route,
 

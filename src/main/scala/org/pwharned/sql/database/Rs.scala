@@ -46,7 +46,12 @@ object Rs:
       Option(rs.getArray(col)).map(x => x.getArray.asInstanceOf[Array[A]]
         .toList
       ).getOrElse(List.empty[A])
-
+  given vec: Rs[Vector[Float]] with
+    def read(rs: ResultSet, col: String): Vector[Float] =
+      // pull out the PG array, cast to Array[Any] (or Array[String])
+      Option(rs.getString(col)).map(x => x.stripPrefix("[").stripSuffix("]").split(",").map( x=> x.trim.toFloat ).toVector
+      ).getOrElse(Vector.empty[Float])
+      
   given optionRs[A](using base: Rs[A]): Rs[Option[A]] with
     def read(rs: ResultSet, col: String): Option[A] =
       // read the raw A

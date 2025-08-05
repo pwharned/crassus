@@ -19,8 +19,27 @@ case object SqlUuid extends  SqlDataType {
   def parse: Parser[SqlDataType] = stringInsensitive("UUID").map(x => this)
 
 }
+case object SqlVector extends SqlDataType  {
+  val sqlNames: Seq[String] = Seq( "Vector")
+  def scalaType: String = "Vector[Float]"
+
+
+  val vectorParser = for {
+    _ <- whitespace
+    initial <- stringInsensitive("ibm_extension.").optional
+    ch <- stringInsensitive("vector")
+    _ <- whitespace
+    open <- char('(')
+    _ <- whitespace
+    number <- numeric.many
+    _ <- whitespace
+    close <- char(')')
+  } yield ch + open + number.mkString + close
+  def parse: Parser[SqlDataType] =
+    ( vectorParser).map(_ => this)
+}
 case object SqlString extends SqlDataType  {
-  val sqlNames: Seq[String] = Seq( "UUID")
+  val sqlNames: Seq[String] = Seq( "TEXT")
   def scalaType: String = "String"
 
 

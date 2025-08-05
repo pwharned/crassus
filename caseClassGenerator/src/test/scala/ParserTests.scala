@@ -68,4 +68,15 @@ ALTER TABLE ONLY public.products ADD CONSTRAINT products_pkey PRIMARY KEY (produ
     case Right(value) => println(value)
   }
 
+  val embeddingTable =
+    """CREATE TABLE public.embeddings (
+      |    embedding_id integer NOT NULL,
+      |    asset_id uuid NOT NULL,
+      |    embedding_vector ibm_extension.vector(768)
+      |);
+      |""".stripMargin
+  SQLParser.createTableParser(embeddingTable) match {
+    case Left(value) => println(value)
+    case Right(value) => println(value)
+  }
 }

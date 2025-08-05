@@ -87,8 +87,6 @@ object FieldBinder:
 
   given [T](using ja: JdbcArray[T]): FieldBinder[List[T]] with
     def bind(stmt: PreparedStatement, idx: Int, v: List[T]): Int =
-      println(v)
-      println(idx)
       val arr = stmt.getConnection.createArrayOf(ja.sqlType, ja.toArray(v))
       stmt.setArray(idx, arr)
       idx + 1
@@ -99,6 +97,10 @@ object FieldBinder:
   given FieldBinder[Boolean] with
     def bind(stmt: PreparedStatement, idx: Int, v: Boolean): Int =
       stmt.setBoolean(idx, v)
+      idx + 1
+  given FieldBinder[Vector[Float]] with
+    def bind(stmt: PreparedStatement, idx: Int, v: Vector[Float]): Int =
+      stmt.setString(idx,   v.mkString("[", ",", "]") )
       idx + 1
   given FieldBinder[Float] with
     def bind(stmt: PreparedStatement, idx: Int, v: Float): Int =

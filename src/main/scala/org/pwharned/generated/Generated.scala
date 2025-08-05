@@ -31,7 +31,6 @@ case class assets[F[_]] ( `asset_id`: F[PrimaryKey[java.util.UUID]],
 `asset_name`: F[String],
 `asset_owner`: F[String],
 `asset_description`: F[String],
-`asset_type`: F[String],
 `asset_link`: F[String],
 `created_at`: F[Default[String]],
 `updated_at`: F[Nullable[String]],
@@ -44,7 +43,8 @@ case class assets[F[_]] ( `asset_id`: F[PrimaryKey[java.util.UUID]],
 `asset_collaborators`: F[Nullable[List[String]]],
 `asset_owner_name`: F[String],
 `asset_geo`: F[Nullable[String]],
-`asset_market`: F[Nullable[String]])
+`asset_market`: F[Nullable[String]],
+`asset_type`: F[Nullable[String]])
 
 case class attributes[F[_]] ( `id`: F[PrimaryKey[Int]],
 `name`: F[String])
@@ -73,12 +73,25 @@ case class comments[F[_]] ( `comment_id`: F[PrimaryKey[java.util.UUID]],
 `creator_name`: F[String],
 `updated_at`: F[Default[String]])
 
+case class embeddings[F[_]] ( `embedding_id`: F[PrimaryKey[Int]],
+`asset_id`: F[java.util.UUID],
+`embedding_vector`: F[Nullable[Vector[Float]]])
+
 case class entities[F[_]] ( `id`: F[PrimaryKey[Int]],
 `name`: F[String])
 
 case class entityattributes[F[_]] ( `eid`: F[PrimaryKey[java.util.UUID]],
  `aid`: F[PrimaryKey[Int]],
  `vid`: F[PrimaryKey[Int]])
+
+case class geos[F[_]] (`parent`: F[Nullable[String]],
+`child`: F[Nullable[String]])
+
+case class mappings[F[_]] (`parent`: F[Nullable[String]],
+`child`: F[Nullable[String]])
+
+case class new_practices[F[_]] (`original`: F[Nullable[String]],
+`new`: F[Nullable[String]])
 
 case class nominations[F[_]] ( `nomination_id`: F[PrimaryKey[java.util.UUID]],
 `asset_id`: F[java.util.UUID],
@@ -110,3 +123,6 @@ case class relationship[F[_]] ( `id`: F[PrimaryKey[Int]],
 `caid`: F[Int],
 `pavid`: F[Int],
 `cavid`: F[Int])
+
+case class test[F[_]] (`id`: F[Nullable[Int]],
+`id2`: F[Nullable[Int]])

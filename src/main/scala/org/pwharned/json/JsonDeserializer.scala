@@ -238,6 +238,46 @@ object JsonDeserializer extends Parse:
                 s"Expected JSON array but got AST node: $other"
               ))
 
+  given vecDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[Vector[A]] =
+    new JsonDeserializer[Vector[A]]:
+      override def defaultValue: Option[Vector[A]] = Some(Vector.empty)
+
+      def deserialize: Parser[Vector[A]] =
+        input =>
+          // 1) parse raw AST array
+          summon[JsonDeserializer[JsonAst]].deserialize(input) match
+            case Left(err) =>
+              Left(err)
+
+            case Right((JsonAst.Arr(elems), restAfter)) =>
+              elems.foldLeft(Right(Vector.empty): Either[ParseError, Vector[A]]) {
+                case (accE, astEl) =>
+                  accE.flatMap { acc =>
+                    val frag = renderJson(astEl)
+                    jd.value.deserialize(frag) match
+                      case Left(parseErr) =>
+                        Left(parseErr)
+                      case Right((a, leftover)) =>
+                        if leftover.trim.nonEmpty then
+                          Left(ParseError(
+                            0,
+                            frag,
+                            s"Leftover in list element: '$leftover'"
+                          ))
+                        else
+                          Right(acc :+ a)
+                  }
+              } match
+                // 3) done!
+                case Left(err) => Left(err)
+                case Right(vList) => Right((vList, restAfter))
+
+            case Right((other, _)) =>
+              Left(ParseError(
+                0,
+                input,
+                s"Expected JSON array but got AST node: $other"
+              ))
 
   given mapDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[Map[String, A]] with {
     override def defaultValue: Option[Map[String, A]] = Some(Map.empty)

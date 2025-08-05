@@ -120,7 +120,14 @@ object Schema:
     def labels = Nil
     def `type`  = Some("array")
     def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
-  
+
+  given [A](using sch: Schema[A]): Schema[Vector[A]] with
+    def labels = Nil
+
+    def `type` = Some("array")
+
+    def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
+
   given [A](using sch: Schema[A]): Schema[List[A]] with
     def labels = Nil
   

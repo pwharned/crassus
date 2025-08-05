@@ -161,6 +161,7 @@ object HttpRequest:
           val start = dup.arrayOffset() + dup.position()
           val len = dup.remaining()
           new String(arr, start, len, StandardCharsets.UTF_8)
+        case u: Unit => ""
         case other =>
           other.toString
 

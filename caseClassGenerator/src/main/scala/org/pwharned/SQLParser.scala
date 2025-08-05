@@ -25,7 +25,7 @@ object SQLParser extends Parse {
 
   def typeParser: Parser[SqlDataType] = {
    val allParsers =  List(
-      SqlInteger,SqlTextArray, SqlString, SqlBoolean, SqlFloat, SqlDate, SqlTimestamp, SqlUuid
+      SqlInteger,SqlTextArray, SqlString, SqlBoolean, SqlFloat, SqlDate, SqlTimestamp, SqlUuid, SqlVector
     ).map( x=> x.parse)
     def tryParsers(remaining: List[Parser[SqlDataType]], p: Parser[SqlDataType]): Parser[SqlDataType] = {
       if (remaining.isEmpty){

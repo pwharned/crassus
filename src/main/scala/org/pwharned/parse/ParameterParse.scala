@@ -74,6 +74,29 @@ object QueryDeserializer extends Parse:
             case Left(err)            => Left(err)
           }
 
+    given vecParser[T](using underlying: QueryFieldDeserializer[T]): QueryFieldDeserializer[Vector[T]] with
+
+      def parser: String => Either[ParseError, (Vector[T], String)] =
+        input =>
+          val inner = input.trim
+            .stripPrefix("[")
+            .stripSuffix("]")
+            .trim
+
+          if inner.isEmpty then
+            Right((Vector.empty, ""))
+          else
+            val tokens = inner.split(",").toList.map(_.trim)
+            // foldLeft to accumulate (List[T], "") without needing a final reverse:
+            val init: Either[ParseError, (Vector[T], String)] = Right((Vector.empty, ""))
+            val result = tokens.foldLeft(init) { (accE, tok) =>
+              for {
+                (xs, _) <- accE // current List[T]
+                (x, rem) <- underlying.parser(tok) // parse this one
+              } yield (xs :+ x, "") // append x onto xs
+            }
+
+            result
     given listParser[T](using underlying: QueryFieldDeserializer[T]): QueryFieldDeserializer[List[T]] with
 
       def parser: String => Either[ParseError, (List[T], String)] =
