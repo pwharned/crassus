@@ -29,7 +29,7 @@ object HttpRequest:
                   headers: Headers,
                   body: B
                 ): HttpRequest[B] =
-      (ByteBuffer.wrap(method.getBytes), ByteBuffer.wrap(path.getBytes), ByteBuffer.wrap(headers.getBytes), body)
+      (ByteBuffer.wrap(method.getBytes), ByteBuffer.wrap(path.pathString.getBytes), ByteBuffer.wrap(headers.getBytes), body)
     // Construct an HttpRequest from its parts.
     def apply[B](
                method: ByteBuffer,
@@ -147,7 +147,7 @@ object HttpRequest:
     def pretty: String =
       // 1. Extract method & path
       val m = new String(req.method.getBytes, StandardCharsets.UTF_8)
-      val p = new String(req.path.getBytes, StandardCharsets.UTF_8)
+      val p = req.path.pathString
 
       // 2. Use raw headers block
       val h = new String(req.headers.getBytes, StandardCharsets.UTF_8) // uses your extension

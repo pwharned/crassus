@@ -109,5 +109,19 @@ object HttpPath:
 extension (inline s: String) inline def asPath: HttpPath = HttpPath.literal(s)
 extension ( s: String)  def toPath: HttpPath = HttpPath(s)
 extension(p: HttpPath)
-  def getBytes = (p.segments.mkString("/") + "?" + p.query.value).getBytes
+  def pathString: String = {
+    // 1. Convert each Segment back to its literal form
+    val segs = p.segments.map {
+      case Segment.Static(seg) => seg.value
+      case Segment.Dynamic(id) => s"{${id.value.value}}"
+      case Segment.WildCard(id) => s"${id.value.value}**"
+    }
+
+    // 2. Join with "/" and ensure leading slash
+    val base = "/" + segs.mkString("/")
+
+    // 3. Append query if nonempty
+    if p.query.value.nonEmpty then s"$base?${p.query.value}"
+    else base
+  }
 // Use the runtime classifier on each segment:
