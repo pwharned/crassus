@@ -150,6 +150,7 @@ object App:
    
    routes.foreach( x=> x.withHeaders(corsHeaders))
 
+  println(assets_route.head.path.segments)
 
   OpenApiBuilder.write("static/openapi.json",routes.toOpenApi.serialize)
 
@@ -159,9 +160,9 @@ object App:
 
 @main
 def main(): Unit =
-  
-
-
+  import org.pwharned.http.toPath
+  val seg ="/api/{test}".toPath
+  println(seg)
 
 
   println("building routing table")

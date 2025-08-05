@@ -29,6 +29,7 @@ object Identifier:
     def value: X = id
 
   given [T]: Conversion[T, Identifier[T]] = x => Identifier(x)
+
 sealed trait Segment
 object Segment:
   final case class Static(segment: PathSegment.PathSegment) extends Segment
@@ -45,19 +46,20 @@ object HttpPath:
   inline def apply(pathString: String): HttpPath =
     val url = pathString.split('?')
     val query = Query.apply(url.tail.mkString)
-    
     val parts: List[Segment] = url.head
       .split("/")
       .filter(_.nonEmpty)
-      .map { segment =>
-        if segment.startsWith("{") && segment.endsWith("}") then
+      .map {
+        case segment@s if s.startsWith("{") && s.endsWith("}") =>
+          // Extract the identifier without the braces.
           val id = segment.substring(1, segment.length - 1)
+          // Now use our helper `toPathSegment` which is in scope.
           Segment.Dynamic(Identifier(toPathSegment(id)))
-        if segment.endsWith("**") then
-          val id = segment.substring(0,segment.length-2 )
-          Segment.WildCard(Identifier(toPathSegment(id)))
-        else
-          Segment.Static(toPathSegment(segment))
+        case segment@s if s.endsWith("**") =>
+          val id = segment.substring(0, segment.length - 2)
+            Segment.WildCard(Identifier(toPathSegment(id )))
+        case segment =>
+           Segment.Static(toPathSegment(segment ))
       }
       .toList
 
@@ -84,16 +86,16 @@ object HttpPath:
           .split("/")
           .filter(_.nonEmpty)
           .toList
-          .map { segment =>
-            if segment.startsWith("{") && segment.endsWith("}") then
+          .map {
+            case segment@s if s.startsWith("{") && s.endsWith("}") =>
               // Extract the identifier without the braces.
               val id = segment.substring(1, segment.length - 1)
               // Now use our helper `toPathSegment` which is in scope.
               '{ Segment.Dynamic(Identifier(toPathSegment(${ Expr(id) }))) }
-            if segment.endsWith("**") then 
-              val id = segment.substring(0, segment.length-2)
-              '{Segment.WildCard(Identifier(toPathSegment(${Expr(id)})))}
-            else
+            case segment@s if s.endsWith("**") =>
+              val id = segment.substring(0, segment.length - 2)
+              '{ Segment.WildCard(Identifier(toPathSegment(${ Expr(id) }))) }
+            case segment =>
               '{ Segment.Static(toPathSegment(${ Expr(segment) })) }
           }
         // Convert query part

@@ -132,7 +132,9 @@ object HTTPServer:
                 _.route.map { route =>
                   route.processRequest(clientChannel,req)
                 }
-              }.getOrElse(Future(HttpResponse.notFound).flatMap(res => summon[SocketWriter[Http]].write(clientChannel, res)))
+              }.getOrElse({
+                Future(HttpResponse.notFound)
+              } .flatMap(res => summon[SocketWriter[Http]].write(clientChannel, res)))
 
 
               response.onComplete {

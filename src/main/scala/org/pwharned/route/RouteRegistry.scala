@@ -20,11 +20,22 @@ import scala.util.{Failure, Success, Try}
 
 def toResponse[A](fa: Future[Try[A]])
                          (encode: A => HttpResponse[A])
-                         (using ExecutionContext): Future[HttpResponse[A]  ]  =
+                         (using ExecutionContext): Future[HttpResponse[A]  ]  = {
 
   fa.map {
     case Failure(exception) => HttpResponse.error(exception.getMessage)
     case Success(value) => encode(value)
+  }
+}
+
+  def toResponse[A](fa: Try[A])
+                   (encode: A => HttpResponse[A])
+                   (using ExecutionContext): HttpResponse[A] = {
+
+    fa match {
+      case Failure(exception) => HttpResponse.error(exception.getMessage)
+      case Success(value) => encode(value)
+    }
   }
 
 object RouteRegistry:
