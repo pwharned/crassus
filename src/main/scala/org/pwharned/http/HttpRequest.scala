@@ -142,5 +142,33 @@ object HttpRequest:
         StandardCharsets.UTF_8)
     def body: B = bodyBuffer
     def parse: Option[HttpRequest[B]] = Some(req)
+
+    /** Renders the request in an HTTP-style, human-readable form */
+    def pretty: String =
+      // 1. Extract method & path
+      val m = req.method.toString
+      val p = req.path.toString
+
+      // 2. Use raw headers block
+      val h = req.headers
+
+      // 3. Render body: if it's a ByteBuffer, decode as UTF-8; else .toString
+      val b = req.body match
+        case bb: ByteBuffer =>
+          val dup = bb.duplicate()
+          val arr = dup.array()
+          val start = dup.arrayOffset() + dup.position()
+          val len = dup.remaining()
+          new String(arr, start, len, StandardCharsets.UTF_8)
+        case other =>
+          other.toString
+
+      // 4. Assemble into a single string
+      s"""$m $p
+         |$h
+         |
+         |$b""".stripMargin
+
+
 extension (b: java.nio.ByteBuffer) def asRequest: Option[HttpRequest.HttpRequest[ByteBuffer]] = HttpRequest.HttpRequest.fromFullBuffer(b)
 
