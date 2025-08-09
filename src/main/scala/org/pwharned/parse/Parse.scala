@@ -184,8 +184,8 @@ object Primitives extends Parse:
     input =>
       val neg = if input.startsWith("-") then "-" else ""
       val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
-      val digits = inputAfterNeg.takeWhile(_.isDigit)
-      if digits.isEmpty then Left(ParseError(0, input, s"Expected integer, found $input"))
+      val digits = inputAfterNeg.takeWhile( x => x.isDigit || x =='.')
+      if digits.isEmpty || digits.contains('.') then Left(ParseError(0, input, s"Expected integer, found $input"))
       else
         try {
           val value = (neg + digits).toInt
@@ -197,21 +197,8 @@ object Primitives extends Parse:
     input =>
       val neg = if input.startsWith("-") then "-" else ""
       val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
-      val digits = inputAfterNeg.takeWhile(_.isDigit)
-      if digits.isEmpty then Left(ParseError(0, input, s"Expected Long, found $input"))
-      else
-        try {
-          val value = (neg + digits).toInt
-          Right((value, inputAfterNeg.drop(digits.length)))
-        } catch {
-          case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
-        }
-  def doubleParser: Parser[Double] =
-    input =>
-      val neg = if input.startsWith("-") then "-" else ""
-      val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
       val digits = inputAfterNeg.takeWhile( x => x.isDigit || x =='.')
-      if digits.isEmpty then Left(ParseError(0, input, s"Expected integer, found $input"))
+      if digits.isEmpty || digits.contains('.') then Left(ParseError(0, input, s"Expected Long, found $input"))
       else
         try {
           val value = (neg + digits).toInt
@@ -219,19 +206,37 @@ object Primitives extends Parse:
         } catch {
           case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
         }
+
+
+  def numberToken(input: String): Either[ParseError, (String, String)] = {
+    // Regex for full decimal with optional exponent
+    val Num = """[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?""".r
+
+    Num.findPrefixOf(input) match {
+      case Some(tok) => Right((tok, input.substring(tok.length)))
+      case None => Left(ParseError(0, input, s"Expected number, found $input"))
+    }
+  }
   def boolParser: Parser[Boolean] =
     input =>
       if input.startsWith("true") then Right((true, input.drop("true".length)))
       else if input.startsWith("false") then Right((false, input.drop("false".length)))
       else Left(ParseError(0, input, s"Expected boolean, found $input"))
 
-  def floatParser: Parser[Float] =
-    input =>
-      if input.head.isDigit then {
-        val digit = input.takeWhile(x => x.isDigit || x =='.')
-        val remaining = input.drop(digit.length)
-        Right((digit.toFloat, input.drop("true".length)))
+  def doubleParser: Parser[Double] = input =>
+    numberToken(input).flatMap { case (tok, rest) =>
+      try Right((tok.toDouble, rest))
+      catch {
+        case _: NumberFormatException =>
+          Left(ParseError(0, input, s"Invalid double format: $tok"))
       }
-      else Left(ParseError(0, input, "Expected boolean"))
-      
-      
+    }
+
+  def floatParser: Parser[Float] = input =>
+    numberToken(input).flatMap { case (tok, rest) =>
+      try Right((tok.toFloat, rest))
+      catch {
+        case _: NumberFormatException =>
+          Left(ParseError(0, input, s"Invalid float format: $tok"))
+      }
+    }

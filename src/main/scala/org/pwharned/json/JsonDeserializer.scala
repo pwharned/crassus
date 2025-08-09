@@ -64,12 +64,12 @@ object JsonDeserializer extends Parse:
     def deserialize: Parser[JsPrimitive] =
       summon[JsonDeserializer[String]].deserialize
         .alt(summon[JsonDeserializer[Int]].deserialize)
-        .alt(summon[JsonDeserializer[Boolean]].deserialize)
         .alt(summon[JsonDeserializer[Long]].deserialize)
         .alt(summon[JsonDeserializer[Double]].deserialize)
         .alt(summon[JsonDeserializer[Float]].deserialize)
+        .alt(summon[JsonDeserializer[Boolean]].deserialize)
 
-  // For Option[T], first check for "null"; otherwise delegate.
+// For Option[T], first check for "null"; otherwise delegate.
   given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[Option[T]] with
     override def isOptional: Boolean = true
     def deserialize: Parser[Option[T]] = input =>

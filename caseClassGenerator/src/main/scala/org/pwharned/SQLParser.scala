@@ -18,6 +18,21 @@ object SQLParser extends Parse {
         case _ => s"`${column.name}`: F[$typeStr]"
       }
     }
+    def toFieldLower: String = {
+      val typeStr = column.nullable.getOrElse(true) match {
+        case true => s"Nullable[${column.dataType.scalaType}]"
+        case false => column.default.getOrElse(false) match {
+          case true => s"Default[${column.dataType.scalaType}]"
+          case false =>   column.dataType.scalaType
+        }
+      }
+
+      // Add annotation for primary key fields
+      column.primary_key match {
+        case Some(true) => s" `${column.name}`: F[PrimaryKey[${column.dataType.scalaType}]]"
+        case _ => s"`${column.name}`: F[$typeStr]"
+      }
+    }
   }
 
 

@@ -62,7 +62,7 @@ object JsonSerializer:
     def serialize(ob: String): String = {
       if ob == null then "null" else s"\"${escapeJsonString(ob)}\""
     }
-
+/*
   given unionSerializer[A, B](using
                               sa: JsonSerializer[A],
                               sb: JsonSerializer[B]
@@ -71,7 +71,7 @@ object JsonSerializer:
     def serialize(ab: A | B): String = ab match
       case a: A => sa.serialize(a)
       case b: B => sb.serialize(b)
-
+*/
   given JsonSerializer[Boolean] with
     def serialize(ob: Boolean): String = ob.toString
   given JsonSerializer[Float] with
@@ -87,6 +87,8 @@ object JsonSerializer:
     def serialize(ob: Map[String, A]): String = "{" + ob.map(x => {
       s"\"${x._1}\":${base.serialize(x._2)}"
     }).mkString(",") + "}"
+  given vecSerializer[A](using base: JsonSerializer[A]): JsonSerializer[Vector[A]] with
+    def serialize(ob: Vector[A]): String = "[" + ob.map(x =>  base.serialize(x) ).mkString(",") + "]"
   given listSerializer[A](using base: JsonSerializer[A]): JsonSerializer[List[A]] with
     def serialize(ob: List[A]): String = "[" + ob.map(x =>  base.serialize(x) ).mkString(",") + "]"
   given iteratorSerializer[A](using base: JsonSerializer[A]): JsonSerializer[Iterator[A]] with

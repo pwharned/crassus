@@ -2,6 +2,7 @@ package org.pwharned.sql.database
 
 import HKD.{Nullable, PrimaryKey}
 import org.postgresql.core.ParameterList
+import org.postgresql.util.PGobject
 import org.pwharned.json.JsonString
 
 import java.sql.{DriverManager, PreparedStatement, Types}
@@ -100,7 +101,10 @@ object FieldBinder:
       idx + 1
   given FieldBinder[Vector[Float]] with
     def bind(stmt: PreparedStatement, idx: Int, v: Vector[Float]): Int =
-      stmt.setString(idx,   v.mkString("[", ",", "]") )
+      val vecObj = new PGobject()
+      vecObj.setType("ibm_extension.vector")
+      vecObj.setValue(v.mkString("[", ",", "]") )
+      stmt.setObject(idx,   vecObj)
       idx + 1
   given FieldBinder[Float] with
     def bind(stmt: PreparedStatement, idx: Int, v: Float): Int =
