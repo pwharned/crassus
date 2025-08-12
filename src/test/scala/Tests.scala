@@ -1,6 +1,6 @@
 package org.pwharned
 
-import generated.assets
+import generated.{assets, attributes}
 import org.pwharned.sql.*
 import org.pwharned.sql.database.Connection.*
 import org.pwharned.sql.database.HKD.*
@@ -56,4 +56,7 @@ def test:Unit =
   // Summon for the constructor `assets`, not an applied type
   val testAssets = summon[DatabaseTest[assets]]
   testAssets.test(conn)
+
+  val testAttributes = summon[DatabaseTest[attributes]]
+  testAttributes.test(conn)
 

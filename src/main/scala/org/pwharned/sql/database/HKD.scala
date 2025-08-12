@@ -62,7 +62,7 @@ object HKD:
 
 
   type NewField[A] = A match
-    case PrimaryKey[t] => Option[t]
+    case PrimaryKey[t] => Option[PrimaryKey[t]]
     case Nullable[t] => Option[t]
     case Default[t] => Option[t]
     case _ => A

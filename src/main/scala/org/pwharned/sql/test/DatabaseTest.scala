@@ -30,6 +30,7 @@ object DatabaseTest:
                                                 sqli: SqlInsert[New[T]],
                                                 sqlo:SqlSelect[Optional[T]],
                                                 fbo: FieldBinder[Optional[T]],
+                                                ib: InsertBinder[New[T]],
                                                rg: RandomGenerator[New[T]],
                                                fb: FieldBinder[New[T]],
                                                randomizer: Randomizer[Persisted[T]],

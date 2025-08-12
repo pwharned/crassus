@@ -1,7 +1,7 @@
 package org.pwharned.sql.database
 
 import org.pwharned.sql.database.Row
-import org.pwharned.sql.derive.{SqlSelect, SqlDelete, SqlUpdate, PrimaryKeyBinder, PrimaryKeyFields, UpdateBinder, SqlInsert, SqlSchema}
+import org.pwharned.sql.derive.{InsertBinder, PrimaryKeyBinder, PrimaryKeyFields, SqlDelete, SqlInsert, SqlSchema, SqlSelect, SqlUpdate, UpdateBinder}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -57,10 +57,10 @@ object Connection:
 
   
   
-    def insert[A <: Product, B<:Product](obj: A)(using fb: FieldBinder[A],sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B],row: Row[B]): Iterator[B] =
+    def insert[A <: Product, B<:Product](obj: A)(using ib: InsertBinder[A],sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B],row: Row[B]): Iterator[B] =
       val built = sqlInsert.sql(obj)
       val stmt = con.prepareStatement(built)
-      val bound = fb.bind(stmt, 1, obj)
+      val bound = ib.bind(stmt, 1, obj)
       val rs = stmt.executeQuery()
 
       Iterator.continually(rs.next())

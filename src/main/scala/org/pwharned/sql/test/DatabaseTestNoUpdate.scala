@@ -28,6 +28,7 @@ object DatabaseTestNoUpdate {
                                            sqlo: SqlSelect[Optional[T]],
                                            fbo: FieldBinder[Optional[T]],
                                            rg: RandomGenerator[New[T]],
+                                           ib: InsertBinder[New[T]],
                                            fb: FieldBinder[New[T]],
                                            randomizer: Randomizer[Persisted[T]],
                                            sqld: SqlDelete[Persisted[T]],

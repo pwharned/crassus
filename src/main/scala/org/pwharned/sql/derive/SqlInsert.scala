@@ -63,5 +63,6 @@ object SqlInsert:
 
         // build and then reverse so we keep original order
         val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
+        println(f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) ")
         dial.insertReturning( f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) ")
       }
