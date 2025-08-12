@@ -7,7 +7,9 @@ import scala.deriving.Mirror
 import scala.language.{implicitConversions, postfixOps}
 
 object HKD:
- 
+
+
+
   sealed trait Sql
   sealed trait PrimaryKey[A] extends Sql:
     def value: A

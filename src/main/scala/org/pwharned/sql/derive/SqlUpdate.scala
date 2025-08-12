@@ -2,12 +2,31 @@ package org.pwharned.sql.derive
 
 import generated.assets
 
-import scala.compiletime.{constValue, erasedValue, summonInline}
+import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
 import org.pwharned.sql.database.HKD.{Persisted, PrimaryKey, Updated}
 import org.pwharned.sql.dialect.SqlDialect
 
 import scala.ValueOf
+import scala.compiletime.ops.int.+
+import scala.compiletime.ops.boolean
+
+
+type Updatable[V] <: Boolean = V match
+  case Option[t]       => Updatable[t]
+  case PrimaryKey[?]   => false
+  case _               => true
+
+// emulate a type-level `If`
+type If[C <: Boolean, Then, Else] = C match
+  case true => Then
+  case false => Else
+
+// convert a boolean literal to 1 or 0
+type BoolToInt[B <: Boolean] = If[B, 1, 0]
+type CountUpdatable[Elems <: Tuple] <: Int = Elems match
+  case EmptyTuple => 0
+  case h *: t => +[BoolToInt[Updatable[h]], CountUpdatable[t]]
 
 trait UpdateField[V]:
   def get(v: V): Option[Any]
@@ -51,6 +70,7 @@ object SqlUpdate:
     Elems <: Tuple, // the field‐types tuple
     Labels <: Tuple // the field‐names tuple
   ](orig: Product, idx: Int): List[(String, String)] =
+    
     inline erasedValue[(Elems, Labels)] match 
       case _: (EmptyTuple, EmptyTuple) =>
         Nil
@@ -87,6 +107,12 @@ object SqlUpdate:
   /** summon a derived instance */
 
   inline given derived[T <: Product](using m: Mirror.ProductOf[T], dial: SqlDialect): SqlUpdate[T] =
+    inline val upCount = constValue[ CountUpdatable[m.MirroredElemTypes] ]
+
+    inline if upCount == 0 then
+      error(
+        "Cannot derive SqlUpdate[] –  no updatable fields"
+      )
     new SqlUpdate[T]:
       def sql(orig: T): String = {
         val name: String = constValue[m.MirroredLabel]
@@ -104,23 +130,3 @@ object SqlUpdate:
       }
 
 
-@main
-def main =
-  import  org.pwharned.sql.dialect.PostgresDialect
-  given dial: SqlDialect = PostgresDialect
-  case class hello[F[_]](a: F[PrimaryKey[String]], b: F[String])
-  val s = summon[SqlUpdate[Updated[hello]]]
-  val c: Updated[hello] = new Updated[hello](None, Some("hello"))
-  val parseKeys = PrimaryKeyParser.makeParser[Persisted[hello]]
-  val keyTuple: PrimaryKeyFields[Persisted[hello]]#Out = parseKeys(List("hello"))
-  val pkTuple = extractPrimaryKeys[Updated[hello]](List("hello"))
-  pkTuple.productIterator.foreach {
-    case (label: String, pk: PrimaryKey[_]) =>
-      println(s"Column: $label, Value: ${pk.value}")
-    case other =>
-      println(s"Unexpected format: $other")
-  }
-
-
-  println(keyTuple.productIterator.foreach(print))
-  println(s.sql(c))

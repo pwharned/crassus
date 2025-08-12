@@ -225,6 +225,32 @@ object RouteRegistry:
     )
   }
 
+  inline def resourceRoutesNoUpdate[P[_], T[_[_]] <: Product](entityName: String)(using
+                                                                          // Common requirements
+                                                                          db: Database,
+                                                                          enc: BodyEncoder[P, Iterator[Persisted[T]]],
+                                                                          sw: SocketWriter[P],
+                                                                          ch: ConnectionHandler[P],
+                                                                          ec: ExecutionContext,
+                                                                          mPersisted: Mirror.ProductOf[Persisted[T]],
+                                                                          mNew: Mirror.ProductOf[New[T]],
+                                                                          jdsNew: JsonDeserializer[New[T]],
+                                                                          row: Row[Persisted[T]],
+                                                                          sqlo: SqlSelect[Optional[T]],
+                                                                          sqlInsert: SqlInsert[New[T]],
+                                                                          sqlDelete: SqlDelete[Persisted[T]],
+                                                                          fb: FieldBinder[Optional[T]],
+                                                                          queryDeserializer: QueryDeserializer[Optional[T]]
+  ): List[Route[P, ? <: HttpMethod, ?, ?]] = {
+
+    List(
+      get[P, T](entityName), // GET /api/entity
+      getWhere[P, T](entityName), // GET /api/entity/{id}
+      post[P, T](entityName), // POST /api/entity
+      delete[P, T](entityName), // DELETE /api/entity/{id}
+    )
+  }
+
 
   extension [P[_] <: Protocal[?], M <: HttpMethod, Req, Res](routes: List[Route[P, M, Req, Res]])
     inline def lazily: List[Lazy[Route[P, M, Req,Res]]] =

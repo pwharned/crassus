@@ -31,11 +31,11 @@ object App:
   lazy val actions_route = RouteRegistry.resourceRoutes[Http, actions]("actions")
   lazy val embeddings_route = RouteRegistry.resourceRoutes[Http, embeddings]("embeddings")
 
-  lazy val asset_bookmarks_route = RouteRegistry.resourceRoutes[Http, asset_bookmarks]("asset_bookmarks")
+  lazy val asset_bookmarks_route = RouteRegistry.resourceRoutesNoUpdate[Http, asset_bookmarks]("asset_bookmarks")
 
-  lazy val asset_collection_route = RouteRegistry.resourceRoutes[Http, asset_collection]("asset_collection")
+  lazy val asset_collection_route = RouteRegistry.resourceRoutesNoUpdate[Http, asset_collection]("asset_collection")
 
-  lazy val asset_product_route = RouteRegistry.resourceRoutes[Http, asset_product]("asset_product")
+  lazy val asset_product_route = RouteRegistry.resourceRoutesNoUpdate[Http, asset_product]("asset_product")
 
   lazy val asset_ratings_route = RouteRegistry.resourceRoutes[Http, asset_ratings]("asset_rating")
 
@@ -55,7 +55,7 @@ object App:
 
   lazy val  entities_route = RouteRegistry.resourceRoutes[Http, entities]("entities")
 
-  lazy val  entityattributes_route = RouteRegistry.resourceRoutes[Http, entityattributes]("entityattributes")
+  lazy val  entityattributes_route = RouteRegistry.resourceRoutesNoUpdate[Http, entityattributes]("entityattributes")
 
   lazy val  nominations_route = RouteRegistry.resourceRoutes[Http, nominations]("nominations")
 
