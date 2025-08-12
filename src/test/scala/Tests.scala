@@ -28,7 +28,7 @@ given db: DbTypeMapper = Db2TypeMapper
 case class users[F[_]](id: F[PrimaryKey[Int]], name: F[Nullable[String]], test: F[String])
 
 def getDbConnection(): java.sql.Connection = {
-  val url = "jdbc:postgresql://localhost:5433/postgres"
+  val url = "jdbc:postgresql://localhost:5433/postgres?currentSchema=public"
   val user = "postgres"
   val password = "password"
 
@@ -46,6 +46,12 @@ def test:Unit =
   import scala.language.implicitConversions
 
   given ExecutionContext = ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
+
+  val stmt = conn.createStatement()
+  val rs = stmt.executeQuery("SELECT tablename, schemaname FROM pg_tables WHERE schemaname = 'public' or tablename = 'schemaname' ")
+  while (rs.next()) {
+    println(rs.getString("tablename") + " " +  rs.getString("schemaname"))
+  }
 
   // Summon for the constructor `assets`, not an applied type
   val testAssets = summon[DatabaseTest[assets]]

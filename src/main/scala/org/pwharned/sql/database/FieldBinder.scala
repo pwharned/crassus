@@ -123,6 +123,10 @@ object FieldBinder:
     def bind(stmt: PreparedStatement, idx: Int, v: java.util.UUID): Int =
       stmt.setObject(idx, v, java.sql.Types.OTHER)
       idx + 1
+  given FieldBinder[java.time.Instant] with
+    def bind(stmt: PreparedStatement, idx: Int, v: java.time.Instant): Int =
+      stmt.setTimestamp(idx, java.sql.Timestamp.from(v))
+      idx + 1
   given [T](using fb: FieldBinder[T]): FieldBinder[Option[T]] with
     def bind(stmt: PreparedStatement, idx: Int, opt: Option[T]): Int =
       opt match

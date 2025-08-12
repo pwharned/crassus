@@ -92,7 +92,7 @@ case object SqlDate extends SqlDataType  {
 }
 case object SqlTimestamp extends SqlDataType {
   val sqlNames = Seq("TIMESTAMP WITH TIME ZONE", "TIMESTAMP")
-  def scalaType: String = "String"
+  def scalaType: String = "java.time.Instant"
 
   def parse: Parser[SqlDataType] =
     (stringInsensitive("TIMESTAMP WITH TIME ZONE") or stringInsensitive("TIMESTAMP"))

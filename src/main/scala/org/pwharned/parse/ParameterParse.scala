@@ -53,6 +53,29 @@ object QueryDeserializer extends Parse:
         }
       }
 
+    given QueryFieldDeserializer[java.time.Instant] with
+      def parser: Parser[java.time.Instant] = { input =>
+        // first parse out the raw string up to the &-delimiter
+        Primitives.stringNoAmpersand(input) match {
+          case Left(err) =>
+            // if the string parser itself failed, keep that error
+            Left(err)
+
+          case Right((raw, rest)) =>
+            // now turn raw into a UUID, catching bad formats
+            Try(java.time.Instant.parse(raw))
+              .toEither
+              .left.map { ex =>
+                // build your ParseError however you like
+                ParseError(
+                  position = 0,
+                  input = raw,
+                  message = s"'$raw' is not a valid Instant: ${ex.getMessage}"
+                )
+              }
+              .map(uuid => (uuid, rest))
+        }
+      }
 
     given QueryFieldDeserializer[Boolean] with
       def parser: Parser[Boolean] = Primitives.boolParser

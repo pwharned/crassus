@@ -90,8 +90,8 @@ object SqlUpdate:
     new SqlUpdate[T]:
       def sql(orig: T): String = {
         val name: String = constValue[m.MirroredLabel]
-        val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0).reverse
-        val keys = pkeys[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0).reverse.map(
+        val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
+        val keys = pkeys[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0).map(
           x => s"${x._1} = ${x._2}"
         ).mkString(" AND ")
         // build and then reverse so we keep original order

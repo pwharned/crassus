@@ -6,7 +6,7 @@ import java.sql.Timestamp
 
 case class actions[F[_]] ( `action_id`: F[PrimaryKey[java.util.UUID]],
 `action_user`: F[String],
-`created_at`: F[Default[String]],
+`created_at`: F[Default[java.time.Instant]],
 `related_asset`: F[java.util.UUID],
 `action_type`: F[String])
 
@@ -32,8 +32,8 @@ case class assets[F[_]] ( `asset_id`: F[PrimaryKey[java.util.UUID]],
 `asset_owner`: F[String],
 `asset_description`: F[String],
 `asset_link`: F[String],
-`created_at`: F[Default[String]],
-`updated_at`: F[Nullable[String]],
+`created_at`: F[Default[java.time.Instant]],
+`updated_at`: F[Nullable[java.time.Instant]],
 `asset_offering_type`: F[Nullable[String]],
 `asset_brand`: F[Nullable[String]],
 `asset_practice`: F[Nullable[String]],
@@ -58,8 +58,8 @@ case class brands[F[_]] ( `brand_id`: F[PrimaryKey[String]],
 
 case class collections[F[_]] ( `collection_id`: F[PrimaryKey[java.util.UUID]],
 `collection_name`: F[String],
-`created_at`: F[Default[String]],
-`updated_at`: F[Default[String]],
+`created_at`: F[Default[java.time.Instant]],
+`updated_at`: F[Default[java.time.Instant]],
 `collection_description`: F[String],
 `collection_owner`: F[String],
 `collection_collaborators`: F[Nullable[List[String]]],
@@ -69,9 +69,9 @@ case class comments[F[_]] ( `comment_id`: F[PrimaryKey[java.util.UUID]],
 `comment_value`: F[String],
 `item_id`: F[java.util.UUID],
 `created_by`: F[String],
-`created_at`: F[Default[String]],
+`created_at`: F[Default[java.time.Instant]],
 `creator_name`: F[String],
-`updated_at`: F[Default[String]])
+`updated_at`: F[Default[java.time.Instant]])
 
 case class embeddings[F[_]] ( `embedding_id`: F[PrimaryKey[Int]],
 `asset_id`: F[java.util.UUID],
@@ -100,7 +100,7 @@ case class nominations[F[_]] ( `nomination_id`: F[PrimaryKey[java.util.UUID]],
 `impact`: F[String],
 `evidence`: F[String],
 `conclusion`: F[Nullable[String]],
-`created_at`: F[Default[String]],
+`created_at`: F[Default[java.time.Instant]],
 `status`: F[String],
 `nominator_name`: F[String])
 

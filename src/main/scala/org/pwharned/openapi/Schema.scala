@@ -94,7 +94,14 @@ object Schema:
     def labels = Nil
     def `type`  = Some("string")
     def toSchema = schema(`type` = `type`)
-  
+
+  given Schema[java.time.Instant] with
+    def labels = Nil
+
+    def `type` = Some("string")
+
+    def toSchema = schema(`type` = `type`)
+
   given Schema[Unit] with
     def labels = Nil
   

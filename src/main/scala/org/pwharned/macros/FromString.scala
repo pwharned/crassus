@@ -16,6 +16,8 @@ object FromString:
     def parse(s: String): String = s
   given FromString[java.util.UUID] with
     def parse(s: String): java.util.UUID = java.util.UUID.fromString(s)
+  given FromString[java.time.Instant] with
+    def parse(s: String): java.time.Instant = java.time.Instant.parse(s)
 
   given [T](using underlying: FromString[T]): FromString[PrimaryKey[T]] with
      def parse(s: String): PrimaryKey[T] = underlying.parse(s)

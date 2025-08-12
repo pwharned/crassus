@@ -44,6 +44,9 @@ object JsonDeserializer extends Parse:
 
   given JsonDeserializer[Double] with
     def deserialize: Parser[Double] = Primitives.doubleParser
+
+  given JsonDeserializer[java.time.Instant] with
+    def deserialize: Parser[java.time.Instant] = Primitives.instantParser
   given JsonDeserializer[Long] with
     def deserialize: Parser[Long] = Primitives.longParser
   given JsonDeserializer[Boolean] with

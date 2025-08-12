@@ -33,11 +33,11 @@ object Connection:
     def update[A <: Product, B<:Product: Row](obj: A, b: PrimaryKeyFields[B]#Out)(using sqlUpdate: SqlUpdate[A],fb: UpdateBinder[A], pkb: PrimaryKeyBinder[B], row: Row[B]): Iterator[B] =
 
       val sql = sqlUpdate.sql(obj)
-      println(sql)
       val stmt = con.prepareStatement(sql)
       val end = fb.bind(stmt, 1, obj)
+      println(obj)
+      println(sql)
       val end2 = pkb.bind(stmt, end, b)
-      println(end2)
       val rs = stmt.executeQuery()
       Iterator.continually(rs.next())
         .takeWhile(identity)
@@ -59,8 +59,6 @@ object Connection:
   
     def insert[A <: Product, B<:Product](obj: A)(using fb: FieldBinder[A],sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B],row: Row[B]): Iterator[B] =
       val built = sqlInsert.sql(obj)
-      println(obj)
-      print(built)
       val stmt = con.prepareStatement(built)
       val bound = fb.bind(stmt, 1, obj)
       val rs = stmt.executeQuery()

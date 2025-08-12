@@ -48,9 +48,6 @@ object SqlDelete:
         val keys = pkeys[m.MirroredElemTypes, m.MirroredElemLabels].map(
           x => s"${x._1} = ${x._2} "
         ).mkString(" AND ")
-        println(keys)
-        // build and then reverse so we keep original order
-
 
         dial.updateReturning( f"delete from  $name  where $keys ")
       }

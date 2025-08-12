@@ -31,6 +31,8 @@ object Rs:
   // 2) your leaf instances
   given Rs[String]  with
     def read(r:java.sql.ResultSet,c: String): String =r.getString(c)
+  given Rs[java.time.Instant]  with
+    def read(r:java.sql.ResultSet,c: String): java.time.Instant =  r.getTimestamp(c).toInstant
 
   given Rs[Int]     with
     def read(r: java.sql.ResultSet, c: String): Int = r.getInt(c)
@@ -45,8 +47,6 @@ object Rs:
     def read(rs: ResultSet, col: String): List[A] =
       // pull out the PG array, cast to Array[Any] (or Array[String])
       Try(rs.getArray(col)).map(x => {
-        println(s"Array type: ${x.getBaseTypeName}") // useful for checking PG column type
-
         x.getArray.asInstanceOf[Array[A]]
           .toList
       }

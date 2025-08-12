@@ -10,6 +10,8 @@ import org.pwharned.utils.{RandomGenerator, Randomizer}
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.deriving.Mirror
+import scala.io.Source
+import scala.util.{Success, Try}
 
 // G is your HKD case class type constructor, e.g. assets
 trait DatabaseTest[P[_[_]]]:
@@ -40,8 +42,7 @@ object DatabaseTest:
       def test(conn: java.sql.Connection): Unit =
         given ExecutionContext =
           ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
-        // Schema creation for persisted rows
-        conn.createTable[Persisted[T]]
+
 
         // Insert → Randomize → Update cycle
         (0 to 5).foreach { _ =>

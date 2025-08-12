@@ -1,9 +1,11 @@
 package org.pwharned.parse
 
 import java.nio.ByteBuffer
+import java.time.Instant
 import scala.annotation.tailrec
 import scala.deriving.*
 import scala.compiletime.*
+import scala.util.Try
 
 case class ParseError(position: Int, input: String, message: String):
   def merge(other: ParseError): ParseError =
@@ -207,6 +209,13 @@ object Primitives extends Parse:
           case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
         }
 
+  def instantParser: Parser[Instant] = {
+    // Regex for full decimal with optional exponent
+    input => Try{java.time.Instant.parse(input)}.toOption match {
+      case Some(tok) => Right((tok, input.substring(tok.toString.length)))
+      case None => Left(ParseError(0, input, s"Expected number, found $input"))
+    }
+  }
 
   def numberToken(input: String): Either[ParseError, (String, String)] = {
     // Regex for full decimal with optional exponent

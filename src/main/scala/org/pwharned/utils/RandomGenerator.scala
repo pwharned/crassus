@@ -20,6 +20,9 @@ object RandomValue:
   //–– 1) Base instances for “plain” types
   given RandomValue[String] with
     def generate = Random.alphanumeric.take(10).mkString
+    
+  given RandomValue[java.time.Instant] with
+    def generate = java.time.Instant.now()
 
   given RandomValue[Int] with
     def generate = Random.nextInt(100)
