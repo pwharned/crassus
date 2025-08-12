@@ -6,6 +6,7 @@ import HKD.*
 import java.sql.ResultSet
 import java.util.UUID
 import scala.language.implicitConversions
+import scala.util.Try
 
 trait Rs[T]:
   def read(rs: ResultSet, col: String): T
@@ -43,8 +44,12 @@ object Rs:
   given arrayRs[A](using base: Rs[A]): Rs[List[A]] with
     def read(rs: ResultSet, col: String): List[A] =
       // pull out the PG array, cast to Array[Any] (or Array[String])
-      Option(rs.getArray(col)).map(x => x.getArray.asInstanceOf[Array[A]]
-        .toList
+      Try(rs.getArray(col)).map(x => {
+        println(s"Array type: ${x.getBaseTypeName}") // useful for checking PG column type
+
+        x.getArray.asInstanceOf[Array[A]]
+          .toList
+      }
       ).getOrElse(List.empty[A])
   given vec: Rs[Vector[Float]] with
     def read(rs: ResultSet, col: String): Vector[Float] =

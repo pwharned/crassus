@@ -74,8 +74,8 @@ lazy val root = project.in(file("."))
       println("Available classes: " + classLoader.getResources(""))
       println("Path to schema file is " + schema.getAbsolutePath)
       val generatorClass = classLoader.loadClass("org.pwharned.generator.CaseClassGenerator")
-      val method   = generatorClass.getMethod("generateCaseClasses", classOf[String])
-      val generatedCode    = method.invoke(null, schema.getAbsolutePath).asInstanceOf[String]
+      val method   = generatorClass.getMethod("generateCaseClasses", classOf[String], classOf[Boolean])
+      val generatedCode    = method.invoke(null, schema.getAbsolutePath, java.lang.Boolean.TRUE).asInstanceOf[String]
       val code  =
         s"""
            |package generated

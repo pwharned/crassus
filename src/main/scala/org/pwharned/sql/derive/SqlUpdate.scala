@@ -1,8 +1,10 @@
 package org.pwharned.sql.derive
 
+import generated.assets
+
 import scala.compiletime.{constValue, erasedValue, summonInline}
 import scala.deriving.Mirror
-import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.database.HKD.{Persisted, PrimaryKey, Updated}
 import org.pwharned.sql.dialect.SqlDialect
 
 import scala.ValueOf
@@ -26,12 +28,13 @@ object UpdateField:
 trait PrimaryKeyField[V]:
   def get(v: V): Option[Any]
 
-object PrimaryKeyField:
-  given skipPk[T]: PrimaryKeyField[PrimaryKey[T]] with
-    def get(pk: PrimaryKey[T]) = Some(pk)
 
-  given optAny[T]: PrimaryKeyField[Option[T]] with
-    def get(opt: Option[T]) = None
+object PrimaryKeyField:
+  given pk[T]: PrimaryKeyField[PrimaryKey[T]] with
+    def get(pk: PrimaryKey[T]) = Some(()) // value doesn't matter
+
+  given optPk[T]: PrimaryKeyField[Option[PrimaryKey[T]]] with
+    def get(opt: Option[PrimaryKey[T]]) = Some(()) // always include
 
   given plain[T]: PrimaryKeyField[T] with
     def get(v: T) = None
@@ -99,3 +102,25 @@ object SqlUpdate:
 
         dial.updateReturning( f"update  $name set ${updates.mkString(",")} where $keys ")
       }
+
+
+@main
+def main =
+  import  org.pwharned.sql.dialect.PostgresDialect
+  given dial: SqlDialect = PostgresDialect
+  case class hello[F[_]](a: F[PrimaryKey[String]], b: F[String])
+  val s = summon[SqlUpdate[Updated[hello]]]
+  val c: Updated[hello] = new Updated[hello](None, Some("hello"))
+  val parseKeys = PrimaryKeyParser.makeParser[Persisted[hello]]
+  val keyTuple: PrimaryKeyFields[Persisted[hello]]#Out = parseKeys(List("hello"))
+  val pkTuple = extractPrimaryKeys[Updated[hello]](List("hello"))
+  pkTuple.productIterator.foreach {
+    case (label: String, pk: PrimaryKey[_]) =>
+      println(s"Column: $label, Value: ${pk.value}")
+    case other =>
+      println(s"Unexpected format: $other")
+  }
+
+
+  println(keyTuple.productIterator.foreach(print))
+  println(s.sql(c))

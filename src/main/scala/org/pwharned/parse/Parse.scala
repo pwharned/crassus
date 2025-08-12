@@ -227,7 +227,7 @@ object Primitives extends Parse:
     numberToken(input).flatMap { case (tok, rest) =>
       try Right((tok.toDouble, rest))
       catch {
-        case _: NumberFormatException =>
+        case _: Exception =>
           Left(ParseError(0, input, s"Invalid double format: $tok"))
       }
     }
@@ -236,7 +236,7 @@ object Primitives extends Parse:
     numberToken(input).flatMap { case (tok, rest) =>
       try Right((tok.toFloat, rest))
       catch {
-        case _: NumberFormatException =>
+        case _: Exception =>
           Left(ParseError(0, input, s"Invalid float format: $tok"))
       }
     }

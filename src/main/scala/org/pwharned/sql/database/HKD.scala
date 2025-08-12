@@ -73,7 +73,7 @@ object HKD:
     case Option[t] => Option[t]
     case _ => Option[A]
   type UpdatedField[A] = A match
-    case PrimaryKey[t] => Option[t]
+    case PrimaryKey[t] => Option[PrimaryKey[t]]
     case Nullable[t] => Option[t]
     case Default[t] => Option[t]
     case _ => Option[A]

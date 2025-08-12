@@ -21,7 +21,6 @@ object Connection:
     def update[A <: Product, B <: Product : Row](obj: A)(using sqlUpdate: SqlUpdate[A], fb: UpdateBinder[A], pkb: PrimaryKeyBinder[A], sqlSelect: SqlSelect[B], row: Row[B]): Iterator[B] =
 
       val sql = sqlUpdate.sql(obj)
-      println(sql)
       val stmt = con.prepareStatement(sql)
 
       val end = fb.bind(stmt, 1, obj)
@@ -31,12 +30,14 @@ object Connection:
         .takeWhile(identity)
         .map(x => row.fromRs(rs))
 
-    def update[A <: Product, B<:Product: Row](obj: A, b: PrimaryKeyFields[A]#Out)(using sqlUpdate: SqlUpdate[A],fb: UpdateBinder[A], pkb: PrimaryKeyBinder[A], row: Row[B]): Iterator[B] =
+    def update[A <: Product, B<:Product: Row](obj: A, b: PrimaryKeyFields[B]#Out)(using sqlUpdate: SqlUpdate[A],fb: UpdateBinder[A], pkb: PrimaryKeyBinder[B], row: Row[B]): Iterator[B] =
 
       val sql = sqlUpdate.sql(obj)
+      println(sql)
       val stmt = con.prepareStatement(sql)
       val end = fb.bind(stmt, 1, obj)
       val end2 = pkb.bind(stmt, end, b)
+      println(end2)
       val rs = stmt.executeQuery()
       Iterator.continually(rs.next())
         .takeWhile(identity)

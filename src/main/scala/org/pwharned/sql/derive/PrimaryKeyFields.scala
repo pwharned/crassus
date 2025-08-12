@@ -142,6 +142,7 @@ def t: Unit =
 
 
   def runtimeKeys =  Seq("Bob")
+  println(extractPrimaryKeys[Person](runtimeKeys))
 
   val cols1 = (42, PrimaryKey("Hello"))
   val cols2 = ("world", true)

@@ -36,8 +36,15 @@ transparent inline def mapToSqlTypes[A <: Tuple](mapper: DbTypeMapper): List[Str
     case _: (head *: tail) =>
       val scalaType = inline erasedValue[head] match
         case _: PrimaryKey[Int] => "PrimaryKey[Int]"
+        case _: PrimaryKey[java.util.UUID] => "PrimaryKey[java.util.UUID]"
+        case _: Default[String] => "String"
+        case _: Option[Float] => "Option[Float]"
+        case _: Option[List[String]] => "Option[List[String]]"
         case _: Id[String] => "String"
         case _: Nullable[String] => "String"
+        case _: Nullable[Boolean] => "Option[Boolean]"
+        case _: Nullable[Float] => "Option[Float]"
+        case _: Nullable[List[String]] => "Option[List[String]]"
         case _: Option[String] => "Option[String]"
         case _: Int => "Int"
         case _: Option[Int] => "Option[Int]"

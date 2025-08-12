@@ -8,13 +8,9 @@ import scala.io.Source
 
 //case class User[F[_]](id: F[PrimaryKey[Int]], name: F[String])
 object CaseClassGenerator  {
-  def generateCaseClasses(filePath: String): String = {
-    // Get resource as stream from classpath
+  def generateCaseClasses(filePath: String, hkd: Boolean= true): String = {
     val input = Source.fromFile(filePath)("UTF-8")
-    //val resourceStream = getClass.getResourceAsStream("/schema.sql")
-    //if (resourceStream == null) {
-    //  throw new IllegalStateException("Could not find schema.sql in resources")
-   /// }
+
     val file = new File(filePath)
     if (!file.exists() || !file.isFile) {
       throw new IllegalArgumentException(s"Schema file not found at: $filePath")
@@ -44,8 +40,14 @@ object CaseClassGenerator  {
         })
 
         System.out.println(value)
-        s"""
-           |case class ${value._1.name}[F[_]] (${columns.map(x => x.toField).mkString(",\n")})""".stripMargin
+
+        hkd match {
+          case true =>  s"""
+                           |case class ${value._1.name}[F[_]] (${columns.map(x => x.toField).mkString(",\n")})""".stripMargin
+          case false =>  s"""
+                            |case class ${value._1.name} (${columns.map(x => x.toFieldLower).mkString(",\n")})""".stripMargin
+        }
+
     }
 
   }.mkString("\n")

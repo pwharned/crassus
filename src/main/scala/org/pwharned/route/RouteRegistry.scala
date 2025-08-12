@@ -177,7 +177,7 @@ object RouteRegistry:
     val dynamicIndexes = path.segments.zipWithIndex.collect {
       case (dynamic: Segment.Dynamic, index) => index
     }
-    val parseKeys = PrimaryKeyParser.makeParser[Updated[T]]
+    val parseKeys = PrimaryKeyParser.makeParser[Persisted[T]]
 
 
     given dial: SqlDialect = db.dial
@@ -189,7 +189,7 @@ object RouteRegistry:
         dynamicIndexes.map(req.path.segments.collect {
           case dynamic: Segment.Static => dynamic.segment.toString
         })
-      val keyTuple: PrimaryKeyFields[Updated[T]]#Out = parseKeys(keyStrings)
+      val keyTuple: PrimaryKeyFields[Persisted[T]]#Out = parseKeys(keyStrings)
 
       toResponse(db.withConnection( x=> x.update[Updated[T], Persisted[T]](req.body,keyTuple)))(enc.apply)
 

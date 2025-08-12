@@ -35,6 +35,8 @@ object RandomValue:
 
   given RandomValue[Boolean] with
     def generate = Random.nextBoolean()
+  given list[T](using underlying: RandomValue[T]): RandomValue[List[T]] with
+    def generate = List(underlying.generate)
 
   given RandomValue[java.util.UUID] with
     def generate = java.util.UUID.randomUUID()
