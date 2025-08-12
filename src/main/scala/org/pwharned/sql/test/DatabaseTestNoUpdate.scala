@@ -15,7 +15,7 @@ import scala.util.{Success, Try}
 
 trait DatabaseTestNoUpdate[P[_[_]]]:
   def test(conn: java.sql.Connection): Unit
-  
+
 object DatabaseTestNoUpdate {
 
   inline given derived[T[_[_]] <: Product](using
@@ -33,8 +33,8 @@ object DatabaseTestNoUpdate {
                                            sqld: SqlDelete[Persisted[T]],
                                            typeMapper: DbTypeMapper
 
-                                          ): DatabaseTest[T] =
-    new DatabaseTest[T]:
+                                          ): DatabaseTestNoUpdate[T] =
+    new DatabaseTestNoUpdate[T]:
       def test(conn: java.sql.Connection): Unit =
         given ExecutionContext =
           ExecutionContext.fromExecutor(Executors.newVirtualThreadPerTaskExecutor())
