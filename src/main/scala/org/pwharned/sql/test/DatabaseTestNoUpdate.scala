@@ -2,10 +2,12 @@ package org.pwharned.sql.test
 import org.pwharned.openapi.Schema
 import org.pwharned.parse.QueryDeserializer
 import org.pwharned.sql.database.Connection.*
-import org.pwharned.sql.database.HKD.*
+import org.pwharned.sql.HKD._
 import org.pwharned.sql.database.{DbTypeMapper, FieldBinder, Row}
 import org.pwharned.sql.derive.*
 import org.pwharned.utils.{RandomGenerator, Randomizer}
+import org.pwharned.sql.derive.given // Scala 3 wildcard import of all givens
+
 
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
@@ -52,31 +54,68 @@ object DatabaseTestNoUpdate {
 
           val pkeys: PrimaryKeyFields[Persisted[T]]#Out =
             TupleKeyExtractor
-              .extractPkTuple(recPersisted2)
+              .extractPkTuple(recPersisted1)
               .asInstanceOf[PrimaryKeyFields[Persisted[T]]#Out]
 
         }
 
         // Query → parse primary keys → select → delete
-        val stream = conn.query[Persisted[T]]
+        val stream = conn.queryRaw[Persisted[T]]
+        val rowMapper = summon[Row[Persisted[T]]]
 
-        stream.foreach { row =>
-          val pkeys: PrimaryKeyFields[Persisted[T]]#Out =
-            TupleKeyExtractor
+
+        stream.foreach { rs =>
+
+
+          val row = rowMapper.fromRs(rs)
+
+          if hasPrimaryKey[Persisted[T]] then
+            // 1) extract the PK‐tuple
+            val pkeys = TupleKeyExtractor
               .extractPkTuple(row)
               .asInstanceOf[PrimaryKeyFields[Persisted[T]]#Out]
 
-          val pkeyStrings: Seq[String] =
-            pkeys.productIterator.toSeq.collect {
-              case pk: PrimaryKey[?] => pk.value.toString
-            }
+            // 2) parse back to strings, select & delete by PK
+            val pkeyStrings: Seq[String] =
+              pkeys.productIterator.toSeq.collect {
+                case pk: PrimaryKey[?] => pk.value.toString
+                case pk: GeneratedPrimaryKey[?] => pk.value.toString
+              }
+            if pkeyStrings.nonEmpty then
+              val parsed = PrimaryKeyParser.makeParser[Persisted[T]](pkeyStrings)
+              conn.query[Persisted[T]](parsed).next()
+              conn.delete[Persisted[T]](parsed)
+            else {
+              val sql = summon[SqlDelete[Persisted[T]]]
+              val query = sql.deleteWhere(row)
 
-          val parseKeys = PrimaryKeyParser.makeParser[Persisted[T]]
-          val keyTuple: PrimaryKeyFields[Persisted[T]]#Out = parseKeys(pkeyStrings)
+              val stmt = conn.prepareStatement(query,java.sql.ResultSet.TYPE_FORWARD_ONLY,
+                java.sql.ResultSet.CONCUR_UPDATABLE)
+              val fb = summon[FieldBinder[Persisted[T]]]
+              val end = fb.bind(stmt, 1, row)
+              stmt.executeUpdate()
+            } else {
+            val sql = summon[SqlDelete[Persisted[T]]]
+            val query = sql.deleteWhere(row)
 
-          val selected = conn.query[Persisted[T]](keyTuple).next()
-          val _ = conn.delete[Persisted[T]](keyTuple)
+            val stmt = conn.prepareStatement(query, java.sql.ResultSet.TYPE_FORWARD_ONLY,
+              java.sql.ResultSet.CONCUR_UPDATABLE)
+            val fb = summon[FieldBinder[Persisted[T]]]
+            val end = fb.bind(stmt, 1, row)
+            stmt.executeUpdate()
+          }
+
         }
 
 
 }
+
+import scala.compiletime.erasedValue
+
+/** Emits `true` iff T’s PK‐tuple is nonempty, else `false` */
+inline def hasPrimaryKey[T <: Product](using
+                                       pk: PrimaryKeyFields[T]
+                                      ): Boolean =
+  inline erasedValue[pk.Out] match
+    case _: EmptyTuple => false
+    case _             => true

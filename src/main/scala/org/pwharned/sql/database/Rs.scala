@@ -1,7 +1,7 @@
 package org.pwharned.sql.database
 
 import org.pwharned.json.{JsonString, given_Conversion_String_JsonString}
-import HKD.*
+import org.pwharned.sql.HKD._
 
 import java.sql.ResultSet
 import java.util.UUID
@@ -19,7 +19,8 @@ object SqlWrap:
   given SqlWrap[Option] with
     def wrap[A](value: A): Option[A] =Option(value)
   given SqlWrap[PrimaryKey] with
-    def wrap[A](value: A): PrimaryKey[A] = value
+    def wrap[A](value: A): PrimaryKey[A] = PrimaryKey(value)
+
   given SqlWrap[Id] with
     def wrap[A](value: A): Id[A] = value
   given SqlWrap[Nullable] with
@@ -29,11 +30,11 @@ object SqlWrap:
 object Rs:
 
   // 2) your leaf instances
+ 
   given Rs[String]  with
     def read(r:java.sql.ResultSet,c: String): String =r.getString(c)
   given Rs[java.time.Instant]  with
     def read(r:java.sql.ResultSet,c: String): java.time.Instant =  r.getTimestamp(c).toInstant
-
   given Rs[Int]     with
     def read(r: java.sql.ResultSet, c: String): Int = r.getInt(c)
   given Rs[Boolean] with
@@ -42,6 +43,10 @@ object Rs:
     def read(r: java.sql.ResultSet, c: String): Float = r.getFloat(c)
   given Rs[UUID]    with
     def read(r: java.sql.ResultSet, c: String): UUID = UUID.fromString(r.getString(c))
+  given genPkey[A](using underlying: Rs[A]): Rs[GeneratedPrimaryKey[A]]    with
+    def read(r: java.sql.ResultSet, c: String): GeneratedPrimaryKey[A] = GeneratedPrimaryKey(underlying.read(r, c))
+  given pkey[A](using underlying: Rs[A]): Rs[PrimaryKey[A]]    with
+    def read(r: java.sql.ResultSet, c: String): PrimaryKey[A] = PrimaryKey(underlying.read(r, c))
 
   given arrayRs[A](using base: Rs[A]): Rs[List[A]] with
     def read(rs: ResultSet, col: String): List[A] =
@@ -64,11 +69,4 @@ object Rs:
       // detect SQL NULL
       if rs.wasNull then None else Some(v)
 
-  given hktReader[F[_], A](using
-                           base:   Rs[A],     // how to read the raw A
-                           wrapper: SqlWrap[F]// how to lift A into F[A]
-                          ): Rs[F[A]] with
-    def read(rs: ResultSet, col: String): F[A] =
-      val a = base.read(rs, col)
-      // immediately ask JDBC “was it null?”
-      wrapper.wrap(a)
+

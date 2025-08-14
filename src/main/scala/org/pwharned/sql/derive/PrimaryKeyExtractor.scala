@@ -1,6 +1,6 @@
 package org.pwharned.sql.derive
 
-import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.HKD._
 
 import scala.compiletime.*
 import scala.deriving.*

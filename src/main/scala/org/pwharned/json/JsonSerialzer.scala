@@ -7,6 +7,7 @@ import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.deriving.*
 import org.pwharned.`lazy`.Lazy
+import org.pwharned.sql.HKD._
 
 trait JsWrap[F[_], A]:
   def wrap(fa: F[A], serializeA: A => String): String
@@ -36,7 +37,12 @@ object JsonSerializer:
       case c if c < ' ' => f"\\u${c.toInt}%04x"
       case c => c.toString
     }
-
+  given fieldBasedSerializer[T, R](using
+                                   fr: FieldReducer.Aux[T, R],
+                                   js: JsonSerializer[R]
+                                  ): JsonSerializer[T] with
+    def serialize(obj: T): String =
+      js.serialize(fr.unwrap(obj))
   inline given derived[T <: Product](using m: Mirror.ProductOf[T]): JsonSerializer[T] =
     new JsonSerializer[T]:
       def serialize(obj: T): String =
@@ -100,14 +106,6 @@ object JsonSerializer:
       case Some(value) => summonInline[JsonSerializer[A]].serialize(value)
       case None => "null"
     }
-
-  given hktSerializer[F[_], A](using
-                               base:    JsonSerializer[A],
-                               wrapper: JsWrap[F,A]
-                              ): JsonSerializer[F[A]] with
-    // ← must take an F[A], *not* an A
-    def serialize(fa: F[A]): String =
-      wrapper.wrap(fa, base.serialize)
 
 
 

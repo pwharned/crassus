@@ -1,6 +1,6 @@
 package org.pwharned.sql.database
 
-import org.pwharned.sql.database.HKD.*
+import org.pwharned.sql.HKD._
 import org.pwharned.macros.typeName
 import scala.quoted.*
 import scala.compiletime.*

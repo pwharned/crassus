@@ -1,7 +1,7 @@
 package org.pwharned.sql.derive
 
 import org.pwharned.sql.database.FieldBinder
-import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.HKD._
 
 import java.sql.PreparedStatement
 import scala.compiletime.{erasedValue, summonInline}
@@ -53,7 +53,10 @@ object PrimaryKeyBinder:
             val pkValue    = rawFields.asInstanceOf[Product].productElement(productIdx).asInstanceOf[h]
             val nextParam  = summonInline[FieldBinder[h]].bind(stmt, idx0, pkValue)
             foldPK[t](stmt, nextParam, rawFields, productIdx + 1)
-
+          case _: GeneratedPrimaryKey[u] =>
+            val pkValue    = rawFields.asInstanceOf[Product].productElement(productIdx).asInstanceOf[h]
+            val nextParam  = summonInline[FieldBinder[h]].bind(stmt, idx0, pkValue)
+            foldPK[t](stmt, nextParam, rawFields, productIdx + 1)
           case _ => foldPK[t](stmt, idx0, rawFields, productIdx)
 
 

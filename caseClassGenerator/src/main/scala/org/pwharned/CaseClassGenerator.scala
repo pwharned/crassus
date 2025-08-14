@@ -18,12 +18,12 @@ object CaseClassGenerator  {
 
 
     val lines = input.getLines().mkString("\n")
-    System.out.println("Discovered statements are  :" + lines)
     val statements  = lines.split(";")
     // val lines = Source.fromFile(inputFile).getLines().toList
     val createTableStatements = statements.filter( x=> x.trim.toUpperCase.startsWith("CREATE TABLE")).map(x => SQLParser.createTableParser(x))
 
     val alterTableStatements = statements.filter( x=> x.trim.toUpperCase.startsWith("ALTER TABLE")).map( x=> SQLParser.alterTablePrimaryKeyParser(x))
+    val alterColumn = statements.filter( x=> x.trim.toUpperCase.startsWith("ALTER TABLE")).map( x=> SQLParser.alterTableAddGeneratedAlwaysAsIdentity(x))
 
     createTableStatements.map {
       case Left(value) => {System.out.println(value)}
@@ -31,15 +31,21 @@ object CaseClassGenerator  {
         val alterations = alterTableStatements.filter {
           x => x.isRight
         }.map( x=> x.toOption.get).filter( x=> x._1.table.toUpperCase==value._1.name.toUpperCase)
+        val generated_always = alterColumn.filter {
+          x => x.isRight
+        }.map( x=> x.toOption.get).filter( x=> x._1.tableName.toUpperCase==value._1.name.toUpperCase)
 
         val columns = value._1.columns.map( x=> {
-          alterations.find(y => y._1.columns.contains(x.name)) match {
-            case Some(value) => Column(x.name, x.dataType,x.nullable,Some(true),x.generated_always_as_identity, x.default)
-            case None => x
-          }
-        })
+          val generated = generated_always.find(y => y._1.colName == x.name) match {
+            case Some(value) => true
+            case None => false
 
-        System.out.println(value)
+          }
+          alterations.find(y => y._1.columns.contains(x.name)) match {
+            case Some(value) => Column(x.name, x.dataType,x.nullable,Some(true),Some(generated), x.default)
+            case None => x}
+
+        })
 
         hkd match {
           case true =>  s"""

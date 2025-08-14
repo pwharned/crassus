@@ -2,7 +2,7 @@ package org.pwharned.sql.derive
 
 
 import org.pwharned.sql.database.FieldBinder
-import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.HKD._
 
 import java.sql.PreparedStatement
 import scala.compiletime.{erasedValue, summonInline}
@@ -52,11 +52,9 @@ object InsertBinder:
       case _: (h *: t) =>
         inline erasedValue[h] match
           // skip primary keys entirely
-          case _: PrimaryKey[u] =>
-            // move to next product element, index stays the same
+          case _: GeneratedPrimaryKey[u] =>
             foldInsert[t](stmt, idx0, raw, prodIndex + 1)
-          case _: Option[PrimaryKey[u]] =>
-            // move to next product element, index stays the same
+          case _: Option[GeneratedPrimaryKey[u]] =>
             foldInsert[t](stmt, idx0, raw, prodIndex + 1)
 
           // otherwise bind this field, then recurse

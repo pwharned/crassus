@@ -1,6 +1,6 @@
 package org.pwharned.utils
 
-import org.pwharned.sql.database.HKD.{PrimaryKey, Nullable, PersistedField, UpdatedField}
+import org.pwharned.sql.HKD._
 import scala.deriving.Mirror
 import scala.compiletime.{erasedValue, summonInline}
 import scala.util.Random
@@ -50,6 +50,8 @@ object RandomValue:
 
   given [T](using rv: RandomValue[T]): RandomValue[PrimaryKey[T]] with
     def generate = PrimaryKey(rv.generate)
+  given [T](using rv: RandomValue[T]): RandomValue[GeneratedPrimaryKey[T]] with
+    def generate = GeneratedPrimaryKey(rv.generate)
 
   given [T](using rv: RandomValue[T]): RandomValue[Nullable[T]] with
     def generate = Nullable(rv.generate)

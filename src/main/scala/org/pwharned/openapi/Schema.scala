@@ -1,7 +1,7 @@
 package org.pwharned.openapi
 
 
-import org.pwharned.sql.database.HKD.*
+import org.pwharned.sql.HKD._
 import org.pwharned.sql.database.summonFieldTypes
 
 import java.nio.ByteBuffer
@@ -62,6 +62,7 @@ object Schema:
     override def format: Option[String] = sch.format
 
     def toSchema: schema = sch.toSchema
+
 
   // 2) Give a Schema for Default[A] (if you have a Default wrapper)
   given [A](using sch: Schema[A]): Schema[Default[A]] with
@@ -148,7 +149,13 @@ object Schema:
     def `type` = sch.`type`
   
     def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
-  
+
+  given [A](using sch: Schema[A]): Schema[GeneratedPrimaryKey[A]] with
+    def labels = Nil
+
+    def `type` = sch.`type`
+
+    def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
   given [A](using sch: Schema[A]): Schema[Option[A]] with
     def labels = Nil
   

@@ -1,15 +1,15 @@
 package org.pwharned.sql.derive
 
-import scala.compiletime.{constValue, erasedValue, summonInline}
+import scala.compiletime.{constValue, constValueTuple, erasedValue, summonInline}
 import scala.deriving.Mirror
-import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.HKD.*
 import org.pwharned.sql.dialect.SqlDialect
 
 import scala.ValueOf
 
 trait SqlDelete[T]:
   def sql: String
-
+  def deleteWhere(ob: T): String
 trait DeleteKey[V]:
   def get(v: String): Option[String]
 
@@ -19,6 +19,9 @@ object DeleteKey:
 
   given plain[T]: DeleteKey[T] with
     def get(v: String) = None
+
+  given skipGenPk[T]: DeleteKey[GeneratedPrimaryKey[T]] with
+    def get(v: String) = Some(v)
 
 
 object SqlDelete:
@@ -48,6 +51,23 @@ object SqlDelete:
         val keys = pkeys[m.MirroredElemTypes, m.MirroredElemLabels].map(
           x => s"${x._1} = ${x._2} "
         ).mkString(" AND ")
-
+        
         dial.updateReturning( f"delete from  $name  where $keys ")
+      }
+
+      def names: List[String] =
+        constValueTuple[m.MirroredElemLabels].productIterator.toList.map(_.toString)
+
+
+      override def deleteWhere(obj: T): String = {
+        val values = obj.productIterator.toList
+        // Filter out fields with None or null values
+        val where = names.zip(values).collect {
+          case (name, value) if value != None => s" $name = ? "
+        }.mkString(" and ")
+
+        val name: String = constValue[m.MirroredLabel]
+
+        val sql = s"delete from $name where $where  "
+        sql
       }

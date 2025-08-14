@@ -79,7 +79,7 @@ lazy val root = project.in(file("."))
       val code  =
         s"""
            |package generated
-           |import org.pwharned.sql.database.HKD._
+           |import org.pwharned.sql.HKD._
            |import java.sql.Timestamp
            |
            |$generatedCode

@@ -2,14 +2,15 @@ package org.pwharned.route
 
 import org.pwharned.`lazy`.Lazy
 import org.pwharned.http.HttpMethod.*
+import org.pwharned.http.Query
 import org.pwharned.http.{BodyEncoder, HttpRequest, HttpResponse, Protocal, Segment, SocketWriter, toPath}
 import org.pwharned.json.JsonDeserializer
 import org.pwharned.macros.toTuple
 import org.pwharned.openapi.Schema
-import org.pwharned.parse.{QueryDeserializer, fromQuery}
+import org.pwharned.parse.*
 import org.pwharned.route.Router.Route
 import org.pwharned.sql.database.Connection.*
-import org.pwharned.sql.database.HKD.*
+import org.pwharned.sql.HKD.*
 import org.pwharned.sql.database.{Database, FieldBinder, Row}
 import org.pwharned.sql.derive.*
 import org.pwharned.sql.dialect.SqlDialect
@@ -59,14 +60,9 @@ object RouteRegistry:
     Route.apply(GET, s"/api/$entityName".toPath, (req: HttpRequest.HttpRequest[Unit]) =>
 
     {
+      
 
-      val maybeQuery: Option[String] = Option(req.path.query.value).map(_.stripMargin) match {
-        case Some(value) => value match {
-          case "" => None
-          case _ => Some(value)
-        }
-        case None => None
-      }
+      val maybeQuery: Option[String] = None
 
       maybeQuery match {
         case Some(value) => value.fromQuery[Optional[T]] match {

@@ -12,9 +12,17 @@ object SQLParser extends Parse {
         }
         }
 
+      val defaultOrGenerated = column.default.getOrElse(false) | column.generated_always_as_identity.getOrElse(false)
+
       // Add annotation for primary key fields
       column.primary_key match {
-        case Some(true) => s" `${column.name}`: F[PrimaryKey[${column.dataType.scalaType}]]"
+        case Some(true) => {
+          defaultOrGenerated match {
+            case true => s" `${column.name}`: F[GeneratedPrimaryKey[${column.dataType.scalaType}]]"
+            case false => s" `${column.name}`: F[PrimaryKey[${column.dataType.scalaType}]]"
+          }
+
+        }
         case _ => s"`${column.name}`: F[$typeStr]"
       }
     }
@@ -136,7 +144,41 @@ object SQLParser extends Parse {
     
     )
 
+  val alterTableAddGeneratedAlwaysAsIdentity: Parser[GeneratedAlwaysAsIdentity] =
+    for {
+      _ <- whitespace
+      _ <- stringInsensitive("ALTER")
+      _ <- whitespace
+      _ <- stringInsensitive("TABLE")
+      - <- whitespace
+      - <- stringInsensitive("ONLY").optional
+      _ <- whitespace
+      schema <- identifier
+      _ <- whitespace
+      _ <- char('.')
+      _ <- whitespace
+      table <- identifier
+      _ <- whitespace
+      _ <- stringInsensitive("ALTER")
+      - <- whitespace
+      _ <- stringInsensitive("COLUMN")
+      _ <- whitespace
+      colName <- identifier
+      _ <- whitespace
+      _ <- stringInsensitive("ADD")
+      - <- whitespace
+      _ <- stringInsensitive("GENERATED")
+      _ <- whitespace
+      _ <- stringInsensitive("ALWAYS")
+      _ <- whitespace
+      _ <- stringInsensitive("AS")
+      _ <- whitespace
+      _ <- stringInsensitive("IDENTITY")
+      _ <- whitespace
+      _ <- char('(')
+      _ <- takeUntilString(")")
 
+    } yield GeneratedAlwaysAsIdentity(schema, table,colName)
 
 
   val columnListParser: Parser[List[Column]] =

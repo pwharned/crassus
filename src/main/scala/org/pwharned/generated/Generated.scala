@@ -1,10 +1,10 @@
 
 package generated
-import org.pwharned.sql.database.HKD._
+import org.pwharned.sql.HKD._
 import java.sql.Timestamp
 
 
-case class actions[F[_]] ( `action_id`: F[PrimaryKey[java.util.UUID]],
+case class actions[F[_]] ( `action_id`: F[GeneratedPrimaryKey[java.util.UUID]],
 `action_user`: F[String],
 `created_at`: F[Default[java.time.Instant]],
 `related_asset`: F[java.util.UUID],
@@ -19,7 +19,7 @@ case class asset_collection[F[_]] ( `asset_id`: F[PrimaryKey[java.util.UUID]],
 case class asset_product[F[_]] ( `asset_id`: F[PrimaryKey[java.util.UUID]],
  `product_id`: F[PrimaryKey[String]])
 
-case class asset_ratings[F[_]] ( `rating_id`: F[PrimaryKey[java.util.UUID]],
+case class asset_ratings[F[_]] ( `rating_id`: F[GeneratedPrimaryKey[java.util.UUID]],
 `rating_value`: F[Float],
 `createdby`: F[String],
 `related_asset`: F[java.util.UUID])
@@ -27,7 +27,7 @@ case class asset_ratings[F[_]] ( `rating_id`: F[PrimaryKey[java.util.UUID]],
 case class asset_types[F[_]] ( `type_id`: F[PrimaryKey[String]],
 `type_name`: F[String])
 
-case class assets[F[_]] ( `asset_id`: F[PrimaryKey[java.util.UUID]],
+case class assets[F[_]] ( `asset_id`: F[GeneratedPrimaryKey[java.util.UUID]],
 `asset_name`: F[String],
 `asset_owner`: F[String],
 `asset_description`: F[String],
@@ -46,17 +46,17 @@ case class assets[F[_]] ( `asset_id`: F[PrimaryKey[java.util.UUID]],
 `asset_market`: F[Nullable[String]],
 `asset_type`: F[Nullable[String]])
 
-case class attributes[F[_]] ( `id`: F[PrimaryKey[Int]],
+case class attributes[F[_]] ( `id`: F[GeneratedPrimaryKey[Int]],
 `name`: F[String])
 
-case class attributevalues[F[_]] ( `id`: F[PrimaryKey[Int]],
+case class attributevalues[F[_]] ( `id`: F[GeneratedPrimaryKey[Int]],
 `aid`: F[Int],
 `value`: F[String])
 
 case class brands[F[_]] ( `brand_id`: F[PrimaryKey[String]],
 `brand_name`: F[String])
 
-case class collections[F[_]] ( `collection_id`: F[PrimaryKey[java.util.UUID]],
+case class collections[F[_]] ( `collection_id`: F[GeneratedPrimaryKey[java.util.UUID]],
 `collection_name`: F[String],
 `created_at`: F[Default[java.time.Instant]],
 `updated_at`: F[Default[java.time.Instant]],
@@ -65,7 +65,7 @@ case class collections[F[_]] ( `collection_id`: F[PrimaryKey[java.util.UUID]],
 `collection_collaborators`: F[Nullable[List[String]]],
 `collection_owner_name`: F[String])
 
-case class comments[F[_]] ( `comment_id`: F[PrimaryKey[java.util.UUID]],
+case class comments[F[_]] ( `comment_id`: F[GeneratedPrimaryKey[java.util.UUID]],
 `comment_value`: F[String],
 `item_id`: F[java.util.UUID],
 `created_by`: F[String],
@@ -77,7 +77,7 @@ case class embeddings[F[_]] ( `embedding_id`: F[PrimaryKey[Int]],
 `asset_id`: F[java.util.UUID],
 `embedding_vector`: F[Nullable[Vector[Float]]])
 
-case class entities[F[_]] ( `id`: F[PrimaryKey[Int]],
+case class entities[F[_]] ( `id`: F[GeneratedPrimaryKey[Int]],
 `name`: F[String])
 
 case class entityattributes[F[_]] ( `eid`: F[PrimaryKey[java.util.UUID]],
@@ -93,7 +93,7 @@ case class mappings[F[_]] (`parent`: F[Nullable[String]],
 case class new_practices[F[_]] (`original`: F[Nullable[String]],
 `new`: F[Nullable[String]])
 
-case class nominations[F[_]] ( `nomination_id`: F[PrimaryKey[java.util.UUID]],
+case class nominations[F[_]] ( `nomination_id`: F[GeneratedPrimaryKey[java.util.UUID]],
 `asset_id`: F[java.util.UUID],
 `nominator`: F[String],
 `features`: F[String],
@@ -107,7 +107,7 @@ case class nominations[F[_]] ( `nomination_id`: F[PrimaryKey[java.util.UUID]],
 case class offering_types[F[_]] ( `offering_type_id`: F[PrimaryKey[String]],
 `offering_type_name`: F[String])
 
-case class parent[F[_]] ( `id`: F[PrimaryKey[Int]],
+case class parent[F[_]] ( `id`: F[GeneratedPrimaryKey[Int]],
 `paid`: F[Int],
 `caid`: F[Int])
 
@@ -118,7 +118,7 @@ case class practices[F[_]] ( `practice_id`: F[PrimaryKey[String]],
 case class products[F[_]] ( `product_id`: F[PrimaryKey[String]],
 `product_name`: F[String])
 
-case class relationship[F[_]] ( `id`: F[PrimaryKey[Int]],
+case class relationship[F[_]] ( `id`: F[GeneratedPrimaryKey[Int]],
 `paid`: F[Int],
 `caid`: F[Int],
 `pavid`: F[Int],

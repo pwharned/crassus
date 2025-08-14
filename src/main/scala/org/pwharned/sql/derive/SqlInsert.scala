@@ -2,7 +2,7 @@ package org.pwharned.sql.derive
 
 import scala.compiletime.{constValue, erasedValue, summonInline}
 import scala.deriving.Mirror
-import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.HKD._
 import org.pwharned.sql.dialect.SqlDialect
 
 import scala.ValueOf
@@ -11,11 +11,11 @@ trait InsertField[V]:
   def get(v: V): Option[Any]
 
 object InsertField:
-  given skipPk[T]: InsertField[PrimaryKey[T]] with
-    def get(pk: PrimaryKey[T]) = None
+  given skipPk[T]: InsertField[GeneratedPrimaryKey[T]] with
+    def get(pk: GeneratedPrimaryKey[T]) = None
 
-  given skipOptPk[T]: InsertField[Option[PrimaryKey[T]]] with
-    def get(opt: Option[PrimaryKey[T]]) = None
+  given skipOptPk[T]: InsertField[Option[GeneratedPrimaryKey[T]]] with
+    def get(opt: Option[GeneratedPrimaryKey[T]]) = None
 
   given optAny[T]: InsertField[Option[T]] with
     def get(opt: Option[T]) = opt
@@ -63,6 +63,5 @@ object SqlInsert:
 
         // build and then reverse so we keep original order
         val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
-        println(f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) ")
         dial.insertReturning( f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) ")
       }

@@ -37,6 +37,22 @@ trait Parse {
     case _ => Left(ParseError(0, input, s"Unexpected end of input , expected digit"))
   }
 
+  def takeUntilString(delim: String): Parser[String] = { input => {
+    @annotation.tailrec
+    def loop(pos: Int): Either[ParseError, (String, String)] = {
+      if (pos + delim.length > input.length)
+        Left(ParseError(pos, input, s"Expected '$delim'"))
+      else if (input.startsWith(delim, pos))
+        // stop just before the delimiter
+        Right((input.substring(0, pos), input.drop(pos)))
+      else
+        loop(pos + 1)
+    }
+
+    loop(0)
+  }
+  }
+
   def string(s: String): Parser[String] = input => if (input.startsWith(s)) Right((s, input.drop(s.length))) else Left(ParseError(0, input, s"Expected '$s''"))
 
   def stringInsensitive(s: String): Parser[String] = input => if (input.toLowerCase.startsWith(s.toLowerCase)) Right((s, input.drop(s.length))) else Left(ParseError(0, input, s"Expected '$s''"))

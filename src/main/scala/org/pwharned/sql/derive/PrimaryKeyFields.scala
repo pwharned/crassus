@@ -1,6 +1,6 @@
 package org.pwharned.sql.derive
 
-import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.HKD._
 
 import scala.compiletime.{constValue, erasedValue, summonInline}
 import scala.deriving.Mirror
@@ -13,6 +13,8 @@ trait PrimaryKeyFields[T] {
 given [T](using m: Mirror.ProductOf[T]): PrimaryKeyFields[T] with {
   type Out = Tuple.Filter[m.MirroredElemTypes, [X] =>> X match {
     case PrimaryKey[t] => true
+    case GeneratedPrimaryKey[t] => true
+
     case _ => false
   }]
 
@@ -35,7 +37,6 @@ type FilterPrimaryKey[Labels <: Tuple, Types <: Tuple] <: Tuple =
       hT match
     // if this field‐type is a PrimaryKey[_], include (label ->> type)
       case PrimaryKey[t] => (hl ->> hT) *: FilterPrimaryKey[tl, tT]
-    // otherwise skip
       case _ => FilterPrimaryKey[tl, tT]
     case _ => EmptyTuple
 
@@ -73,6 +74,21 @@ inline def buildPKsRec[Ls <: Tuple, Ts <: Tuple](values: Seq[Any]): FilterPrimar
   inline erasedValue[(Ls, Ts)] match
     case _: ((lh *: lt), (th *: tt)) =>
       inline erasedValue[th] match
+        case _: GeneratedPrimaryKey[a] =>
+          // 1) Find index of this label in the full labels list
+          val labels = summonLabels[Ls]
+          val idx = labels.indexOf(constValue[lh])
+          // 2) Pull the runtime value, cast to `a`
+          val rawValue = values(idx).asInstanceOf[a]
+          // 3) Wrap it into your PK type
+          val pkValue = GeneratedPrimaryKey(rawValue)
+          // 4) Create the head pair (lh ->> th)
+          val head = (constValue[lh], pkValue)
+          val tail: FilterPrimaryKey[lt, tt] =
+            buildPKsRec[lt, tt](values)
+          // 5) Recurse for the tail
+          (head *: tail).asInstanceOf[FilterPrimaryKey[Ls, Ts]]
+
         // Field `th` is PrimaryKey[a]
         case _: PrimaryKey[a] =>
           // 1) Find index of this label in the full labels list
@@ -126,9 +142,7 @@ inline def processColumns[T <: Tuple](
       processColumns(columns.tail, stmt, idx + 1)
 
 inline def extractPrimaryKeys[T <: Product](values: Seq[Any])(using m: Mirror.ProductOf[T]): PrimaryKeys[T] =
-  // summon the mirror at compile‐time
-  // now m.MirroredElemLabels and m.MirroredElemTypes are
-  // concrete tuples, and buildPKsRec can reduce
+
   buildPKsRec[m.MirroredElemLabels, m.MirroredElemTypes](values).asInstanceOf
 
 
@@ -136,10 +150,10 @@ inline def extractPrimaryKeys[T <: Product](values: Seq[Any])(using m: Mirror.Pr
 
 @main
 def t: Unit =
-  case class Person(name: PrimaryKey[String], age: Int)
+  case class Person(name: String, age: Int)
 
   type PersonName = PrimaryKeys[Person]
-
+  
 
   def runtimeKeys =  Seq("Bob")
   println(extractPrimaryKeys[Person](runtimeKeys))

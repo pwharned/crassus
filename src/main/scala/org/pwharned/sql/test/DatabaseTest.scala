@@ -2,7 +2,7 @@ package org.pwharned.sql.test
 import org.pwharned.openapi.Schema
 import org.pwharned.parse.QueryDeserializer
 import org.pwharned.sql.database.Connection.*
-import org.pwharned.sql.database.HKD.*
+import org.pwharned.sql.HKD._
 import org.pwharned.sql.database.{DbTypeMapper, FieldBinder, Row}
 import org.pwharned.sql.derive.*
 import org.pwharned.utils.{RandomGenerator, Randomizer}
@@ -56,9 +56,8 @@ object DatabaseTest:
 
           val pkeys: PrimaryKeyFields[Persisted[T]]#Out =
             TupleKeyExtractor
-              .extractPkTuple(recPersisted2)
+              .extractPkTuple(recPersisted1)
               .asInstanceOf[PrimaryKeyFields[Persisted[T]]#Out]
-
           val recPersisted3: Persisted[T] =
             conn.update[Persisted[T], Persisted[T]](recPersisted2, pkeys).next()
 
@@ -77,6 +76,7 @@ object DatabaseTest:
           val pkeyStrings: Seq[String] =
             pkeys.productIterator.toSeq.collect {
               case pk: PrimaryKey[?] => pk.value.toString
+              case pk: GeneratedPrimaryKey[?] => pk.value.toString
             }
 
           val parseKeys = PrimaryKeyParser.makeParser[Persisted[T]]

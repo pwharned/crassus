@@ -1,14 +1,14 @@
 package org.pwharned.json
 
-import org.pwharned.sql.database.HKD.{NewField, Nullable, PrimaryKey}
 import org.pwharned.parse.{Parse, ParseError, Parser, Primitives}
 
+import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.deriving.*
 import scala.quoted.*
-import org.pwharned.sql.database.HKD.~>.idToId
 import org.pwharned.json
 import org.pwharned.`lazy`.Lazy
+import org.pwharned.sql.HKD._
 
 type JsPrimitive = String | Int | Boolean | Long | Null | Double | Float
 
@@ -199,6 +199,22 @@ object JsonDeserializer extends Parse:
 
           }
 
+  given fieldBasedDeserializer[T, R](using
+                                     fr: FieldReducer.Aux[T, R],
+                                     jd: JsonDeserializer[R]
+                                    ): JsonDeserializer[T] with
+
+    // 1) delegate parsing to the inner parser
+    def deserialize: Parser[T] = (input: String) =>
+      jd.deserialize(input).map { case (r, rest) =>
+        (fr.wrap(r), rest)
+      }
+
+    // 2) preserve optional/default metadata
+    override def isOptional: Boolean = jd.isOptional
+
+    override def defaultValue: Option[T] =
+      jd.defaultValue.map(fr.wrap)
 
   given listDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[List[A]] =
     new JsonDeserializer[List[A]]:

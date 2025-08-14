@@ -1,6 +1,6 @@
 package org.pwharned.macros
 
-import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.HKD._
 
 import scala.compiletime.{erasedValue, summonInline}
 import scala.util.Try
@@ -20,8 +20,9 @@ object FromString:
     def parse(s: String): java.time.Instant = java.time.Instant.parse(s)
 
   given [T](using underlying: FromString[T]): FromString[PrimaryKey[T]] with
-     def parse(s: String): PrimaryKey[T] = underlying.parse(s)
-
+     def parse(s: String): PrimaryKey[T] = PrimaryKey(underlying.parse(s))
+  given [T](using underlying: FromString[T]): FromString[GeneratedPrimaryKey[T]] with
+    def parse(s: String): GeneratedPrimaryKey[T] = GeneratedPrimaryKey(underlying.parse(s))
 
 inline def listToTuple[T <: Tuple](list: List[String]): T = {
   inline erasedValue[T] match

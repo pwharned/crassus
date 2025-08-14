@@ -1,6 +1,6 @@
 package org.pwharned.parse
 
-import org.pwharned.sql.database.HKD.{Nullable, PrimaryKey}
+import org.pwharned.sql.HKD._
 import org.pwharned.json.JsonString
 import org.pwharned.json.given_Conversion_String_JsonString
 import org.pwharned.parse.{Parse, ParseError, Primitives}
@@ -84,6 +84,9 @@ object QueryDeserializer extends Parse:
     given [T](using underlying: QueryFieldDeserializer[T]): QueryFieldDeserializer[PrimaryKey[T]] with
       def parser: Parser[PrimaryKey[T]] =
         underlying.parser.map(PrimaryKey(_))
+    given [T](using underlying: QueryFieldDeserializer[T]): QueryFieldDeserializer[GeneratedPrimaryKey[T]] with
+      def parser: Parser[GeneratedPrimaryKey[T]] =
+        underlying.parser.map(GeneratedPrimaryKey(_))
     given [T](using underlying: QueryFieldDeserializer[T]): QueryFieldDeserializer[Nullable[T]] with
       def parser: Parser[Nullable[T]] =
         underlying.parser.map(Nullable(_))

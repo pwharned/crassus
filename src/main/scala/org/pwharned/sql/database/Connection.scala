@@ -35,8 +35,7 @@ object Connection:
       val sql = sqlUpdate.sql(obj)
       val stmt = con.prepareStatement(sql)
       val end = fb.bind(stmt, 1, obj)
-      println(obj)
-      println(sql)
+
       val end2 = pkb.bind(stmt, end, b)
       val rs = stmt.executeQuery()
       Iterator.continually(rs.next())
@@ -59,6 +58,8 @@ object Connection:
   
     def insert[A <: Product, B<:Product](obj: A)(using ib: InsertBinder[A],sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B],row: Row[B]): Iterator[B] =
       val built = sqlInsert.sql(obj)
+      println(built)
+      println(obj)
       val stmt = con.prepareStatement(built)
       val bound = ib.bind(stmt, 1, obj)
       val rs = stmt.executeQuery()
@@ -78,6 +79,13 @@ object Connection:
 
       val rs = stmt.executeQuery()
       Iterator.continually(rs.next()).takeWhile(identity).map(x => row.fromRs(rs) )
+    def queryRaw[A <: Product](using  sql: SqlSelect[A]): Iterator[java.sql.ResultSet] =
+
+      val stmt = con.prepareStatement(sql.select)
+
+      val rs = stmt.executeQuery()
+      Iterator.continually(rs.next()).takeWhile(identity).map(x => rs)
+      
     def queryParameterized[A <: Product,B<:Product: Row](obj:A )(using sqlSelect: SqlSelect[A],fb:FieldBinder[A], row: Row[B]): Iterator[B] =
       val sql = sqlSelect.selectWhere(obj)
 

@@ -4,7 +4,7 @@ package org.pwharned.sql.derive
 import org.pwharned.macros.FromString
 
 import scala.quoted.*
-import org.pwharned.sql.database.HKD.PrimaryKey
+import org.pwharned.sql.HKD._
 
 object PrimaryKeyParser:
 
@@ -23,7 +23,7 @@ object PrimaryKeyParser:
 
     // 1) Dealiased T and the PrimaryKey constructor symbol
     val tpeRepr       = TypeRepr.of[T].dealias
-    val pkConstructor = TypeRepr.of[PrimaryKey[?]].typeSymbol
+    //val pkConstructor = TypeRepr.of[PrimaryKey[?]].typeSymbol
     val pkSym = Symbol
       .requiredClass("org.pwharned.sql.database.HKD$PrimaryKey")
 

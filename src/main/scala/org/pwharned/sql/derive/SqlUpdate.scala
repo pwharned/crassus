@@ -4,7 +4,7 @@ import generated.assets
 
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
-import org.pwharned.sql.database.HKD.{Persisted, PrimaryKey, Updated}
+import org.pwharned.sql.HKD._
 import org.pwharned.sql.dialect.SqlDialect
 
 import scala.ValueOf
@@ -15,6 +15,7 @@ import scala.compiletime.ops.boolean
 type Updatable[V] <: Boolean = V match
   case Option[t]       => Updatable[t]
   case PrimaryKey[?]   => false
+  case GeneratedPrimaryKey[?] => false
   case _               => true
 
 // emulate a type-level `If`
@@ -38,6 +39,12 @@ object UpdateField:
   given skipOptPk[T]: UpdateField[Option[PrimaryKey[T]]] with
     def get(opt: Option[PrimaryKey[T]]) = None
 
+  given skipGenPk[T]: UpdateField[GeneratedPrimaryKey[T]] with
+    def get(pk: GeneratedPrimaryKey[T]) = None
+
+  given skipOptGenPk[T]: UpdateField[Option[GeneratedPrimaryKey[T]]] with
+    def get(opt: Option[GeneratedPrimaryKey[T]]) = None
+
   given optAny[T]: UpdateField[Option[T]] with
     def get(opt: Option[T]) = opt
 
@@ -51,6 +58,10 @@ trait PrimaryKeyField[V]:
 object PrimaryKeyField:
   given pk[T]: PrimaryKeyField[PrimaryKey[T]] with
     def get(pk: PrimaryKey[T]) = Some(()) // value doesn't matter
+  given genpk[T]: PrimaryKeyField[GeneratedPrimaryKey[T]] with
+    def get(pk: GeneratedPrimaryKey[T]) = Some(()) // value doesn't matter
+  given optGenPk[T]: PrimaryKeyField[Option[GeneratedPrimaryKey[T]]] with
+    def get(opt: Option[GeneratedPrimaryKey[T]]) = Some(()) // always include
 
   given optPk[T]: PrimaryKeyField[Option[PrimaryKey[T]]] with
     def get(opt: Option[PrimaryKey[T]]) = Some(()) // always include

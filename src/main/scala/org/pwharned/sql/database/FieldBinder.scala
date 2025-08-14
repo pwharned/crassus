@@ -1,9 +1,9 @@
 package org.pwharned.sql.database
 
-import HKD.{Nullable, PrimaryKey}
 import org.postgresql.core.ParameterList
 import org.postgresql.util.PGobject
 import org.pwharned.json.JsonString
+import org.pwharned.sql.HKD._
 
 import java.sql.{DriverManager, PreparedStatement, Types}
 import java.util.UUID
@@ -93,6 +93,10 @@ object FieldBinder:
       idx + 1
   given [T](using fb: FieldBinder[T]): FieldBinder[PrimaryKey[T]] with
     def bind(stmt: PreparedStatement, idx: Int, v: PrimaryKey[T]): Int =
+      fb.bind(stmt,idx,v.value)
+
+  given [T](using fb: FieldBinder[T]): FieldBinder[GeneratedPrimaryKey[T]] with
+    def bind(stmt: PreparedStatement, idx: Int, v: GeneratedPrimaryKey[T]): Int =
       fb.bind(stmt,idx,v.value)
 
   given FieldBinder[Boolean] with
