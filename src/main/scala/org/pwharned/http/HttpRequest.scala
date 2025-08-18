@@ -135,11 +135,35 @@ object HttpRequest:
         pathBuffer.arrayOffset() + pathBuffer.position(),
         pathBuffer.remaining(),
         StandardCharsets.UTF_8))
-    def headers: String =
-      new String(headersBuffer.duplicate().array(),
-        headersBuffer.arrayOffset() + headersBuffer.position(),
-        headersBuffer.remaining(),
-        StandardCharsets.UTF_8)
+
+    def cookies: Map[String, String] =
+      req.headers.get("Cookie")
+        .map(Cookie.parse)
+        .getOrElse(Map.empty)
+    def headers: Headers =
+      // 1) decode the raw bytes into a String
+      val dup = req.headersBuffer.duplicate()
+      val raw = new String(
+        dup.array(),
+        dup.arrayOffset() + dup.position(),
+        dup.remaining(),
+        StandardCharsets.UTF_8
+      )
+
+      // 2) split on CRLF, then each line on the first “:”
+      val m: Map[String, String] =
+        raw
+          .split("\r\n")
+          .iterator
+          .flatMap { line =>
+            line.split(":", 2) match
+              case Array(k, v) => Some(k.trim -> v.trim)
+              case _ => None
+          }
+          .toMap
+
+      // 3) wrap in your opaque Headers type
+      Headers(m)
     def body: B = bodyBuffer
     def parse: Option[HttpRequest[B]] = Some(req)
 

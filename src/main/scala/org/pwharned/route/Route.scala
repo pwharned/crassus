@@ -19,36 +19,76 @@ object Router:
 
   // Route now includes connection handling logic
   case class Route[+F[_], +T <: HttpMethod, Req, Res](
-                                           method: T,
-                                           path: HttpPath,
-                                           handler:  HttpRequest[Req] => Future[HttpResponse[Res]],
-                                           pathItem:  pathItem,
-                                           var extraHeaders: Headers = Headers.empty
-                                         )(using writer: SocketWriter[F], connection: ConnectionHandler[F], bodyReader: BodyReader[Req]) {
-    type Out = Res
+                                                       method:    T,
+                                                       path:      HttpPath,
+                                                       handler:   Handler[Req, Res],
+                                                       pathItem:  pathItem,
+                                                       var extraHeaders: Headers             = Headers.empty,
+                                                       middleware: List[Middleware[Req, Res]] = Nil
+                                                     )(
+                                                       using writer:     SocketWriter[F],
+                                                       connection: ConnectionHandler[F],
+                                                       bodyReader:  BodyReader[Req]
+                                                     ) {
+    // Expose `withMiddleware` for a fluent API
+    def withMiddleware(mw: Middleware[Req, Res]): Route[F, T, Req, Res] =
+      copy(middleware = middleware :+ mw)
 
-    def processRequest(socket: SocketChannel, request: HttpRequest[ByteBuffer])(using ec: ExecutionContext ): Future[Unit] = {
+    private def requireCheck[Req, Res](
+                                p: HttpRequest[Req] => Future[Boolean]
+                              )(using ec: ExecutionContext): Middleware[Req, Res] =
+      next => req =>
+        p(req).flatMap {
+          case true => next(req)
+          case false =>
+            Future.successful(
+              HttpResponse(403, Headers.empty, Body.text("Forbidden"))
+            )
+        }
+    private def requireResourceCheck[Res](
+                                        p: HttpRequest[Any] => Future[Boolean]
+                                      )(using ec: ExecutionContext): Middleware[Any, Res] =
+      next => req =>
+        p(req).flatMap {
+          case true => next(req)
+          case false =>
+            Future.successful(
+              HttpResponse(403, Headers.empty, Body.text("Forbidden"))
+            )
+        }
+    inline def withResourceAuthorizer[M<:HttpMethod](using ec: ExecutionContext, ra: ResourceAuthorizer[M,Req,Res]): Route[F, T, Req, Res] = {
+      copy(middleware = middleware :+ ra.middleware(path) ) 
+    }
+
+    inline def withRouteAuthorizer[M<:HttpMethod](using ec: ExecutionContext, ra: RouteAuthorizer[M,Req, Res]): Route[F, T, Req, Res] = {
+      
+      copy(middleware = middleware :+ ra.middleware(path) )
+    }
+
+    // Build the final handler by folding in all middleware
+    private def composedHandler: Handler[Req, Res] =
+      middleware.foldLeft(handler) { (h, mw) => mw(h) }
+
+    def processRequest(
+                        socket:  SocketChannel,
+                        request: HttpRequest[ByteBuffer]
+                      )(using ec: ExecutionContext): Future[Unit] =
 
       request.as[Req] match {
         // JSON‐parse failure → 400
         case Left(err) =>
-          val bad = HttpResponse.error( s"Bad Request – cannot parse JSON: ${err}")
-          writer.write(socket, bad)
-            .map(_ => connection.handleConnection(socket))
+          val bad = HttpResponse.error(s"Bad Request – cannot parse JSON: $err")
+          writer.write(socket, bad).map(_ => connection.handleConnection(socket))
 
+        // Run the middleware-stacked handler
         case Right(typedReq) =>
-          handler(typedReq)
-            .map(resp => resp.withHeaders(extraHeaders))
-            .flatMap(resp => writer.write(socket, resp))
+          composedHandler(typedReq)                        // invoke middleware + handler
+            .map(_.withHeaders(extraHeaders))              // attach route’s headers
+            .flatMap(resp => writer.write(socket, resp))  // write response
             .map(_ => connection.handleConnection(socket))
-
       }
-
-    }
-
-
-
   }
+
 
   extension [F[_], T <: HttpMethod, Req, Res](route: Route[F, T, Req, Res])
     def withHeaders(additional: Headers):Unit =

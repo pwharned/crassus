@@ -98,7 +98,7 @@ object RouteRegistry:
     {
       val keyStrings: List[String] =
         dynamicIndexes.map(req.path.segments.collect {
-          case dynamic: Segment.Static => dynamic.segment.toString
+          case dynamic: Segment.Dynamic => dynamic.segment.toString
         })
       val keyTuple: PrimaryKeyFields[Persisted[T]]#Out = parseKeys(keyStrings)
       toResponse(db.withConnection(x => x.query[Persisted[T]](keyTuple)))(enc.apply)

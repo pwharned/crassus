@@ -6,11 +6,11 @@ import org.pwharned.`lazy`.Lazy
 import org.pwharned.http.{Body, Header, Headers, Http, HttpResponse, asPath}
 import org.pwharned.http.HttpMethod.{GET, HttpMethod}
 import org.pwharned.http.HttpPath.HttpPath
-import org.pwharned.http.HttpRequest.HttpRequest
+import org.pwharned.http.HttpRequest._
 import org.pwharned.json.serialize
 import org.pwharned.openapi.*
 import org.pwharned.route.Router.Route
-import org.pwharned.route.{RouteRegistry, RoutingTable, httpConnection}
+import org.pwharned.route.{Middleware, RouteRegistry, RoutingTable, httpConnection}
 import org.pwharned.server.{FileServer, HTTPServer, Resource}
 import org.pwharned.sql.*
 import org.pwharned.sql.database.{ConnectionDetails, Database, DbTypeMapper, PostgresTypeMapper}
@@ -88,6 +88,7 @@ object App:
   })
 
 
+
   inline def files = Route[Http, GET, Unit, String](GET, "/static/**".asPath, FileServer.apply[Resource]("/static/".asPath, "./static"))
 
   inline def openapi = Route[Http, GET, Unit, String](GET, "/doc/openapi.json".asPath, (req: HttpRequest[Unit]) => Future {
@@ -150,7 +151,6 @@ object App:
    
    routes.foreach( x=> x.withHeaders(corsHeaders))
 
-  println(assets_route.head.path.segments)
 
   OpenApiBuilder.write("static/openapi.json",routes.toOpenApi.serialize)
 
