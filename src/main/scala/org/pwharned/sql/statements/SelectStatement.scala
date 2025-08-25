@@ -1,10 +1,8 @@
 package org.pwharned.sql.statements
 
 import org.pwharned.sql.dialect.SqlDialect
-import org.pwharned.sql.statements.SelectStatement
 
 import scala.compiletime.*
-import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.*
 import scala.language.implicitConversions
 

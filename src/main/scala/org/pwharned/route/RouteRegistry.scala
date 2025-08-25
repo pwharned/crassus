@@ -62,11 +62,13 @@ object RouteRegistry:
     {
       
 
-      val maybeQuery: Option[String] = None
+      val maybeQuery: Option[String] = Option(req.path.query.value)
+
 
       maybeQuery match {
+        case Some("") => toResponse(db.withConnection( x=> x.query[Persisted[T]]) )(enc.apply)
         case Some(value) => value.fromQuery[Optional[T]] match {
-          case Left(value) => Future(HttpResponse.error(s"Bad Request: invalid query $value"))
+          case Left(value) => Future(HttpResponse.error(s"Bad Request: invalid query ${maybeQuery.get}"))
           case Right(value) => toResponse(db.withConnection(x => x.queryParameterized[Optional[T], Persisted[T]](value)))(enc.apply)
         }
         case None => toResponse(db.withConnection( x=> x.query[Persisted[T]]) )(enc.apply)
@@ -98,7 +100,7 @@ object RouteRegistry:
     {
       val keyStrings: List[String] =
         dynamicIndexes.map(req.path.segments.collect {
-          case dynamic: Segment.Dynamic => dynamic.segment.toString
+          case dynamic: Segment.Static => dynamic.segment.toString
         })
       val keyTuple: PrimaryKeyFields[Persisted[T]]#Out = parseKeys(keyStrings)
       toResponse(db.withConnection(x => x.query[Persisted[T]](keyTuple)))(enc.apply)

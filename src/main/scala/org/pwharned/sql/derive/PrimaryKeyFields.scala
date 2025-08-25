@@ -150,13 +150,13 @@ inline def extractPrimaryKeys[T <: Product](values: Seq[Any])(using m: Mirror.Pr
 
 @main
 def t: Unit =
-  case class Person(name: String, age: Int)
+  case class Person[F[_]](name: F[PrimaryKey[String]], age: F[Int])
 
-  type PersonName = PrimaryKeys[Person]
+  type PersonName = PrimaryKeys[Person[Id]]
   
 
   def runtimeKeys =  Seq("Bob")
-  println(extractPrimaryKeys[Person](runtimeKeys))
+  println(extractPrimaryKeys[Person[Id]](runtimeKeys))
 
   val cols1 = (42, PrimaryKey("Hello"))
   val cols2 = ("world", true)

@@ -3,28 +3,34 @@ import generated.*
 import org.pwharned.App.{corsHeaders, given_ExecutionContext}
 import org.pwharned.server.FileReader.given
 import org.pwharned.`lazy`.Lazy
-import org.pwharned.http.{Body, Header, Headers, Http, HttpResponse, asPath}
-import org.pwharned.http.HttpMethod.{GET, HttpMethod}
+import org.pwharned.http.{Body, Header, Headers, Http, HttpResponse, asPath, toPath}
+import org.pwharned.http.HttpMethod.{GET, HttpMethod, POST}
 import org.pwharned.http.HttpPath.HttpPath
-import org.pwharned.http.HttpRequest._
+import org.pwharned.http.HttpRequest.*
 import org.pwharned.json.serialize
 import org.pwharned.openapi.*
 import org.pwharned.route.Router.Route
 import org.pwharned.route.{Middleware, RouteRegistry, RoutingTable, httpConnection}
 import org.pwharned.server.{FileServer, HTTPServer, Resource}
 import org.pwharned.sql.*
+import org.pwharned.sql.HKD.IdHKD
 import org.pwharned.sql.database.{ConnectionDetails, Database, DbTypeMapper, PostgresTypeMapper}
 import org.pwharned.sql.dialect.{PostgresDialect, SqlDialect}
+import org.pwharned.sql.statements.SelectStatement
 import org.pwharned.utils.EnvLoader
 
 import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 
+
 object App:
   val corsHeaders = Headers.empty
     .add(Header.AccessControlAllowOrigin, "*")
     .add(Header.AccessControlAllowMethods, "GET, POST, DELETE, PUT, PATCH, OPTIONS")
+  
+  
+
 
 
 
@@ -68,7 +74,16 @@ object App:
   lazy val  products_route = RouteRegistry.resourceRoutes[Http, products]("products")
 
   lazy val  relationship_route = RouteRegistry.resourceRoutes[Http, relationship]("relationship")
- 
+
+  case class joined_attributes(name: Option[String], value: Option[String], id: Option[Int], aid: Option[Int])
+
+  object joined_attributes:
+    given SelectStatement[joined_attributes] with
+      override def select: String = "select a.name as name, av.value as value, av.id as id, a.id as aid from attributevalues av join attributes a on a.id = av.aid;"
+
+
+  lazy val  joined_attributes_route = RouteRegistry.get[Http, IdHKD[joined_attributes]]("joined_attributes")
+
   given dialect: SqlDialect = PostgresDialect
 
 
@@ -96,6 +111,7 @@ object App:
     HttpResponse(body = Body.text(source.getLines().mkString), headers = Headers(Map("content-type" -> "text/html")))
 
   })
+  
 
   val connectionDetails = EnvLoader.loadFromEnvFile[ConnectionDetails](".env") match {
     case Right(details) => details
@@ -103,6 +119,8 @@ object App:
       println(s"Error: $error")
       sys.exit(1)
   }
+  lazy val insertAttributesRoute = Route[Http, POST, assetAtt, assetAtt](POST, "/api/assetAttributes".toPath, insertAssetAttributesFunction)
+
 
   given Database = Database(connectionDetails)
 
@@ -147,7 +165,7 @@ object App:
 
     products_route,
 
-    relationship_route).flatten ++ List(openapi, swagger, files))
+    relationship_route).flatten ++ List(openapi, swagger, files, joined_attributes_route, insertAttributesRoute))
    
    routes.foreach( x=> x.withHeaders(corsHeaders))
 

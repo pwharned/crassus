@@ -72,8 +72,8 @@ object Router:
     def processRequest(
                         socket:  SocketChannel,
                         request: HttpRequest[ByteBuffer]
-                      )(using ec: ExecutionContext): Future[Unit] =
-
+                      )(using ec: ExecutionContext): Future[Unit] = {
+      
       request.as[Req] match {
         // JSON‐parse failure → 400
         case Left(err) =>
@@ -87,6 +87,7 @@ object Router:
             .flatMap(resp => writer.write(socket, resp))  // write response
             .map(_ => connection.handleConnection(socket))
       }
+    }
   }
 
 
