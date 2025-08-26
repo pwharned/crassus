@@ -37,7 +37,7 @@ type NewField[A] = A match
 
 type OptionalField[A] = A match
   case PrimaryKey[t] => Option[t]
-  case GeneratedPrimaryKey[t] => Option[GeneratedPrimaryKey[t]]
+  case GeneratedPrimaryKey[t] => Option[t]
   case Nullable[t] => Option[t]
   case Default[t] => Option[t]
   case Option[t] => Option[t]
