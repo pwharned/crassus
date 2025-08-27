@@ -127,8 +127,7 @@ object FileServer {
                               fallbackFile: Option[String] = Some("index.html")
                             )(using reader: FileReader[F]): HttpRequest[Unit] => Future[HttpResponse[String]] = { req =>
     Future {
-      println("hello")
-     // val relSegments = normalize(req.path, mountPath)
+    // val relSegments = normalize(req.path, mountPath)
        // .collect { case Segment.Static(ps) => ps.value }
       val relSegments = req.path.segments.collect { case Segment.Static(ps) => ps.value }
       val requestPath = relSegments.mkString("/", "/", "")
