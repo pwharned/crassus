@@ -105,7 +105,7 @@ object Router:
 
       val m = simpleTypeName[T]
       val returnType =  simpleTypeName[Res] // magic code
-      val summary = s"${m.toLowerCase} a ${path.segments(1).toString}"
+      val summary = s"${m.toLowerCase} a ${returnType}"
       val operationId= s"${m.toLowerCase}_${returnType.toLowerCase}"
       val mediaType = new mediaType(schema = resSch)
       val req: Option[request] = reqSch match {

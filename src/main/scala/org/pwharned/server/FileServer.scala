@@ -78,6 +78,7 @@ object FileServer {
           case Segment.Static(actual) :: rest if actual == expected =>
             go(rest, tail)
           case _ =>
+
             // prefix didn't match → yield empty to trigger 404
             Nil
         }
@@ -96,7 +97,7 @@ object FileServer {
 
   private def shouldUseFallback(requestPath: String, fallbackFile: Option[String]): Boolean = {
     fallbackFile.isDefined && {
-      val ext = requestPath.split("\\.").lastOption.getOrElse("").toLowerCase
+      val ext = requestPath.split(".").lastOption.getOrElse("").toLowerCase
       // Only use fallback for requests that look like routes (no file extension or html extension)
       // Don't use fallback for assets like CSS, JS, images, etc.
       ext.isEmpty || ext == "html"
@@ -117,24 +118,22 @@ object FileServer {
     }
   }
 
-  // Original method without client-side routing support
-  def apply[F <: FileSystem](mountPath: HttpPath, resourceRoot: String)(using reader: FileReader[F]): HttpRequest[Unit] => Future[HttpResponse[String]] = {
-    apply(mountPath, resourceRoot, None)
-  }
+
 
   // New method with optional client-side routing support
   def apply[F <: FileSystem](
                               mountPath: HttpPath,
                               resourceRoot: String,
-                              fallbackFile: Option[String]
+                              fallbackFile: Option[String] = Some("index.html")
                             )(using reader: FileReader[F]): HttpRequest[Unit] => Future[HttpResponse[String]] = { req =>
     Future {
-      val relSegments = normalize(req.path, mountPath)
-        .collect { case Segment.Static(ps) => ps.value }
-
+      println("hello")
+     // val relSegments = normalize(req.path, mountPath)
+       // .collect { case Segment.Static(ps) => ps.value }
+      val relSegments = req.path.segments.collect { case Segment.Static(ps) => ps.value }
       val requestPath = relSegments.mkString("/", "/", "")
       val fullPath = resourceRoot.stripSuffix("/") + requestPath
-
+      val currentDir = System.getProperty("user.dir")
       reader.readFile(fullPath) match {
         case Some(bytes) =>
           val ext = requestPath.split("\\.").lastOption.getOrElse("").toLowerCase
