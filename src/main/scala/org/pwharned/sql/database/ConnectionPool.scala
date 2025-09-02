@@ -21,29 +21,12 @@ class  ConnectionPool(
   // Load the JDBC driver once during pool creation.
   Class.forName(driverClassName)
 
-  val url = jdbcUrl.split("\\?")(0)
 
   val properties: java.util.Properties = {
-    val url  = jdbcUrl.split("\\?")
     val props = new java.util.Properties();
     props.put("user", user)
-    props.put("password", password)
-
-    if (url.length>1){
-      val pps = url(1)
-
-      val pps1 = pps.split("&")
-      pps1.foreach{
-        x => {
-          val j = x.split("=")
-          if (j.length>1){
-            props.put(j(0), j(1))
-          }
-        }
-      }
-
-
-    }
+    props.put("pasword", password)
+    
     props
   }
 
