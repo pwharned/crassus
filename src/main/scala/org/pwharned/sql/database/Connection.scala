@@ -58,16 +58,18 @@ object Connection:
   
     def insert[A <: Product, B<:Product](obj: A)(using ib: InsertBinder[A],sqlInsert: SqlInsert[A], sqlSelect: SqlSelect[B],row: Row[B]): Iterator[B] =
       val built = sqlInsert.sql(obj)
-      println(built)
-      println(obj)
+
       val stmt = con.prepareStatement(built)
       val bound = ib.bind(stmt, 1, obj)
-      val rs = stmt.executeQuery()
-
-      Iterator.continually(rs.next())
-        .takeWhile(identity)
-        .map(x => row.fromRs(rs) )
-
+      val hasResult = stmt.execute()
+      if (hasResult) {
+        val rs = stmt.getResultSet
+        Iterator.continually(rs.next())
+          .takeWhile(identity)
+          .map(x => row.fromRs(rs))
+      } else {
+        Iterator.empty
+      }
     def query[A <: Product](using sql: SqlSelect[A], row:Row[A]): Iterator[A] =
       val stmt = con.prepareStatement(sql.select)
       val rs = stmt.executeQuery()

@@ -177,12 +177,8 @@ object App:
 
 @main
 def main(): Unit =
-  import org.pwharned.http.toPath
-  val seg ="/api/{test}".toPath
-  println(seg)
+  
 
-
-  println("building routing table")
   lazy val table  = RoutingTable.build(App.routes)
   RoutingTable.printReadable(table)
 

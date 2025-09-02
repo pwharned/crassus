@@ -52,7 +52,8 @@ object SqlDelete:
           x => s"${x._1} = ${x._2} "
         ).mkString(" AND ")
         
-        dial.updateReturning( f"delete from  $name  where $keys ")
+        val sql = dial.deleteReturning( f"delete from  $name  where $keys ")
+        sql
       }
 
       def names: List[String] =

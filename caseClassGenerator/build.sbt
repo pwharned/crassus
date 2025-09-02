@@ -1,2 +1,2 @@
 name := "caseClassGenerator"
-scalaVersion := "2.13.16"
+scalaVersion := "2.12.18"

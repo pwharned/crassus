@@ -16,7 +16,7 @@ object Db2Dialect extends SqlDialect:
   def updateReturning(raw: String): String =
     s"SELECT * FROM FINAL TABLE ($raw)"
   def deleteReturning(raw: String): String =
-    s"SELECT * FROM FINAL TABLE($raw)"
+    s"SELECT * FROM OLD TABLE($raw)"
   def insertNoReturn(table: String, cols: Seq[String]): String =
     val cs = cols.mkString(", ")
     val ps = List.fill(cols.size)("?").mkString(", ")

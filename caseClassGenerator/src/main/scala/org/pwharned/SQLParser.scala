@@ -44,9 +44,7 @@ object SQLParser extends Parse {
 
 
   def typeParser: Parser[SqlDataType] = {
-   val allParsers =  List(
-      SqlInteger,SqlTextArray, SqlString, SqlBoolean, SqlFloat, SqlDate, SqlTimestamp, SqlUuid, SqlVector
-    ).map( x=> x.parse)
+   val allParsers =  SqlDataType.values.map( x=> x.parse)
     def tryParsers(remaining: List[Parser[SqlDataType]], p: Parser[SqlDataType]): Parser[SqlDataType] = {
       if (remaining.isEmpty){
          p
@@ -90,7 +88,7 @@ object SQLParser extends Parse {
       - <- whitespace
       schema <- identifier.optional
       _ <- whitespace
-      _ <- char('.')
+      _ <- char('.').optional
       name <- identifier
       _ <- whitespace
       - <- char('(')
@@ -190,7 +188,8 @@ object SQLParser extends Parse {
   val columnNameListParser: Parser[List[String]] =
     for {
       first <- identifier
-      rest <- (comma.flatMap(_ => identifier)).many
+
+      rest <- (comma.flatMap(_ => whitespace.flatMap(_ => identifier))).many
     } yield first :: rest
 
   val alterTablePrimaryKeyParser: Parser[PrimaryKey] =

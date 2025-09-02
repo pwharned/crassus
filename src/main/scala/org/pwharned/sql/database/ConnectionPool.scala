@@ -21,6 +21,32 @@ class  ConnectionPool(
   // Load the JDBC driver once during pool creation.
   Class.forName(driverClassName)
 
+  val url = jdbcUrl.split("\\?")(0)
+
+  val properties: java.util.Properties = {
+    val url  = jdbcUrl.split("\\?")
+    val props = new java.util.Properties();
+    props.put("user", user)
+    props.put("password", password)
+
+    if (url.length>1){
+      val pps = url(1)
+
+      val pps1 = pps.split("&")
+      pps1.foreach{
+        x => {
+          val j = x.split("=")
+          if (j.length>1){
+            props.put(j(0), j(1))
+          }
+        }
+      }
+
+
+    }
+    props
+  }
+
   // Internal state holds idle connections along with the timestamp (in millis) when they were returned.
   private val idleConnections: Queue[(Connection, Long)] = Queue.empty
   private var totalConnections: Int = 0
@@ -51,7 +77,12 @@ class  ConnectionPool(
 
 
   // Helper method to create a new JDBC connection.
-  private def createConnection(): Try[Connection] = Try{DriverManager.getConnection(jdbcUrl, user, password)}
+  private def createConnection(): Try[Connection] = Try{
+
+    DriverManager.getConnection(jdbcUrl, properties)
+
+
+  }
 
   /**
    * Acquires a connection from the pool.

@@ -79,4 +79,15 @@ ALTER TABLE ONLY public.products ADD CONSTRAINT products_pkey PRIMARY KEY (produ
     case Left(value) => println(value)
     case Right(value) => println(value)
   }
+
+
+  val primaryKey =
+    """
+      |ALTER TABLE PORTFOLIO.DUNS ADD constraint pk_number_tenant PRIMARY KEY (NUMBER, TENANT_ID);
+      |""".stripMargin
+
+  SQLParser.alterTablePrimaryKeyParser(primaryKey) match {
+    case Left(value) => println(value)
+    case Right(value) => println(value)
+  }
 }
