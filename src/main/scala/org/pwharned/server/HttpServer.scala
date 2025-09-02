@@ -136,16 +136,9 @@ object HTTPServer:
           // bytesRead == 0, try again (shouldn't happen with blocking I/O but just in case)
           Thread.sleep(1)
 
-  val ex: ExecutorService = {
-    val cores = Runtime.getRuntime.availableProcessors()
-    val poolSize = Math.max(cores * 2, 8)
-    Executors.newFixedThreadPool(poolSize, r => {
-      val t = new Thread(r)
-      t.setDaemon(true)
-      t.setName(s"http-server-${ThreadLocalRandom.current().nextInt()}")
-      t
-    })
-  }
+
+
+  val ex: ExecutorService = Executors.newVirtualThreadPerTaskExecutor()
 
   given ExecutionContext = ExecutionContext.fromExecutor(ex)
 
