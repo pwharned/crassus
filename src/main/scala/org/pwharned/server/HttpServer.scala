@@ -151,7 +151,7 @@ object HTTPServer:
 
     serverChannel.bind(new InetSocketAddress(port), 128)
 
-    println(s"HTTP Server started on port $port with ${ex.asInstanceOf[java.util.concurrent.ThreadPoolExecutor].getCorePoolSize} threads")
+    println(s"HTTP Server started on port $port")
 
     while true do
       val clientChannel = serverChannel.accept()

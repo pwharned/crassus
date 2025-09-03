@@ -25,7 +25,7 @@ class  ConnectionPool(
   val properties: java.util.Properties = {
     val props = new java.util.Properties();
     props.put("user", user)
-    props.put("pasword", password)
+    props.put("password", password)
 
     props
   }

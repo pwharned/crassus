@@ -123,7 +123,7 @@ object RoutingTable:
                 someNode
               else
                 findNode(node.children, next)
-
+    
             case None =>
               // 2. Dynamic-parameter match
               branch.collectFirst { case (Segment.Dynamic(_), node) => node } match
@@ -132,13 +132,15 @@ object RoutingTable:
                     Some(node)
                   else
                     findNode(node.children, next)
-
+    
                 case None =>
                   // 3. WildCard match: short-circuit, consume all remaining segments
                   branch.collectFirst { case (Segment.WildCard(_), node) => node }
-
+    
         case Nil =>
-          None
+          // Check for wildcard routes that can match empty paths
+          branch.collectFirst { case (Segment.WildCard(_), node) => node }
+
 
 
   def printReadable[P[_] <: Protocal[_]](table: RoutingTable[HttpMethod, P]): Unit = {

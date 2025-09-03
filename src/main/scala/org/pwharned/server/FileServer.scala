@@ -60,7 +60,6 @@ object FileServer {
     "svg" -> "image/svg+xml"
   )
 
-
   def normalize(
                  reqPath: HttpPath,
                  mountPath: HttpPath
@@ -78,7 +77,6 @@ object FileServer {
           case Segment.Static(actual) :: rest if actual == expected =>
             go(rest, tail)
           case _ =>
-
             // prefix didn't match → yield empty to trigger 404
             Nil
         }
@@ -95,12 +93,20 @@ object FileServer {
     go(reqPath.segments, mountPath.segments)
   }
 
-  private def shouldUseFallback(requestPath: String, fallbackFile: Option[String]): Boolean = {
+  private def isDirectory(path: String): Boolean = {
+    val filePath = Paths.get(path)
+    Files.exists(filePath) && Files.isDirectory(filePath)
+  }
+
+  private def shouldUseFallback(requestPath: String, fullPath: String, fallbackFile: Option[String]): Boolean = {
     fallbackFile.isDefined && {
-      val ext = requestPath.split(".").lastOption.getOrElse("").toLowerCase
-      // Only use fallback for requests that look like routes (no file extension or html extension)
-      // Don't use fallback for assets like CSS, JS, images, etc.
-      ext.isEmpty || ext == "html"
+      val ext = requestPath.split("\\.").lastOption.getOrElse("").toLowerCase
+      // Use fallback if:
+      // 1. No file extension (likely a route)
+      // 2. HTML extension
+      // 3. Path points to a directory
+      // 4. File doesn't exist and looks like a route
+      ext.isEmpty || ext == "html" || isDirectory(fullPath)
     }
   }
 
@@ -118,8 +124,6 @@ object FileServer {
     }
   }
 
-
-
   // New method with optional client-side routing support
   def apply[F <: FileSystem](
                               mountPath: HttpPath,
@@ -127,15 +131,22 @@ object FileServer {
                               fallbackFile: Option[String] = Some("index.html")
                             )(using reader: FileReader[F]): HttpRequest[Unit] => Future[HttpResponse[String]] = { req =>
     Future {
-    // val relSegments = normalize(req.path, mountPath)
-       // .collect { case Segment.Static(ps) => ps.value }
       val relSegments = req.path.segments.collect { case Segment.Static(ps) => ps.value }
-      val requestPath = relSegments.mkString("/", "/", "")
-      val fullPath = resourceRoot.stripSuffix("/") + requestPath
-      val currentDir = System.getProperty("user.dir")
+      val requestPath = if (relSegments.isEmpty) "/" else relSegments.mkString("/", "/", "")
+
+      // Handle root directory case - try to serve index file directly
+      val actualRequestPath = if (requestPath == "/" && fallbackFile.isDefined) {
+        "/" + fallbackFile.get
+      } else {
+        requestPath
+      }
+
+      val fullPath = resourceRoot.stripSuffix("/") + actualRequestPath
+
+      // First, try to read the requested file (or index file for root)
       reader.readFile(fullPath) match {
         case Some(bytes) =>
-          val ext = requestPath.split("\\.").lastOption.getOrElse("").toLowerCase
+          val ext = actualRequestPath.split("\\.").lastOption.getOrElse("").toLowerCase
           val contentType = mimeTypes.getOrElse(ext, "application/octet-stream")
 
           HttpResponse[String](
@@ -145,8 +156,8 @@ object FileServer {
           )
 
         case None =>
-          // Try fallback file for client-side routing
-          if (shouldUseFallback(requestPath, fallbackFile)) {
+          // If the direct file read failed, check if we should use fallback
+          if (shouldUseFallback(requestPath, resourceRoot.stripSuffix("/") + requestPath, fallbackFile)) {
             fallbackFile.flatMap(fallback => serveFallback(resourceRoot, fallback)) match {
               case Some(response) => response
               case None =>
