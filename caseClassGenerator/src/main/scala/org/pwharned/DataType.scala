@@ -23,6 +23,19 @@ case object SqlVector extends SqlDataType  {
   val sqlNames: Seq[String] = Seq( "Vector")
   def scalaType: String = "Vector[Float]"
 
+  val db2vectorParser = for {
+    _ <- whitespace
+    ch <- stringInsensitive("vector")
+    _ <- whitespace
+    open <- char('(')
+    _ <- whitespace
+    number <- numeric.many
+    _ <- whitespace
+    _ <- char(',')
+    _ <- stringInsensitive("float32")
+    _ <- whitespace
+    close <- char(')')
+  } yield ch + open + number.mkString + close
 
   val vectorParser = for {
     _ <- whitespace
@@ -36,7 +49,7 @@ case object SqlVector extends SqlDataType  {
     close <- char(')')
   } yield ch + open + number.mkString + close
   def parse: Parser[SqlDataType] =
-    ( vectorParser).map(_ => this)
+    ( vectorParser.or(db2vectorParser)).map(_ => this)
 }
 case object SqlString extends SqlDataType  {
   val sqlNames: Seq[String] = Seq( "TEXT")
