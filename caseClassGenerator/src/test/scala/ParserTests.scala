@@ -90,4 +90,14 @@ ALTER TABLE ONLY public.products ADD CONSTRAINT products_pkey PRIMARY KEY (produ
     case Left(value) => println(value)
     case Right(value) => println(value)
   }
+
+
+  val vectorpasrings =
+    """vector(768, FLOAT32)
+      |""".stripMargin
+
+  SqlDataType.values.find( x=> x.scalaType=="Vector[Float]").get.parse(vectorpasrings) match {
+    case Left(value) => println(value)
+    case Right(value) => println(value)
+  }
 }

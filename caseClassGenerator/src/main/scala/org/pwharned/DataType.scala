@@ -32,6 +32,7 @@ case object SqlVector extends SqlDataType  {
     number <- numeric.many
     _ <- whitespace
     _ <- char(',')
+    _ <- whitespace
     _ <- stringInsensitive("float32")
     _ <- whitespace
     close <- char(')')
@@ -49,7 +50,7 @@ case object SqlVector extends SqlDataType  {
     close <- char(')')
   } yield ch + open + number.mkString + close
   def parse: Parser[SqlDataType] =
-    ( vectorParser.or(db2vectorParser)).map(_ => this)
+    ( db2vectorParser.or(vectorParser)).map(_ => this)
 }
 case object SqlString extends SqlDataType  {
   val sqlNames: Seq[String] = Seq( "TEXT")
