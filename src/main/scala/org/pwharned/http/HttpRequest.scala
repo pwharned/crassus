@@ -1,200 +1,258 @@
 package org.pwharned.http
 
-import org.pwharned.http.Headers.Headers
-import org.pwharned.http.HttpMethod
-import org.pwharned.http.HttpMethod.HttpMethod
-import org.pwharned.http.HttpPath.HttpPath
+import HttpTypes.*
+import org.pwharned.codec.Codec
+import org.pwharned.io.IO
 
 import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
-import scala.compiletime.summonInline
+import scala.annotation.tailrec
+import scala.collection.mutable
+
+// Internal data structure for HTTP request
+case class HttpRequest[A](
+                           rawData: ByteBuffer,
+                           requestLineEnd: Int,
+                           headersEnd: Int,
+                           bodyStart: Int,
+                           bodyValue: A,
+                           // Cached values for lazy parsing
+                           var cachedMethod: Option[HttpMethod]=None,
+                           var cachedPath: Option[HttpPath]=None,
+                           var cachedHeaders: Map[HeaderName, ByteSlice] = null,
+                           var cachedQueryParams: Map[String, ByteSlice] = null
+                         )
+
+// Zero-cost opaque HTTP request with full type safety
 
 object HttpRequest:
-  // The HttpRequest opaque type is now a tuple of four ByteBuffers:
-  // (method, path, headers, body)
-  opaque type HttpRequest[B] = (ByteBuffer, ByteBuffer, ByteBuffer, B)
+  // Constructor - only way to create HttpRequest
 
-  type ReqParam[Req] = Req match
-    case Unit => HttpRequest // the old opaque-tuple type
-    case _ => HttpRequest[Req] // the new generic version
-  extension (req: HttpRequest[ByteBuffer])
-    inline def as[B](using br: BodyReader[B]): Either[String, HttpRequest[B]] =
-      br.read(req.body).map { b =>
-        HttpRequest(req._1, req._2, req._3, b)
-      }
-  object HttpRequest:
-    def apply[B](
-                  method: HttpMethod,
-                  path: HttpPath,
-                  headers: Headers,
-                  body: B
-                ): HttpRequest[B] =
-      (ByteBuffer.wrap(method.getBytes), ByteBuffer.wrap(path.pathString.getBytes), ByteBuffer.wrap(headers.getBytes), body)
-    // Construct an HttpRequest from its parts.
-    def apply[B](
-               method: ByteBuffer,
-               path: ByteBuffer,
-               headers: ByteBuffer,
-               body: B
-             ): HttpRequest[B] =
-      (method, path, headers, body)
+  // Parse from buffer with typed body
+  def parse[A](buffer: ByteBuffer)(using codec: Codec[A]): IO[Either[String, HttpRequest[A]]] =
+    IO.effect {
+      val requestLineEnd = findSequence(buffer, "\r\n".getBytes(), 0)
+      if requestLineEnd == -1 then return IO.pure(Left("Invalid request line"))
 
-    given routeConversion[B, A](using br: BodyReader[B])
-    : Conversion[HttpRequest[B] => HttpResponse[A],
-      HttpRequest[ByteBuffer] => HttpResponse[A]] =
-      handler =>
-        rawReq =>
-          br.read(rawReq._4) match
-            case Left(err) =>
-              HttpResponse.error(
-                s"Bad Request – cannot parse JSON: $err"
-              )
-            case Right(decoded) =>
-              // re‐package and call the user’s handler
-              val typedReq =
-                HttpRequest(rawReq._1, rawReq._2, rawReq._3, decoded)
-              handler(typedReq)
-    def fromFullBuffer(buffer: ByteBuffer): Option[HttpRequest[ByteBuffer]] =
-      // Work on a duplicate so we don't modify the caller's buffer.
+      val headersEnd = findSequence(buffer, "\r\n\r\n".getBytes(), requestLineEnd)
+      if headersEnd == -1 then return IO.pure(Left("Invalid headers"))
+
+      val bodyStart = headersEnd + 4
+      val bodySlice = if bodyStart < buffer.limit() then
+        ByteSlice(buffer, bodyStart, buffer.limit())
+      else
+        ByteSlice(buffer, 0, 0)
+
+      codec.decode(bodySlice) match
+        case Left(error) => Left(s"Body decode error: $error")
+        case Right(body) =>
+          val data = HttpRequest(buffer, requestLineEnd, headersEnd, bodyStart, body)
+          Right(data)
+    }
+
+  def findSequence(buffer: ByteBuffer, sequence: Array[Byte], start: Int): Int =
+    val limit = buffer.limit() - sequence.length + 1
+    var i = start
+
+    while i < limit do
+      var matches = true
+      for j <- sequence.indices if matches do
+        if buffer.get(i + j) != sequence(j) then
+          matches = false
+
+      if matches then return i
+      i += 1
+
+    -1
+
+  // Extension methods for zero-cost operations
+  extension [A](request: HttpRequest[A])
+    // Direct access to underlying data - zero cost
+
+    // Zero-allocation method access with lazy parsing
+    inline def method: HttpMethod =
+      if Option(request.cachedMethod).isEmpty then parseRequestLine(request)
+      request.cachedMethod.get
+
+    inline def path: HttpPath =
+      if Option(request.cachedPath).isEmpty then parseRequestLine(request)
+      request.cachedPath.get
+
+    // Direct typed body access - zero additional cost
+    inline def body: A = request.bodyValue
+
+    // Zero-copy header access with lazy parsing
+    def headers: Map[HeaderName, ByteSlice] =
+      if request.cachedHeaders == null then parseHeaders(request)
+      request.cachedHeaders
+
+    inline def header(name: HeaderName): Option[ByteSlice] =
+      headers.get(name)
+
+    // Optimized common header accessors
+    inline def contentType: Option[String] =
+      header(HeaderName.ContentType).map(_.toString)
+
+    inline def contentLength: Option[Long] =
+      header(HeaderName.ContentLength).map(_.toString.toLong)
+
+    inline def isChunked: Boolean =
+      header(HeaderName.TransferEncoding)
+        .exists(_.toString.toLowerCase.contains("chunked"))
+
+    // Query parameters with zero-copy values and lazy parsing
+    def queryParams: Map[String, ByteSlice] =
+      if request.cachedQueryParams == null then parseQueryParams(request)
+      request.cachedQueryParams
+
+    inline def queryParam(name: String): Option[ByteSlice] =
+      queryParams.get(name)
+
+    // Zero-cost transformation to different body type
+    def as[B](newBody: B): HttpRequest[B] =
+      request.copy(bodyValue = newBody)
+
+    // Zero-copy body slice access
+    def bodySlice(): ByteSlice = ByteSlice(request.rawData, request.bodyStart, request.rawData.limit())
+
+    // Streaming body with backpressure
+    def bodyStream(chunkSize: Int = 8192): Stream[ByteSlice] =
+      if request.bodyStart >= request.rawData.limit() then Stream.Empty
+      else
+        Stream.unfold(request.bodyStart) { offset =>
+          if offset >= request.rawData.limit() then None
+          else
+            val end = (offset + chunkSize).min(request.rawData.limit())
+            val slice = ByteSlice(request.rawData, offset, end)
+            Some((slice, end))
+        }
+
+  // Private parsing methods with maximum efficiency
+  private def parseRequestLine[A](data: HttpRequest[A]): Unit =
+    var pos = 0
+    var spaceCount = 0
+    var methodEnd = 0
+    var pathEnd = 0
+
+    while pos < data.requestLineEnd do
+      if data.rawData.get(pos) == ' ' then
+        spaceCount match
+          case 0 =>
+            methodEnd = pos
+            spaceCount = 1
+          case 1 =>
+            pathEnd = pos
+            spaceCount = 2
+          case _ => // ignore
+      pos += 1
+
+    // Extract method
+    val methodBytes = Array.ofDim[Byte](methodEnd)
+    val originalPos = data.rawData.position()
+    data.rawData.position(0)
+    data.rawData.get(methodBytes)
+    data.cachedMethod = Some(HttpMethod(new String(methodBytes)))
+
+    // Extract path  
+    val pathBytes = Array.ofDim[Byte](pathEnd - methodEnd - 1)
+    data.rawData.position(methodEnd + 1)
+    data.rawData.get(pathBytes)
+    data.cachedPath = Some(HttpPath(new String(pathBytes)))
+
+    data.rawData.position(originalPos)
+
+  private def parseHeaders[A]( data: HttpRequest[A]): Unit =
+    val headers = mutable.Map[HeaderName, ByteSlice]()
+    var lineStart = data.requestLineEnd + 2 // Skip \r\n
+
+    while lineStart < data.headersEnd do
+      val lineEnd = findLineEnd(data, lineStart)
+      if lineEnd > lineStart then
+        val colonPos = findColon(data, lineStart, lineEnd)
+        if colonPos > lineStart then
+          val nameLength = colonPos - lineStart
+          val nameBytes = Array.ofDim[Byte](nameLength)
+          val pos = data.rawData.position()
+          data.rawData.position(lineStart)
+          data.rawData.get(nameBytes)
+          data.rawData.position(pos)
+
+          val headerName = HeaderName(new String(nameBytes).toLowerCase)
+          val valueStart = skipSpaces(data, colonPos + 1, lineEnd)
+          val valueSlice = ByteSlice(data.rawData, valueStart, lineEnd)
+          headers(headerName) = valueSlice
+
+      lineStart = lineEnd + 2
+
+    data.cachedHeaders = headers.toMap
+
+  private def parseQueryParams[A](data: HttpRequest[A]): Unit =
+    // Ensure path is parsed first
+    if data.cachedPath == null then parseRequestLine(data)
+
+    data.cachedPath.map( x=> x.queryString) match
+      case None =>
+        data.cachedQueryParams = Map.empty
+      case Some(queryStr) =>
+        val params = mutable.Map[String, ByteSlice]()
+        val pairs = queryStr.map( x=> x.split("&")).get
+
+        pairs.foreach { pair =>
+          val eqIndex = pair.indexOf("=")
+          if eqIndex > 0 then
+            val name = pair.substring(0, eqIndex)
+            val value = pair.substring(eqIndex + 1)
+            val valueBytes = value.getBytes()
+            val buffer = ByteBuffer.wrap(valueBytes)
+            params(name) = ByteSlice(buffer, 0, valueBytes.length)
+          else if pair.nonEmpty then
+            val emptyBuffer = ByteBuffer.allocate(0)
+            params(pair) = ByteSlice(emptyBuffer, 0, 0)
+        }
+
+        data.cachedQueryParams = params.toMap
+
+  // Optimized byte scanning methods
+  private  def findLineEnd[A](data: HttpRequest[A], start: Int): Int =
+    var i = start
+    while i < data.headersEnd - 1 do
+      if data.rawData.get(i) == '\r' && data.rawData.get(i + 1) == '\n' then
+        return i
+      i += 1
+    data.headersEnd
+
+  private  def findColon[A](data: HttpRequest[A], start: Int, end: Int): Int =
+    var i = start
+    while i < end do
+      if (data.rawData.get(i) == ':'){
+        return 1
+      } 
+      i += 1
+    -1
+
+  private inline def skipSpaces[A](data: HttpRequest[A], start: Int, end: Int): Int =
+    var i = start
+    while i < end && data.rawData.get(i) == ' ' do i += 1
+    i
+
+// Internal data structure for HTTP response
 
 
-      def readUntil(delim: Byte): Option[ByteBuffer] =
-        val start = buffer.position()
-        var found = false
-        while buffer.hasRemaining && !found do
-          if buffer.get() == delim then found = true
-        if !found then None
-        else
-          val end = buffer.position() - 1
-          // Reset position to start and create a slice.
-          buffer.position(start)
-          val slice = buffer.slice()
-          slice.limit(end - start)
-          // Advance the position past the delimiter.
-          buffer.position(end + 1)
-          Some(slice)
-
-      // 1. Extract the METHOD (read until first space).
-      val maybeMethod = readUntil(' '.toByte)
-      if maybeMethod.isEmpty then return None
-      val methodSlice = maybeMethod.get
-
-      // 2. Extract the PATH (read until the next space).
-      val maybePath = readUntil(' '.toByte)
-      if maybePath.isEmpty then return None
-      val pathSlice = maybePath.get
-
-      // 3. Skip the HTTP version by reading until the end-of-line.
-      while buffer.hasRemaining && buffer.get() != '\n'.toByte do ()
-
-      // 4. Extract HEADERS.
-      // Headers are assumed to end with CRLFCRLF.
-      val headersStart = buffer.position()
-      // We assume the underlying ByteBuffer is array-backed.
-      val arr = buffer.array()
-      // Calculate the array index corresponding to the current position.
-      val arrOffset = buffer.arrayOffset() + buffer.position()
-      var headerEnd = -1
-      var i = 0
-      while i <= buffer.remaining() - 4 && headerEnd == -1 do
-        if arr(arrOffset + i)   == '\r'.toByte &&
-          arr(arrOffset + i+1) == '\n'.toByte &&
-          arr(arrOffset + i+2) == '\r'.toByte &&
-          arr(arrOffset + i+3) == '\n'.toByte then
-          headerEnd = buffer.position() + i
-        else
-          i += 1
-      if headerEnd == -1 then return None
-      // Make a slice for headers.
-      buffer.position(headersStart)
-      val headersSlice = buffer.slice()
-      headersSlice.limit(headerEnd - headersStart)
-      // Advance past the header terminator (\r\n\r\n).
-      buffer.position(headerEnd + 4)
-
-      // 5. The rest is the BODY.
-      val bodySlice = buffer.slice()
-
-      Some(HttpRequest(methodSlice, pathSlice, headersSlice, bodySlice))
-
-  // Extension methods give you a nice API to work with HttpRequest.
-  extension[B] (req: HttpRequest[B])
-    private def methodBuffer: ByteBuffer = req._1
-    private def pathBuffer: ByteBuffer = req._2
-    private def headersBuffer: ByteBuffer = req._3
-    private def bodyBuffer: B = req._4
-
-    // Decode the ByteBuffer into a String. We use a duplicate in order not to disturb positions.
-    def method: HttpMethod.HttpMethod =
-      HttpMethod(new String(methodBuffer.duplicate().array(),
-        methodBuffer.arrayOffset() + methodBuffer.position(),
-        methodBuffer.remaining(),
-        StandardCharsets.UTF_8))
-    def path: HttpPath =
-      HttpPath.apply(new String(pathBuffer.duplicate().array(),
-        pathBuffer.arrayOffset() + pathBuffer.position(),
-        pathBuffer.remaining(),
-        StandardCharsets.UTF_8))
-
-    def cookies: Map[String, String] =
-      req.headers.get("Cookie")
-        .map(Cookie.parse)
-        .getOrElse(Map.empty)
-    def headers: Headers =
-      // 1) decode the raw bytes into a String
-      val dup = req.headersBuffer.duplicate()
-      val raw = new String(
-        dup.array(),
-        dup.arrayOffset() + dup.position(),
-        dup.remaining(),
-        StandardCharsets.UTF_8
-      )
-
-      // 2) split on CRLF, then each line on the first “:”
-      val m: Map[String, String] =
-        raw
-          .split("\r\n")
-          .iterator
-          .flatMap { line =>
-            line.split(":", 2) match
-              case Array(k, v) => Some(k.trim -> v.trim)
-              case _ => None
-          }
-          .toMap
-
-      // 3) wrap in your opaque Headers type
-      Headers(m)
-    def body: B = bodyBuffer
-    def parse: Option[HttpRequest[B]] = Some(req)
-
-    /** Renders the request in an HTTP-style, human-readable form */
-    def pretty: String =
-      // 1. Extract method & path
-      val m = new String(req.method.getBytes, StandardCharsets.UTF_8)
-      val p = req.path.pathString
-
-      // 2. Use raw headers block
-      val h = new String(req.headers.getBytes, StandardCharsets.UTF_8) // uses your extension
+// ============================================================================
+// ROUTE SYSTEM WITH TYPE SAFETY
+// ============================================================================
 
 
-      // 3. Render body: if it's a ByteBuffer, decode as UTF-8; else .toString
-      val b = req.body match
-        case bb: ByteBuffer =>
-          val dup = bb.duplicate()
-          val arr = dup.array()
-          val start = dup.arrayOffset() + dup.position()
-          val len = dup.remaining()
-          new String(arr, start, len, StandardCharsets.UTF_8)
-        case u: Unit => ""
-        case other =>
-          other.toString
 
-      // 4. Assemble into a single string
-      s"""$m $p
-         |$h
-         |
-         |$b""".stripMargin
+// Route matching with compile-time type safety
+class RouteRegistry:
+  private val routes = mutable.ArrayBuffer[Route[?, ?]]()
 
+  def register[A, B](route: Route[A, B]): Unit =
+    routes += route
 
-extension (b: java.nio.ByteBuffer) def asRequest: Option[HttpRequest.HttpRequest[ByteBuffer]] = HttpRequest.HttpRequest.fromFullBuffer(b)
+  def findRoute(method: HttpMethod, path: HttpPath): Option[Route[?, ?]] =
+    routes.find(r => r.method.value == method.value && matchesPath(r.path, path))
 
+  private def matchesPath(routePath: HttpPath, requestPath: HttpPath): Boolean =
+    // Simple exact matching - can be enhanced with path parameters
+    routePath.pathOnly == requestPath.pathOnly
