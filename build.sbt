@@ -47,8 +47,15 @@ lazy val root = project.in(file("."))
       Compile / compile / javaOptions ++= Seq(
       "-Xms4G", "-Xmx8G", "-XX:+UseG1GC"
     ),
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-actor-typed" % "2.8.5",
+      "com.typesafe.akka" %% "akka-stream" % "2.8.5",
+      "com.typesafe.akka" %% "akka-http" % "10.5.3",
+      "ch.qos.logback" % "logback-classic" % "1.4.11"
+    ),
 
-    Compile / scalacOptions ++= Seq(
+
+      Compile / scalacOptions ++= Seq(
       "-deprecation",
       "-encoding", "UTF-8",
       "-feature",

@@ -1,0 +1,34 @@
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+import uvicorn
+
+class User(BaseModel):
+    id: int
+    name: str
+    email: str
+
+app = FastAPI()
+
+@app.get("/")
+async def root():
+    return "Welcome to the API"
+
+@app.get("/users/1")
+async def get_user():
+    return User(id=1, name="John Doe", email="john@example.com")
+
+@app.get("/stats")
+async def stats():
+    return "FastAPI server stats"
+
+if __name__ == "__main__":
+    # Run with uvicorn for best performance
+    uvicorn.run(
+        "server:app",
+        host="localhost", 
+        port=8080,
+        workers=1,  # Single worker for fair comparison
+        access_log=False  # Disable logging for performance
+    )
+

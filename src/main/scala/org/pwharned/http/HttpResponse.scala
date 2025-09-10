@@ -21,6 +21,8 @@ object HttpResponse:
   // Convenience constructors
   def ok[A](body: A)(using Codec[A]): HttpResponse[A] =
     HttpResponse(ResponseData(StatusCode.Ok, Map.empty, body))
+  def json[A<:Product](body: A)(using Codec[A]): HttpResponse[A] =
+    HttpResponse(ResponseData(StatusCode.Ok, Map.empty, body))
 
   def created[A](body: A)(using Codec[A]): HttpResponse[A] =
     HttpResponse(ResponseData(StatusCode.Created, Map.empty, body))

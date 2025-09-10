@@ -5,15 +5,23 @@ sealed trait Stream[+A]:
   def flatMap[B](f: A => Stream[B]): Stream[B]
   def filter(p: A => Boolean): Stream[A]
   def take(n: Int): Stream[A]
-  def fold[B](zero: B)(f: (B, A) => B): B
   def ++[B >: A](other: => Stream[B]): Stream[B]
+
+  // Tail-recursive fold implementation
+  final def fold[B](zero: B)(f: (B, A) => B): B = {
+    @annotation.tailrec
+    def loop(stream: Stream[A], acc: B): B = stream match {
+      case Empty => acc
+      case Cons(h, t) => loop(t(), f(acc, h()))
+    }
+    loop(this, zero)
+  }
 
 case object Empty extends Stream[Nothing]:
   def map[B](f: Nothing => B) = Empty
   def flatMap[B](f: Nothing => Stream[B]) = Empty
   def filter(p: Nothing => Boolean) = Empty
   def take(n: Int) = Empty
-  def fold[B](zero: B)(f: (B, Nothing) => B) = zero
   def ++[B](other: => Stream[B]) = other
 
 case class Cons[+A](head: () => A, tail: () => Stream[A]) extends Stream[A]:
@@ -30,9 +38,6 @@ case class Cons[+A](head: () => A, tail: () => Stream[A]) extends Stream[A]:
   def take(n: Int): Stream[A] =
     if n <= 0 then Empty
     else Cons(head, () => tail().take(n - 1))
-
-  def fold[B](zero: B)(f: (B, A) => B): B =
-    tail().fold(f(zero, head()))(f)
 
   def ++[B >: A](other: => Stream[B]): Stream[B] =
     Cons(head, () => tail() ++ other)

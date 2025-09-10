@@ -49,6 +49,28 @@ object HttpRequest:
           Right(data)
     }
 
+  def parseRawRequest(buffer: ByteBuffer): Either[String, (HttpMethod, HttpPath)] =
+    val requestLineEnd = HttpRequest.findSequence(buffer, "\r\n".getBytes(), 0)
+    if (requestLineEnd == -1) {
+      Left("Invalid request line")
+    } else {
+      val requestLine = Array.ofDim[Byte](requestLineEnd)
+      val originalPos = buffer.position()
+      buffer.position(0)
+      buffer.get(requestLine)
+      buffer.position(originalPos)
+
+      val requestStr = new String(requestLine)
+      val parts = requestStr.split(" ")
+
+      if (parts.length >= 2) {
+        Right((HttpMethod(parts(0)), HttpPath(parts(1))))
+      } else {
+        Left("Invalid request line format")
+      }
+    }
+  def parseTypedRequest[A](buffer: ByteBuffer)(using codec: Codec[A]): Either[String, HttpRequest[A]] =
+    HttpRequest.parse[A](buffer).unsafeRun()
   def findSequence(buffer: ByteBuffer, sequence: Array[Byte], start: Int): Int =
     val limit = buffer.limit() - sequence.length + 1
     var i = start
@@ -234,25 +256,3 @@ object HttpRequest:
     while i < end && data.rawData.get(i) == ' ' do i += 1
     i
 
-// Internal data structure for HTTP response
-
-
-// ============================================================================
-// ROUTE SYSTEM WITH TYPE SAFETY
-// ============================================================================
-
-
-
-// Route matching with compile-time type safety
-class RouteRegistry:
-  private val routes = mutable.ArrayBuffer[Route[?, ?]]()
-
-  def register[A, B](route: Route[A, B]): Unit =
-    routes += route
-
-  def findRoute(method: HttpMethod, path: HttpPath): Option[Route[?, ?]] =
-    routes.find(r => r.method.value == method.value && matchesPath(r.path, path))
-
-  private def matchesPath(routePath: HttpPath, requestPath: HttpPath): Boolean =
-    // Simple exact matching - can be enhanced with path parameters
-    routePath.pathOnly == requestPath.pathOnly

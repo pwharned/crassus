@@ -1,6 +1,5 @@
 package org.pwharned.codec
 
-import org.pwharned.codec
 
 import java.nio.charset.StandardCharsets
 import scala.deriving.Mirror
@@ -15,17 +14,17 @@ object IntervalCursor:
 
 // ─── 1. ByteDecoder Typeclass ─────────────────────────────────────────────────
 
-trait ByteDecoder[T]:
+trait JsonDecoder[T]:
   def decode(buf: Array[Byte], start: Int, end: Int): Either[String, T]
 
-object ByteDecoder:
+object JsonDecoder:
   import java.nio.charset.StandardCharsets
   import scala.deriving.*
   import scala.compiletime.*
 
   // ─── Primitive Instances ─────────────────────────────────────────────────────
 
-  given ByteDecoder[Int] with
+  given JsonDecoder[Int] with
     def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Int] =
       if start >= end then Left("Empty int")
       else
@@ -40,20 +39,24 @@ object ByteDecoder:
             i += 1
           else return Left(s"Invalid digit: ${b.toChar}")
         Right(sign * acc)
+  given JsonDecoder[Long] with
+    def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Long] =
+      val s = new String(buf, start, end - start, StandardCharsets.UTF_8)
+      s.toLongOption.toRight(s"Invalid double: $s")
 
-  given ByteDecoder[Double] with
+  given JsonDecoder[Double] with
     def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Double] =
       val s = new String(buf, start, end - start, StandardCharsets.UTF_8)
       s.toDoubleOption.toRight(s"Invalid double: $s")
 
-  given ByteDecoder[String] with
+  given JsonDecoder[String] with
     def decode(buf: Array[Byte], start: Int, end: Int): Either[String, String] =
       if end - start >= 2 && buf(start) == '"'.toByte && buf(end - 1) == '"'.toByte then
         Right(new String(buf, start + 1, end - start - 2, StandardCharsets.UTF_8))
       else
         Left(s"Invalid string at [$start,$end)")
 
-  given ByteDecoder[Boolean] with
+  given JsonDecoder[Boolean] with
     def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Boolean] =
       val len = end - start
       if len == 4 &&
@@ -73,7 +76,7 @@ object ByteDecoder:
 
   // ─── Recursive-safe Option Decoder ───────────────────────────────────────────
 
-  given optionDecoder[T](using dec: => ByteDecoder[T]): ByteDecoder[Option[T]] with
+  given optionDecoder[T](using dec: => JsonDecoder[T]): JsonDecoder[Option[T]] with
     def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Option[T]] =
       val len = end - start
       if len == 4 &&
@@ -89,8 +92,8 @@ object ByteDecoder:
       case _: Option[?] => true
       case _ => false
 
-  inline given derived[T](using m: Mirror.ProductOf[T]): ByteDecoder[T] =
-    lazy val self: ByteDecoder[T] =
+  inline given derived[T](using m: Mirror.ProductOf[T]): JsonDecoder[T] =
+    lazy val self: JsonDecoder[T] =
       val labels = getLabels[m.MirroredElemLabels]
       val decodersWithFlags = summonInstancesWithTypes[T, m.MirroredElemTypes](self)
 
@@ -99,7 +102,7 @@ object ByteDecoder:
         val results = labels.zip(decodersWithFlags).map { case (name, (dec, isOpt)) =>
           cursor.extractField(name) match
             case Some((s, e)) =>
-              dec.asInstanceOf[ByteDecoder[Any]].decode(buf, s, e)
+              dec.asInstanceOf[JsonDecoder[Any]].decode(buf, s, e)
             case None =>
               if isOpt then Right(None)
               else Left(s"Missing field: $name")
@@ -116,12 +119,12 @@ object ByteDecoder:
 
   // ─── Utilities ───────────────────────────────────────────────────────────────
 
-  inline def summonInstances[T, Elems <: Tuple](self: => ByteDecoder[T]): List[ByteDecoder[?]] =
+  inline def summonInstances[T, Elems <: Tuple](self: => JsonDecoder[T]): List[JsonDecoder[?]] =
     inline erasedValue[Elems] match
       case _: (elem *: elems) => deriveOrSummon[T, elem](self) :: summonInstances[T, elems](self)
       case _: EmptyTuple      => Nil
 
-  inline def summonInstancesWithTypes[T, Elems <: Tuple](self: => ByteDecoder[T]): List[(ByteDecoder[?], Boolean)] =
+  inline def summonInstancesWithTypes[T, Elems <: Tuple](self: => JsonDecoder[T]): List[(JsonDecoder[?], Boolean)] =
     inline erasedValue[Elems] match
       case _: (elem *: elems) =>
         val dec = deriveOrSummon[T, elem](self)
@@ -129,10 +132,10 @@ object ByteDecoder:
         (dec, opt) :: summonInstancesWithTypes[T, elems](self)
       case _: EmptyTuple => Nil
 
-  inline def deriveOrSummon[T, Elem](self: => ByteDecoder[T]): ByteDecoder[Elem] =
+  inline def deriveOrSummon[T, Elem](self: => JsonDecoder[T]): JsonDecoder[Elem] =
     inline erasedValue[Elem] match
-      case _: T => self.asInstanceOf[ByteDecoder[Elem]]
-      case _    => summonInline[ByteDecoder[Elem]]
+      case _: T => self.asInstanceOf[JsonDecoder[Elem]]
+      case _    => summonInline[JsonDecoder[Elem]]
 
   inline def getLabels[T <: Tuple]: List[String] =
     constValueTuple[T].toList.asInstanceOf[List[String]]
@@ -258,15 +261,15 @@ class IntervalCursor(buf: Array[Byte], sliceStart: Int, sliceEnd: Int):
     }
       |}
     """.stripMargin
-  import ByteDecoder.*
+  import JsonDecoder.*
 
   val personRowJson =
     """{"name":"Jack","age":1}
       |""".stripMargin
 
   val buf = json.getBytes(StandardCharsets.UTF_8)
-  val res = summon[ByteDecoder[Person]].decode(buf, 0, buf.length)
+  val res = summon[JsonDecoder[Person]].decode(buf, 0, buf.length)
   println(res)
   val buf1 = personRowJson.getBytes(StandardCharsets.UTF_8)
-  val res2 = summon[ByteDecoder[PersonRow]].decode(buf1, 0, buf.length)
+  val res2 = summon[JsonDecoder[PersonRow]].decode(buf1, 0, buf.length)
   println(res2)

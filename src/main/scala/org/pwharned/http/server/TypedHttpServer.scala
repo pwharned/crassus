@@ -2,7 +2,7 @@ package org.pwharned.http.server
 
 import org.pwharned.codec.Codec
 import org.pwharned.http.HttpTypes.HttpPath
-import org.pwharned.http.{BufferPool, HttpMethod, HttpRequest, HttpResponse, ResponseData, Route, RouteRegistry, StatusCode}
+import org.pwharned.http.{BufferPool, HttpMethod, HttpRequest, HttpResponse, ResponseData, Route, StatusCode}
 import org.pwharned.io.IO
 
 import java.nio.ByteBuffer
@@ -34,7 +34,7 @@ class TypedHttpServer(port: Int):
     for
       _ <- server.bind()
       _ <- IO.println(s"Server started on port $port")
-     // _ <- handleConnections()
+      _ <- handleConnections()
     yield ()
 
   private def handleConnections(): IO[Unit] =
