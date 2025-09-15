@@ -2,7 +2,7 @@ package org.pwharned.http.server
 
 import org.pwharned.codec.Codec
 import org.pwharned.http.HttpTypes.HttpPath
-import org.pwharned.http.{BufferPool, HttpMethod, HttpRequest, HttpResponse, ResponseData, Route, StatusCode}
+import org.pwharned.http.{BufferPool, HttpMethod, HttpRequest, HttpResponse, Route, StatusCode}
 import org.pwharned.io.IO
 
 import java.nio.ByteBuffer

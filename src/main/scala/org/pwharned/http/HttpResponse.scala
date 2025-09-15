@@ -6,36 +6,35 @@ import org.pwharned.io.IO
 
 import java.nio.charset.StandardCharsets
 
-case class ResponseData[A](
+case class HttpResponse[A](
                                     status: StatusCode,
                                     headers: Map[HeaderName, String],
                                     bodyValue: A
                                   )
 
 // Zero-cost opaque HTTP response with full type safety
-opaque type HttpResponse[A] = ResponseData[A]
 
 object HttpResponse:
   // Constructor - only way to create HttpResponse
-  private[HttpResponse] def apply[A](data: ResponseData[A]): HttpResponse[A] = data
+  private def apply[A](data: A): HttpResponse[A] = HttpResponse(data)
 
   // Convenience constructors
   def ok[A](body: A)(using Codec[A]): HttpResponse[A] =
-    HttpResponse(ResponseData(StatusCode.Ok, Map.empty, body))
+    HttpResponse(StatusCode.Ok, Map.empty, body)
   def json[A<:Product](body: A)(using Codec[A]): HttpResponse[A] =
-    HttpResponse(ResponseData(StatusCode.Ok, Map.empty, body))
+    HttpResponse(StatusCode.Ok, Map.empty, body)
 
   def created[A](body: A)(using Codec[A]): HttpResponse[A] =
-    HttpResponse(ResponseData(StatusCode.Created, Map.empty, body))
+    HttpResponse(StatusCode.Created, Map.empty, body)
 
   def badRequest[A](body: A)(using Codec[A]): HttpResponse[A] =
-    HttpResponse(ResponseData(StatusCode.BadRequest, Map.empty, body))
+    HttpResponse(StatusCode.BadRequest, Map.empty, body)
 
   def notFound[A](body: A)(using Codec[A]): HttpResponse[A] =
-    HttpResponse(ResponseData(StatusCode.NotFound, Map.empty, body))
-
+    HttpResponse(StatusCode.NotFound, Map.empty, body)
+    
   def internalError[A](body: A)(using Codec[A]): HttpResponse[A] =
-    HttpResponse(ResponseData(StatusCode.InternalServerError, Map.empty, body))
+    HttpResponse(StatusCode.InternalServerError, Map.empty, body)
 
   // Extension methods for zero-cost operations
   extension [A](response: HttpResponse[A])
@@ -49,13 +48,13 @@ object HttpResponse:
 
     // Zero-cost transformations
     def withStatus(newStatus: StatusCode): HttpResponse[A] =
-      HttpResponse(data.copy(status = newStatus))
+      data.copy(status = newStatus)
 
     def withHeader(name: HeaderName, value: String): HttpResponse[A] =
-      HttpResponse(data.copy(headers = data.headers + (name -> value)))
-
+      data.copy(headers = data.headers + (name -> value))
+      
     def as[B](newBody: B): HttpResponse[B] =
-      HttpResponse(ResponseData(data.status, data.headers, newBody))
+      HttpResponse(data.status, data.headers, newBody)
 
     // Efficient serialization
     def toBytes(using codec: Codec[A]): Array[Byte] =
@@ -74,7 +73,7 @@ object HttpResponse:
         s"data: $encoded\n\n"
       })
 
-      HttpResponse(ResponseData(
+      HttpResponse(
         StatusCode.Ok,
         Map(
           HeaderName.ContentType -> "text/event-stream",
@@ -82,7 +81,7 @@ object HttpResponse:
           HeaderName.Connection -> "keep-alive"
         ),
         sseStream
-      ))
+      )
     }
 
     // Create chunked streaming response
@@ -93,12 +92,12 @@ object HttpResponse:
         s"$size\r\n${new String(encoded)}\r\n"
       })
 
-      HttpResponse(ResponseData(
+      HttpResponse(
         StatusCode.Ok,
         Map(
           HeaderName.ContentType -> "application/json", // or appropriate type
           HeaderName.TransferEncoding -> "chunked"
         ),
         chunkedStream
-      ))
+      )
     }

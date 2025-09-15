@@ -5,7 +5,7 @@ import org.pwharned.http.HttpTypes.ByteSlice
 
 import java.nio.charset.StandardCharsets
 import scala.deriving.Mirror
-import scala.util.Right as slice
+import scala.util.{Try, Right as slice}
 
 
 trait Codec[A]:
@@ -19,7 +19,7 @@ object Codec:
     def decode(slice: HttpTypes.ByteSlice): Either[String, Unit] = Right(())
     def encode(value: Unit): Array[Byte] = Array.empty
     def contentType: String = "text/plain"
-
+ 
   // String codec for simple text
   given stringCodec: Codec[String] with
     def decode(slice: HttpTypes.ByteSlice): Either[String, String] =
@@ -38,8 +38,9 @@ object Codec:
     def decode(slice: ByteSlice): Either[String, A] =
       val decoder = summon[JsonDecoder[A]] // Fixed: ByteDecoder not JsonDecoder
       val bytes = slice.toBytes
-      decoder.decode(bytes, 0, bytes.length)
-
+      Try {
+        decoder.decode(bytes, 0, bytes.length)
+      }.toEither.left.map(_.getMessage)
     def encode(entity: A): Array[Byte] =
       val encoder = summon[JsonEncoder[A]]
       encoder.encode(entity)

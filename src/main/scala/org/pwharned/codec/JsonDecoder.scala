@@ -7,15 +7,11 @@ import scala.compiletime.{constValueTuple, erasedValue, error, summonInline}
 import scala.collection.mutable.ArrayBuffer
 import scala.language.implicitConversions
 
-object IntervalCursor:
-  private inline def quote = '"'.toByte
-  private inline def openBrace = '{'.toByte
-  private inline def closeBrace = '}'.toByte
 
 // ─── 1. ByteDecoder Typeclass ─────────────────────────────────────────────────
 
 trait JsonDecoder[T]:
-  def decode(buf: Array[Byte], start: Int, end: Int): Either[String, T]
+  def decode(buf: Array[Byte], start: Int, end: Int): T
 
 object JsonDecoder:
   import java.nio.charset.StandardCharsets
@@ -25,66 +21,124 @@ object JsonDecoder:
   // ─── Primitive Instances ─────────────────────────────────────────────────────
 
   given JsonDecoder[Int] with
-    def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Int] =
-      if start >= end then Left("Empty int")
-      else
-        var i = start
-        var sign = 1
-        if buf(i) == '-'.toByte then { sign = -1; i += 1 }
-        var acc = 0
-        while i < end do
-          val b = buf(i)
-          if b >= '0'.toByte && b <= '9'.toByte then
-            acc = acc * 10 + (b - '0'.toByte)
-            i += 1
-          else return Left(s"Invalid digit: ${b.toChar}")
-        Right(sign * acc)
+    inline def decode(buf: Array[Byte], start: Int, end: Int):  Int=
+      var i = start
+      var sign = 1
+      if buf(i) == '-'.toByte then { sign = -1; i += 1 }
+      var acc = 0
+      while i < end do
+        val b = buf(i)
+        if b >= '0'.toByte && b <= '9'.toByte then
+          acc = acc * 10 + (b - '0'.toByte)
+          i += 1
+        else throw Exception("Invalid integer")
+      sign * acc
+
   given JsonDecoder[Long] with
-    def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Long] =
-      val s = new String(buf, start, end - start, StandardCharsets.UTF_8)
-      s.toLongOption.toRight(s"Invalid double: $s")
+    inline def decode(buf: Array[Byte], start: Int, end: Int): Long =
+      var i = start
+      var sign = 1
+      if buf(i) == '-'.toByte then {
+        sign = -1; i += 1
+      }
+      var acc: Long = 0
+      while i < end do
+        val b = buf(i)
+        if b >= '0'.toByte && b <= '9'.toByte then
+          acc = acc * 10 + (b - '0'.toByte)
+          i += 1
+        else throw Exception("Invalid integer")
+      sign * acc
 
   given JsonDecoder[Double] with
-    def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Double] =
-      val s = new String(buf, start, end - start, StandardCharsets.UTF_8)
-      s.toDoubleOption.toRight(s"Invalid double: $s")
+    inline def decode(buf: Array[Byte], start: Int, end: Int): Double =
+      var i = start
+      var result = 0.0f
+      var sign = 1.0f
+      var decimalMultiplier = 0.1f
+      var pastDecimal = false
+
+      // Handle sign
+      if i < end && buf(i) == '-'.toByte then {
+        sign = -1.0f
+        i += 1
+      }
+
+      while i < end do
+        val b = buf(i)
+        if b == '.'.toByte then
+          if pastDecimal then throw new Exception("Multiple decimal points")
+          pastDecimal = true
+        else if b >= '0'.toByte && b <= '9'.toByte then
+          val digit = (b - '0'.toByte).toFloat
+          if pastDecimal then
+            result += digit * decimalMultiplier
+            decimalMultiplier *= 0.1f
+          else
+            result = result * 10.0f + digit
+        else
+          throw new Exception("Invalid float character")
+        i += 1
+
+      sign * result
+  given JsonDecoder[Float] with
+    inline def decode(buf: Array[Byte], start: Int, end: Int): Float =
+      var i = start
+      var result = 0.0f
+      var sign = 1.0f
+      var decimalMultiplier = 0.1f
+      var pastDecimal = false
+
+      // Handle sign
+      if i < end && buf(i) == '-'.toByte then {
+        sign = -1.0f
+        i += 1
+      }
+
+      while i < end do
+        val b = buf(i)
+        if b == '.'.toByte then
+          if pastDecimal then throw new Exception("Multiple decimal points")
+          pastDecimal = true
+        else if b >= '0'.toByte && b <= '9'.toByte then
+          val digit = (b - '0'.toByte).toFloat
+          if pastDecimal then
+            result += digit * decimalMultiplier
+            decimalMultiplier *= 0.1f
+          else
+            result = result * 10.0f + digit
+        else
+          throw new Exception("Invalid float character")
+        i += 1
+
+      sign * result
 
   given JsonDecoder[String] with
-    def decode(buf: Array[Byte], start: Int, end: Int): Either[String, String] =
+    inline def decode(buf: Array[Byte], start: Int, end: Int): String =
       if end - start >= 2 && buf(start) == '"'.toByte && buf(end - 1) == '"'.toByte then
-        Right(new String(buf, start + 1, end - start - 2, StandardCharsets.UTF_8))
+        new String(buf, start + 1, end - start - 2, StandardCharsets.UTF_8)
       else
-        Left(s"Invalid string at [$start,$end)")
+        throw new RuntimeException(s"Invalid string at [$start,$end)")
 
   given JsonDecoder[Boolean] with
-    def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Boolean] =
+    inline def decode(buf: Array[Byte], start: Int, end: Int): Boolean =
       val len = end - start
-      if len == 4 &&
-        buf(start) == 't' &&
-        buf(start + 1) == 'r' &&
-        buf(start + 2) == 'u' &&
-        buf(start + 3) == 'e' then Right(true)
-      else if len == 5 &&
-        buf(start) == 'f' &&
-        buf(start + 1) == 'a' &&
-        buf(start + 2) == 'l' &&
-        buf(start + 3) == 's' &&
-        buf(start + 4) == 'e' then Right(false)
+      if len == 4 then true
+      else if len == 5 then false
       else
-        val invalid = new String(buf, start, len, StandardCharsets.UTF_8)
-        Left(s"Invalid boolean: $invalid")
+        throw new RuntimeException(s"Invalid boolean at ${start}: ${end}")
 
   // ─── Recursive-safe Option Decoder ───────────────────────────────────────────
 
   given optionDecoder[T](using dec: => JsonDecoder[T]): JsonDecoder[Option[T]] with
-    def decode(buf: Array[Byte], start: Int, end: Int): Either[String, Option[T]] =
+    inline def decode(buf: Array[Byte], start: Int, end: Int): Option[T] =
       val len = end - start
       if len == 4 &&
         buf(start) == 'n' &&
         buf(start + 1) == 'u' &&
         buf(start + 2) == 'l' &&
-        buf(start + 3) == 'l' then Right(None)
-      else dec.decode(buf, start, end).map(Some(_))
+        buf(start + 3) == 'l' then None
+      else Some(dec.decode(buf, start, end))
 
   // ─── Derivation ──────────────────────────────────────────────────────────────
   inline def isOptional[T]: Boolean =
@@ -96,7 +150,7 @@ object JsonDecoder:
     lazy val self: JsonDecoder[T] =
       val labels = getLabels[m.MirroredElemLabels]
       val decodersWithFlags = summonInstancesWithTypes[T, m.MirroredElemTypes](self)
-
+      
       (buf: Array[Byte], start: Int, end: Int) =>
         val cursor = IntervalCursor(buf, start, end)
         val results = labels.zip(decodersWithFlags).map { case (name, (dec, isOpt)) =>
@@ -104,15 +158,12 @@ object JsonDecoder:
             case Some((s, e)) =>
               dec.asInstanceOf[JsonDecoder[Any]].decode(buf, s, e)
             case None =>
-              if isOpt then Right(None)
-              else Left(s"Missing field: $name")
+              if isOpt then None
+              else throw new RuntimeException("Missing field: $name")
         }
 
-        results.collectFirst { case Left(err) => Left(err) }
-          .getOrElse {
-            val vs = results.collect { case Right(v) => v }
-            Right(m.fromProduct(Tuple.fromArray(vs.toArray)))
-          }
+            m.fromProduct(Tuple.fromArray(results.toArray))
+
 
     self
 
@@ -144,94 +195,6 @@ object JsonDecoder:
 
 // ─── 4. IntervalCursor (with Nested-Object Slicing) ──────────────────────────
 
-class IntervalCursor(buf: Array[Byte], sliceStart: Int, sliceEnd: Int):
-  private val UTF8       = StandardCharsets.UTF_8
-  private val intervals  = ArrayBuffer((sliceStart, sliceEnd))
-
-  def extractField(field: String): Option[(Int,Int)] =
-    val keyBytes = ("\"" + field + "\"").getBytes(UTF8)
-    val keyLen   = keyBytes.length
-
-    // 1) find first interval containing the key
-    var hitPos    = -1
-    var intervalI = -1
-    var i         = 0
-    while i < intervals.length && hitPos < 0 do
-      val (a,b) = intervals(i)
-      val f     = findSubArray(buf, keyBytes, a, b)
-      if f >= 0 then
-        hitPos    = f
-        intervalI = i
-      else
-        i += 1
-
-    if hitPos < 0 then return None
-
-    // 2) split interval: keep [a,hitPos) and (hitPos+keyLen,b)
-    val (a, b)     = intervals(intervalI)
-    val splitEnd   = hitPos + keyLen
-    intervals.remove(intervalI)
-    if a < hitPos      then intervals.insert(intervalI, (a, hitPos))
-    if splitEnd < b    then
-      val insertAt = if a < hitPos then intervalI + 1 else intervalI
-      intervals.insert(insertAt, (splitEnd, b))
-
-    // 3) parse JSON value at hitPos
-    var pos = hitPos + keyLen
-    while pos < sliceEnd && buf(pos) != ':'.toByte do pos += 1
-    pos += 1
-    while pos < sliceEnd && isWhitespace(buf(pos)) do pos += 1
-    val valueStart = pos
-
-    val (vs, ve) =
-      if pos < sliceEnd && buf(pos) == '"'.toByte then
-        // string literal (handle escapes simply)
-        var p = pos + 1
-        while p < sliceEnd && buf(p) != '"'.toByte do
-          if buf(p) == '\\'.toByte then p += 1
-          p += 1
-        (pos, p + 1)
-
-      else if pos < sliceEnd && buf(pos) == '{'.toByte then
-        // nested object: balance braces, ignore quoted sections
-        var depth = 1
-        var inStr = false
-        var p     = pos + 1
-        while p < sliceEnd && depth > 0 do
-          buf(p) match
-            case quote if !inStr => inStr = true;   p += 1
-            case quote if inStr  => inStr = false;  p += 1
-            case openBrace if !inStr => depth += 1;     p += 1
-            case closeBrace if !inStr => depth -= 1;     p += 1
-            case _                    => p += 1
-        (pos, p)
-
-      else
-        // number, boolean, or null
-        var p = pos
-        while p < sliceEnd && buf(p) != ','.toByte && buf(p) != '}'.toByte do
-          p += 1
-        (pos, p)
-
-    Some((vs, ve))
-
-  private def findSubArray(
-                            hay: Array[Byte],
-                            needle: Array[Byte],
-                            from: Int,
-                            to:   Int
-                          ): Int =
-    val max = to - needle.length
-    var i   = from
-    while i <= max do
-      var j = 0
-      while j < needle.length && hay(i+j) == needle(j) do j += 1
-      if j == needle.length then return i
-      i += 1
-    -1
-
-  private def isWhitespace(b: Byte): Boolean =
-    b == ' '.toByte || b == '\n'.toByte || b == '\r'.toByte || b == '\t'.toByte
 
 // ─── 5. Example: Nested Case Classes ──────────────────────────────────────────
 
@@ -240,7 +203,7 @@ class IntervalCursor(buf: Array[Byte], sliceStart: Int, sliceEnd: Int):
   case class Address(street: String, city: String)
   case class Person(
                      name: String,
-                     age: Int,
+                     age: Float,
                      active: Boolean,
                      address: Address,
                      spouse:Option[Person]
