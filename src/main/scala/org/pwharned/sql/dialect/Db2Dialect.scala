@@ -1,5 +1,6 @@
 package org.pwharned.sql.dialect
 
+import org.pwharned.sql.derive.TableOrganizationMacro
 import org.pwharned.sql.dialect.SqlDialect
 
 object Db2Dialect extends SqlDialect:
@@ -7,12 +8,10 @@ object Db2Dialect extends SqlDialect:
     s"SELECT ${cols.mkString(",")} FROM $table"
 
   def insertReturning(table: String, cols: Seq[String]): String =
-    val cs = cols.mkString(", ")
-    val ps = List.fill(cols.size)("?").mkString(", ")
-    s"SELECT $cs FROM FINAL TABLE (INSERT INTO $table ($cs) VALUES ($ps))"
+      val cs = cols.mkString(", ")
+      val ps = List.fill(cols.size)("?").mkString(", ")
+      s"SELECT $cs FROM FINAL TABLE (INSERT INTO $table ($cs) VALUES ($ps))"
 
-  def insertReturning(raw: String): String =
-    s"SELECT * FROM FINAL TABLE ($raw)"
   def updateReturning(raw: String): String =
     s"SELECT * FROM FINAL TABLE ($raw)"
   def deleteReturning(raw: String): String =
@@ -21,3 +20,18 @@ object Db2Dialect extends SqlDialect:
     val cs = cols.mkString(", ")
     val ps = List.fill(cols.size)("?").mkString(", ")
     s"INSERT INTO $table ($cs) VALUES ($ps)"
+  inline def updateReturning[T](rawUpdate: String): String =
+    val (tableName, isColumnOrganized) = TableOrganizationMacro.tableInfo[T]
+    if isColumnOrganized then
+      rawUpdate // Just return the raw update
+    else
+      s"SELECT * FROM FINAL TABLE ($rawUpdate)"
+
+  inline def insertReturning[T](raw: String): String =
+    val (tableName, isColumnOrganized) = TableOrganizationMacro.tableInfo[T]
+    if isColumnOrganized then
+      // Column-organized table: use regular insert without returning
+      raw
+    else
+      s"SELECT * FROM FINAL TABLE ($raw)"
+

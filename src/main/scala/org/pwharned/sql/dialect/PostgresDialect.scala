@@ -11,7 +11,7 @@ object PostgresDialect extends SqlDialect:
     val ps = List.fill(cols.size)("?").mkString(", ")
     s"INSERT INTO $table ($cs) VALUES ($ps) RETURNING *"
 
-  def insertReturning(raw: String): String =
+  def insertReturning[T](raw: String): String =
     s"$raw RETURNING *"
   def deleteReturning(raw: String): String  = s"$raw RETURNING *"
   override def updateReturning(raw: String): String = s"$raw RETURNING *"
