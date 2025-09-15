@@ -2,6 +2,7 @@ package org.pwharned.http
 
 import org.pwharned.codec.Codec
 import org.pwharned.http.HttpTypes.HeaderName
+import org.pwharned.io.IO
 
 import java.nio.charset.StandardCharsets
 
@@ -66,3 +67,38 @@ object HttpResponse:
       val headerString = allHeaders.map { case (k, v) => s"${k.value}: $v" }.mkString("\r\n")
       val responseStr = s"HTTP/1.1 ${data.status.code} ${data.status.reasonPhrase}\r\n$headerString\r\n\r\n"
       responseStr.getBytes(StandardCharsets.UTF_8) ++ bodyBytes
+
+    def serverSentEvents(stream: org.pwharned.stream.Stream[IO[A]])(using codec: Codec[A]): HttpResponse[org.pwharned.stream.Stream[IO[String]]] = {
+      val sseStream = stream.map(_.map { value =>
+        val encoded = new String(codec.encode(value))
+        s"data: $encoded\n\n"
+      })
+
+      HttpResponse(ResponseData(
+        StatusCode.Ok,
+        Map(
+          HeaderName.ContentType -> "text/event-stream",
+          HeaderName.CacheControl -> "no-cache",
+          HeaderName.Connection -> "keep-alive"
+        ),
+        sseStream
+      ))
+    }
+
+    // Create chunked streaming response
+    def chunked(stream: Stream[IO[A]])(using codec: Codec[A]): HttpResponse[Stream[IO[String]]] = {
+      val chunkedStream = stream.map(_.map { value =>
+        val encoded = codec.encode(value)
+        val size = encoded.length.toHexString
+        s"$size\r\n${new String(encoded)}\r\n"
+      })
+
+      HttpResponse(ResponseData(
+        StatusCode.Ok,
+        Map(
+          HeaderName.ContentType -> "application/json", // or appropriate type
+          HeaderName.TransferEncoding -> "chunked"
+        ),
+        chunkedStream
+      ))
+    }

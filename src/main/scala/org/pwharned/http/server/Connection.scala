@@ -32,3 +32,5 @@ object ConnectionState:
   case class Processing(buffer: ByteBuffer) extends ConnectionState
 
   case object Closed extends ConnectionState
+
+  case class Streaming(eventStream: org.pwharned.stream.Stream[IO[String]], key: SelectionKey) extends ConnectionState // NEW

@@ -8,6 +8,7 @@ import java.nio.channels.{SelectionKey, SocketChannel}
 import java.util.concurrent.{Executors, ConcurrentLinkedQueue, ConcurrentHashMap}
 import java.util.concurrent.atomic.{AtomicInteger, AtomicBoolean}
 import scala.collection.mutable
+import org.pwharned.stream.Stream as Stream
 import scala.concurrent.ExecutionContext
 class HttpServer(port: Int):
   private val server = Server(port)
@@ -100,6 +101,15 @@ class HttpServer(port: Int):
     route(HttpMethod.PUT, HttpPath(path))(handler)
   def delete[B](path: String)(handler: HttpRequest[Unit] => IO[HttpResponse[B]])(using codec: Codec[B]): Unit =
     route(HttpMethod.DELETE, HttpPath(path))(handler)(using Codec.unitCodec, codec)
+
+  def getSSE[A](path: String)(handler: HttpRequest[Any] => IO[org.pwharned.stream.Stream[IO[A]]])(using codec: Codec[A]): Unit = {
+    route(HttpMethod.GET, HttpPath(path)) { request =>
+      handler(request).map { stream =>
+        HttpResponse.serverSentEvents(stream)
+      }
+    }
+  }
+
   def start(): IO[Unit] =
     for {
       _ <- server.bind()
@@ -241,25 +251,7 @@ class HttpServer(port: Int):
         handleTypedRouteInVirtualThread(buffer, route)
     }
   }
-  private def handleTypedRouteInVirtualThread(buffer: ByteBuffer, route: Route[?, ?]): ByteBuffer = {
-    route match {
-      case r: Route[a, b] =>
-        given requestCodec: Codec[a] = r.requestCodec
-        given responseCodec: Codec[b] = r.responseCodec
-        HttpRequest.parse[a](buffer).unsafeRun() match {
-          case Left(error) =>
-            getPooledErrorResponse(StatusCode.BadRequest)
-          case Right(request) =>
-            try {
-              val response = r.handler(request).unsafeRun()
-              ByteBuffer.wrap(response.toBytes)
-            } catch {
-              case ex: Exception =>
-                getPooledErrorResponse(StatusCode.InternalServerError)
-            }
-        }
-    }
-  }
+
   private def getPooledErrorResponse(status: StatusCode): ByteBuffer = {
     val pooled = status match {
       case StatusCode.NotFound => notFound404Pool.poll()
@@ -355,3 +347,92 @@ class HttpServer(port: Int):
     handleReadDirect(key)
   }
 
+  private def handleTypedRouteInVirtualThread(buffer: ByteBuffer, route: Route[?, ?]): ByteBuffer = {
+    route match {
+      case r: Route[a, b] =>
+        given requestCodec: Codec[a] = r.requestCodec
+        given responseCodec: Codec[b] = r.responseCodec
+        HttpRequest.parse[a](buffer).unsafeRun() match {
+          case Left(error) =>
+            getPooledErrorResponse(StatusCode.BadRequest)
+          case Right(request) =>
+            try {
+              val response = r.handler(request).unsafeRun()
+  
+              // Check if response contains a stream
+              response.body match {
+                case stream: Stream[IO[String]] =>
+                  // Handle streaming response
+                  startStreamingResponse(request, response, stream)
+                  // Return initial headers only
+                  createStreamingHeaders(response)
+                case normalBody =>
+                  // Normal response
+                  ByteBuffer.wrap(response.toBytes)
+              }
+            } catch {
+              case ex: Exception =>
+                getPooledErrorResponse(StatusCode.InternalServerError)
+            }
+        }
+    }
+  }
+
+  private def startStreamingResponse[A](request: HttpRequest[A], response: HttpResponse[Stream[IO[String]]], stream: Stream[IO[String]]): Unit = {
+    // This would be called to initiate streaming
+    // The actual stream processing happens in the connection state
+
+    virtualThreadExecutor.execute(() => {
+      processStreamingResponse(stream, key)
+    })
+  }
+
+  private def processStreamingResponse(stream: Stream[IO[String]], key: SelectionKey): Unit = {
+    try {
+      // Convert stream to iterator for processing
+      val iterator = stream.iterator
+
+      while (iterator.hasNext && connectionStates.contains(key)) {
+        val dataIO = iterator.next()
+        val data = dataIO.unsafeRun()
+
+        // Write data chunk
+        writeStreamChunk(key, data)
+
+        // Add backpressure/rate limiting if needed
+        Thread.sleep(10) // Simple rate limiting
+      }
+
+      // Close connection when stream ends
+      cleanupConnectionUnsafe(key)
+
+    } catch {
+      case ex: Exception =>
+        println(s"Streaming error: ${ex.getMessage}")
+        cleanupConnectionUnsafe(key)
+    }
+  }
+
+  private def writeStreamChunk(key: SelectionKey, data: String): Unit = {
+    synchronized {
+      connectionStates.get(key) match {
+        case Some(_) =>
+          val dataBuffer = ByteBuffer.wrap(data.getBytes())
+          connectionStates(key) = ConnectionState.Writing(dataBuffer)
+          key.interestOps(SelectionKey.OP_WRITE)
+
+          if (needsWakeup.compareAndSet(false, true)) {
+            key.selector().wakeup()
+          }
+        case None =>
+        // Connection closed
+      }
+    }
+  }
+  private def createStreamingHeaders[A](response: HttpResponse[A]): ByteBuffer = {
+    val headers = response.headers
+    val headerString = headers.map { case (k, v) => s"${k.value}: $v" }.mkString("\r\n")
+    val statusLine = s"HTTP/1.1 ${response.status.code} ${response.status.reasonPhrase}"
+    val responseStr = s"$statusLine\r\n$headerString\r\n\r\n"
+    ByteBuffer.wrap(responseStr.getBytes())
+  }
