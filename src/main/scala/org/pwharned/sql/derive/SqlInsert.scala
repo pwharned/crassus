@@ -28,7 +28,7 @@ object InsertField:
  * your InsertField says “include me.”
  */
 trait SqlInsert[T]:
-  def sql(orig: T): String
+   def sql(orig: T): String
 
 object SqlInsert:
 
@@ -57,12 +57,17 @@ object SqlInsert:
         included.fold(tail)(_ => tail :+ (colName -> "?"))
 
   inline given derived[T <: Product](using m: Mirror.ProductOf[T], dial: SqlDialect): SqlInsert[T] =
+    val isColumnOrganized: (String,Boolean) = TableOrganizationMacro.tableInfo[T]
     new SqlInsert[T]:
-      def sql(orig: T): String = {
+       def sql(orig: T): String = {
         val name: String = constValue[m.MirroredLabel]
-
-        // build and then reverse so we keep original order
         val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
-        val sql = dial.insertReturning( f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) ")
-        sql
+         isColumnOrganized._2 match {
+           case true =>  f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) "
+           case false => {
+             val sql = dial.insertReturning[T](f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",")}) ")
+             sql
+           }
+         }
+
       }
