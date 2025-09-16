@@ -1,168 +1,162 @@
-
 package org.pwharned.codec
 import java.nio.charset.StandardCharsets
-import scala.collection.mutable.ArrayBuffer
 
-object IntervalCursor:
-  private inline def quote = '"'.toByte
-  private inline def openBrace = '{'.toByte
-  private inline def closeBrace = '}'.toByte
-  
+class IntervalCursor(buf: Array[Byte]) {
+  import IntervalCursor._
 
-class IntervalCursor(buf: Array[Byte], sliceStart: Int, sliceEnd: Int) {
   private val UTF8 = StandardCharsets.UTF_8
-  private lazy val intervals = ArrayBuffer((sliceStart, sliceEnd))
-  private lazy val resultMap = scala.collection.mutable.Map.empty[String, Any]
-  def extractField: Option[(Int, Int)] =
-    val keyBytes = ("\"" + field + "\"").getBytes(UTF8)
-    val keyLen = keyBytes.length
+  var pos   = 0
+  val length = buf.length
+  lazy val resultMap = scala.collection.mutable.ArrayBuffer.empty[(String, (Int, Int))]
 
-    // 1) find first interval containing the key
-    var hitPos = -1
-    var intervalI = -1
-    var i = 0
-    while i < intervals.length && hitPos < 0 do
-      val (a, b) = intervals(i)
-      val f = findSubArray(buf, keyBytes, a, b)
-      if f >= 0 then
-        hitPos = f
-        intervalI = i
-      else
-        i += 1
+  inline def parse(): Unit = {
+    // 1) Skip to '{'
+    while (pos < length && buf(pos) != openBrace) pos += 1
+    if (pos < length) pos += 1
 
-    if hitPos < 0 then return None
+    // 2) Main loop: read fields until '}'
+    while (pos < length && buf(pos) != closeBrace) {
+      extractField()
 
-    // 2) split interval: keep [a,hitPos) and (hitPos+keyLen,b)
-    val (a, b) = intervals(intervalI)
-    val splitEnd = hitPos + keyLen
-    intervals.remove(intervalI)
-    if a < hitPos then intervals.insert(intervalI, (a, hitPos))
-    if splitEnd < b then
-      val insertAt = if a < hitPos then intervalI + 1 else intervalI
-      intervals.insert(insertAt, (splitEnd, b))
+      // Eat trailing whitespace or commas
+      skipWhile(b => isWs(b) || b == comma)
+    }
+  }
 
-    // 3) parse JSON value at hitPos
-    var pos = hitPos + keyLen
-    while pos < sliceEnd && buf(pos) != ':'.toByte do pos += 1
+  private def extractField(): Unit = {
+    skipWhile(isWs)
+    // 1) --- Key (always a JSON string) ---
+    require(pos < length && buf(pos) == quote, "Expected '\"' at key start")
+    val kStart = pos + 1
     pos += 1
-    while pos < sliceEnd && isWhitespace(buf(pos)) do pos += 1
-    val valueStart = pos
+    // Find closing quote, honouring escapes
+    while (pos < length && buf(pos) != quote) {
+      if (buf(pos) == backslash) pos += 2
+      else pos += 1
+    }
+    val kEnd = pos
+    if (pos < length) pos += 1        // skip closing quote
+    val key  = new String(buf, kStart, kEnd - kStart, UTF8)
 
-    val (vs, ve) =
-      if pos < sliceEnd && buf(pos) == '"'.toByte then
-        // string literal (handle escapes simply)
-        var p = pos + 1
-        while p < sliceEnd && buf(p) != '"'.toByte do
-          if buf(p) == '\\'.toByte then p += 1
-          p += 1
-        (pos, p + 1)
+    // 2) Skip whitespace + colon
+    skipWhile(b => isWs(b) || b == colon)
 
-      else if pos < sliceEnd && buf(pos) == '{'.toByte then
-        // nested object: balance braces, ignore quoted sections
-        var depth = 1
-        var inStr = false
-        var p = pos + 1
-        while p < sliceEnd && depth > 0 do
-          buf(p) match
-            case quote if !inStr => inStr = true; p += 1
-            case quote if inStr => inStr = false; p += 1
-            case openBrace if !inStr => depth += 1; p += 1
-            case closeBrace if !inStr => depth -= 1; p += 1
-            case _ => p += 1
-        (pos, p)
+    // 3) --- Value (string, object, array or primitive) ---
+    if (pos >= length) return
+    val interval: (Int, Int) = buf(pos) match {
+      case `quote`      => parseString()
+      case `openBrace`  => parseNested(openBrace, closeBrace)
+      case `openBracket`=> parseNested(openBracket, closeBracket)
+      case _            => parsePrimitive()
+    }
 
-      else
-        // number, boolean, or null
-        var p = pos
-        while p < sliceEnd && buf(p) != ','.toByte && buf(p) != '}'.toByte do
-          p += 1
-        (pos, p)
+    resultMap += ((key, interval))
+  }
 
-    Some((vs, ve))
-    
-    
-  def extractField(field: String): Option[(Int, Int)] =
-    val keyBytes = ("\"" + field + "\"").getBytes(UTF8)
-    val keyLen = keyBytes.length
+  inline def skipToObjectStart(start: Int, end: Int): Unit = {
+    pos = start
+    while pos < end && buf(pos) != openBrace do pos += 1
+    if pos < end then pos += 1
+  }
 
-    // 1) find first interval containing the key
-    var hitPos = -1
-    var intervalI = -1
-    var i = 0
-    while i < intervals.length && hitPos < 0 do
-      val (a, b) = intervals(i)
-      val f = findSubArray(buf, keyBytes, a, b)
-      if f >= 0 then
-        hitPos = f
-        intervalI = i
-      else
-        i += 1
+  /** This replaces extractFieldNoReturn.  Returns:
+   *   ((keyStart, keyEnd), (valueStart, valueEnd))
+   * where keyEnd/valueEnd are exclusive indices.
+   */
+  inline def nextField(): ((Int, Int), (Int, Int)) = {
+    // 1) Skip any commas or whitespace before the key
+    while pos < length && (isWs(buf(pos)) || buf(pos) == comma) do
+      pos += 1
 
-    if hitPos < 0 then return None
-
-    // 2) split interval: keep [a,hitPos) and (hitPos+keyLen,b)
-    val (a, b) = intervals(intervalI)
-    val splitEnd = hitPos + keyLen
-    intervals.remove(intervalI)
-    if a < hitPos then intervals.insert(intervalI, (a, hitPos))
-    if splitEnd < b then
-      val insertAt = if a < hitPos then intervalI + 1 else intervalI
-      intervals.insert(insertAt, (splitEnd, b))
-
-    // 3) parse JSON value at hitPos
-    var pos = hitPos + keyLen
-    while pos < sliceEnd && buf(pos) != ':'.toByte do pos += 1
+    // 2) Parse the key (must be a JSON string)
+    require(pos < length && buf(pos) == quote, s"Expected '\"' at $pos")
+    val kStart = pos + 1
     pos += 1
-    while pos < sliceEnd && isWhitespace(buf(pos)) do pos += 1
-    val valueStart = pos
+    while pos < length && buf(pos) != quote do
+      if buf(pos) == backslash then pos += 2
+      else pos += 1
+    val kEnd = pos
+    pos += 1 // skip closing quote
 
-    val (vs, ve) =
-      if pos < sliceEnd && buf(pos) == '"'.toByte then
-        // string literal (handle escapes simply)
-        var p = pos + 1
-        while p < sliceEnd && buf(p) != '"'.toByte do
-          if buf(p) == '\\'.toByte then p += 1
-          p += 1
-        (pos, p + 1)
+    // 3) Skip whitespace + the colon
+    while pos < length && (isWs(buf(pos)) || buf(pos) == colon) do
+      pos += 1
 
-      else if pos < sliceEnd && buf(pos) == '{'.toByte then
-        // nested object: balance braces, ignore quoted sections
-        var depth = 1
-        var inStr = false
-        var p = pos + 1
-        while p < sliceEnd && depth > 0 do
-          buf(p) match
-            case quote if !inStr => inStr = true; p += 1
-            case quote if inStr => inStr = false; p += 1
-            case openBrace if !inStr => depth += 1; p += 1
-            case closeBrace if !inStr => depth -= 1; p += 1
-            case _ => p += 1
-        (pos, p)
+    // 4) Parse the value, returning its half-open interval
+    val (vStart, vEnd) =
+      buf(pos) match
+        case `quote`       => parseString()
+        case `openBrace`   => parseNested(openBrace, closeBrace)
+        case `openBracket` => parseNested(openBracket, closeBracket)
+        case _             => parsePrimitive()
+    ((kStart, kEnd), (vStart, vEnd))
+  }
 
-      else
-        // number, boolean, or null
-        var p = pos
-        while p < sliceEnd && buf(p) != ','.toByte && buf(p) != '}'.toByte do
-          p += 1
-        (pos, p)
+  // --- helper methods copied from before ---
+  inline private def isWs(b: Byte) =
+    b == 32 || b == 9 || b == 10 || b == 13
 
-    Some((vs, ve))
+  private inline def parseString(): (Int, Int) = {
+    // pos is at the opening quote
+    val vs = pos // include the open-quote
+    pos += 1 // skip it
 
-  private def findSubArray(
-                            hay: Array[Byte],
-                            needle: Array[Byte],
-                            from: Int,
-                            to: Int
-                          ): Int =
-    val max = to - needle.length
-    var i = from
-    while i <= max do
-      var j = 0
-      while j < needle.length && hay(i + j) == needle(j) do j += 1
-      if j == needle.length then return i
-      i += 1
-    -1
+    // skip through the string, honouring escapes
+    while pos < length && buf(pos) != quote do
+      if buf(pos) == backslash then pos += 2
+      else pos += 1
 
-  private def isWhitespace(b: Byte): Boolean =
-    b == ' '.toByte || b == '\n'.toByte || b == '\r'.toByte || b == '\t'.toByte
+    pos += 1 // skip the closing quote
+    val ve = pos // ve is one past the close-quote
+    (vs, ve) // half-open [vs, ve) includes both quotes
+  }
+
+  private inline def parseNested(open: Byte, close: Byte): (Int, Int) = {
+    val vs = pos
+    var depth = 1
+    var inStr = false
+    pos += 1
+    while pos < length && depth > 0 do
+      buf(pos) match
+        case `quote` if !inStr    => inStr = true;  pos += 1
+        case `quote` if inStr     => inStr = false; pos += 1
+        case `backslash` if inStr => pos += 2
+        case b if b == open  && !inStr => depth += 1; pos += 1
+        case b if b == close && !inStr => depth -= 1; pos += 1
+        case _                     => pos += 1
+    (vs, pos)
+  }
+
+  private inline def parsePrimitive(): (Int, Int) = {
+    val vs = pos
+    while pos < length &&
+      buf(pos) != comma && buf(pos) != closeBrace &&
+      !isWs(buf(pos)) do
+      pos += 1
+    (vs, pos)
+  }
+
+
+
+
+  // Helpers
+  private inline def skipWhile(p: Byte => Boolean): Unit =
+    while (pos < length && p(buf(pos))) pos += 1
+}
+
+object IntervalCursor {
+  private inline val quote       = 34
+  private inline val backslash   = 92
+  private inline val openBrace   = 123
+  private inline val closeBrace  = 125
+  private inline val openBracket = 91
+  private inline val closeBracket= 93
+  private inline val colon       = 58
+  private inline val comma       = 44
+
+  private inline def isWs(b: Byte): Boolean =
+    b == 32 || b == 9 || b == 10 || b == 13
+
+  private inline def isDelimiter(b: Byte): Boolean =
+    b == comma || b == closeBrace || isWs(b)
 }

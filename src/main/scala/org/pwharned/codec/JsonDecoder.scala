@@ -1,12 +1,17 @@
 package org.pwharned.codec
 
 
+
+import io.circe.{Decoder, Encoder, Json}
+import io.circe.generic.semiauto._
+import io.circe.parser._
+
+
 import java.nio.charset.StandardCharsets
 import scala.deriving.Mirror
 import scala.compiletime.{constValueTuple, erasedValue, error, summonInline}
 import scala.collection.mutable.ArrayBuffer
 import scala.language.implicitConversions
-
 
 // ─── 1. ByteDecoder Typeclass ─────────────────────────────────────────────────
 
@@ -31,7 +36,11 @@ object JsonDecoder:
         if b >= '0'.toByte && b <= '9'.toByte then
           acc = acc * 10 + (b - '0'.toByte)
           i += 1
-        else throw Exception("Invalid integer")
+
+        else throw {
+          val string = String(buf.slice(start, end))
+          Exception(s"Invalid integer : ${string} at ${start}: ${end}")
+        }
       sign * acc
 
   given JsonDecoder[Long] with
@@ -47,7 +56,10 @@ object JsonDecoder:
         if b >= '0'.toByte && b <= '9'.toByte then
           acc = acc * 10 + (b - '0'.toByte)
           i += 1
-        else throw Exception("Invalid integer")
+        else throw {
+          val string = String(buf.slice(start, end))
+          Exception(s"Invalid integer : ${string} at ${start}: ${end}")
+        }
       sign * acc
 
   given JsonDecoder[Double] with
@@ -115,10 +127,7 @@ object JsonDecoder:
 
   given JsonDecoder[String] with
     inline def decode(buf: Array[Byte], start: Int, end: Int): String =
-      if end - start >= 2 && buf(start) == '"'.toByte && buf(end - 1) == '"'.toByte then
         new String(buf, start + 1, end - start - 2, StandardCharsets.UTF_8)
-      else
-        throw new RuntimeException(s"Invalid string at [$start,$end)")
 
   given JsonDecoder[Boolean] with
     inline def decode(buf: Array[Byte], start: Int, end: Int): Boolean =
@@ -147,26 +156,60 @@ object JsonDecoder:
       case _ => false
 
   inline given derived[T](using m: Mirror.ProductOf[T]): JsonDecoder[T] =
+    // 1) Precompute the sum‐of‐bytes for each label
+    val labelSums: Vector[Int] =
+      getLabels[m.MirroredElemLabels].iterator
+        .map(_.getBytes(StandardCharsets.UTF_8).map(b => b & 0xFF).sum)
+        .toVector
+
+
+    // 2) Build a tiny "perfect hash" table: pick a size > 2*N to avoid collisions
+    val tableSize = labelSums.length * 2 + 1
+    val jump: Array[Int] = Array.fill(tableSize)(-1)
+    for i <- labelSums.indices do
+      val bucket = labelSums(i) % tableSize
+      jump(bucket) = i
+
     lazy val self: JsonDecoder[T] =
-      val labels = getLabels[m.MirroredElemLabels]
-      val decodersWithFlags = summonInstancesWithTypes[T, m.MirroredElemTypes](self)
-      
+      // decoders in the same order as `labels`
+      val decoders: Vector[JsonDecoder[Any]] =
+        summonInstancesWithTypes[T, m.MirroredElemTypes](self)
+          .map(_._1.asInstanceOf[JsonDecoder[Any]])
+          .toVector
+
       (buf: Array[Byte], start: Int, end: Int) =>
-        val cursor = IntervalCursor(buf, start, end)
-        val results = labels.zip(decodersWithFlags).map { case (name, (dec, isOpt)) =>
-          cursor.extractField(name) match
-            case Some((s, e)) =>
-              dec.asInstanceOf[JsonDecoder[Any]].decode(buf, s, e)
-            case None =>
-              if isOpt then None
-              else throw new RuntimeException("Missing field: $name")
-        }
+        val cursor = new IntervalCursor(buf)
+        // position cursor at first '{'
+        cursor.skipToObjectStart(start, end)
 
-            m.fromProduct(Tuple.fromArray(results.toArray))
+        // prepare result array
+        val resultArr = Array.ofDim[Any](labelSums.length)
 
+        // parse exactly `labels.length` fields inline
+        var i = 0
+        while i < labelSums.length do
+          val ((kStart, kEnd), (vStart, vEnd)) = cursor.nextField()
+          var s = 0
+          var j = kStart
+          while j < kEnd do
+            s += buf(j) & 0xFF
+            j += 1
+
+          // perfect-hash dispatch
+          val bucket = s % tableSize
+          val idx = jump(bucket)
+          // collision check
+          if idx < 0 || labelSums(idx) != s then
+            throw new IllegalArgumentException(s"Unknown JSON key sum: $s")
+
+          // decode into the proper slot
+          resultArr(idx) = decoders(idx).decode(buf, vStart, vEnd)
+          i += 1
+
+        // build your product
+        m.fromProduct(Tuple.fromArray(resultArr))
 
     self
-
 
   // ─── Utilities ───────────────────────────────────────────────────────────────
 
@@ -193,20 +236,16 @@ object JsonDecoder:
 
 
 
-// ─── 4. IntervalCursor (with Nested-Object Slicing) ──────────────────────────
 
-
-// ─── 5. Example: Nested Case Classes ──────────────────────────────────────────
 
 @main def runNested(): Unit =
 
   case class Address(street: String, city: String)
   case class Person(
                      name: String,
-                     age: Float,
+                     age: Int,
                      active: Boolean,
-                     address: Address,
-                     spouse:Option[Person]
+                     score: Float,
                    )
 
   type PersonRow = (name: String,age:Int)
@@ -227,12 +266,10 @@ object JsonDecoder:
   import JsonDecoder.*
 
   val personRowJson =
-    """{"name":"Jack","age":1}
+    """{"name":"Jack","age":1, "active":true, "score": 0.1}
       |""".stripMargin
 
-  val buf = json.getBytes(StandardCharsets.UTF_8)
+  val buf = personRowJson.getBytes(StandardCharsets.UTF_8)
   val res = summon[JsonDecoder[Person]].decode(buf, 0, buf.length)
+
   println(res)
-  val buf1 = personRowJson.getBytes(StandardCharsets.UTF_8)
-  val res2 = summon[JsonDecoder[PersonRow]].decode(buf1, 0, buf.length)
-  println(res2)

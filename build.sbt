@@ -47,13 +47,10 @@ lazy val root = project.in(file("."))
       Compile / compile / javaOptions ++= Seq(
       "-Xms4G", "-Xmx8G", "-XX:+UseG1GC"
     ),
-    libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor-typed" % "2.8.5",
-      "com.typesafe.akka" %% "akka-stream" % "2.8.5",
-      "com.typesafe.akka" %% "akka-http" % "10.5.3",
-      "ch.qos.logback" % "logback-classic" % "1.4.11"
-    ),
 
+    libraryDependencies += "io.circe" %% "circe-core" % "0.15.0-M1",
+    libraryDependencies += "io.circe" %% "circe-generic" % "0.15.0-M1",
+    libraryDependencies += "io.circe" %% "circe-parser" % "0.15.0-M1",
 
       Compile / scalacOptions ++= Seq(
       "-deprecation",
