@@ -137,10 +137,10 @@ object HttpRequest:
     def bodySlice(): ByteSlice = ByteSlice(request.rawData, request.bodyStart, request.rawData.limit())
 
     // Streaming body with backpressure
-    def bodyStream(chunkSize: Int = 8192): Stream[ByteSlice] =
-      if request.bodyStart >= request.rawData.limit() then Stream.Empty
+    def bodyStream(chunkSize: Int = 8192): org.pwharned.stream.Stream[ByteSlice] =
+      if request.bodyStart >= request.rawData.limit() then org.pwharned.stream.Empty
       else
-        Stream.unfold(request.bodyStart) { offset =>
+        org.pwharned.stream.Stream.unfold(request.bodyStart) { offset =>
           if offset >= request.rawData.limit() then None
           else
             val end = (offset + chunkSize).min(request.rawData.limit())

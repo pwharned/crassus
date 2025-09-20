@@ -3,11 +3,11 @@ package org.pwharned.codec
 
 
 import io.circe.{Decoder, Encoder, Json}
-import io.circe.generic.semiauto._
-import io.circe.parser._
-
+import io.circe.generic.semiauto.*
+import io.circe.parser.*
 
 import java.nio.charset.StandardCharsets
+import scala.annotation.tailrec
 import scala.deriving.Mirror
 import scala.compiletime.{constValueTuple, erasedValue, error, summonInline}
 import scala.collection.mutable.ArrayBuffer
@@ -212,7 +212,22 @@ object JsonDecoder:
     self
 
   // ─── Utilities ───────────────────────────────────────────────────────────────
+  inline def fnv1aHash(inline s: String): Long = {
+    // 64-bit FNV-1a constants
+    val OffsetBasis = 1469598103934665603L
+    val Prime = 1099511628211L
 
+    // recursive, inline loop over string characters
+    @tailrec
+    def loop(i: Int, hash: Long): Long =
+      if i < s.length then
+        // mix in next byte
+        loop(i + 1, (hash ^ s.charAt(i).toLong) * Prime)
+      else
+        hash
+
+    loop(0, OffsetBasis)
+  }
   inline def summonInstances[T, Elems <: Tuple](self: => JsonDecoder[T]): List[JsonDecoder[?]] =
     inline erasedValue[Elems] match
       case _: (elem *: elems) => deriveOrSummon[T, elem](self) :: summonInstances[T, elems](self)
@@ -240,6 +255,14 @@ object JsonDecoder:
 
 @main def runNested(): Unit =
 
+  import com.github.plokhotnyuk.jsoniter_scala.core.*
+  import com.github.plokhotnyuk.jsoniter_scala.macros.*
+
+
+  object Person:
+    given codec: JsonValueCodec[Person] = JsonCodecMaker.make
+
+
   case class Address(street: String, city: String)
   case class Person(
                      name: String,
@@ -248,7 +271,7 @@ object JsonDecoder:
                      score: Float,
                    )
 
-  type PersonRow = (name: String,age:Int)
+  type PersonRow = (name: String,age:Int, active: Boolean, score: Float)
 
   val json =
     """
@@ -272,4 +295,51 @@ object JsonDecoder:
   val buf = personRowJson.getBytes(StandardCharsets.UTF_8)
   val res = summon[JsonDecoder[Person]].decode(buf, 0, buf.length)
 
-  println(res)
+  object BenchmarkManual {
+    // sample JSON
+    val jsonStr = """{"name":"Alice","age":30,"active":true, "score": 0.1}"""
+    val customDecoder = summon[JsonDecoder[PersonRow]]
+
+    def time[R](label: String)(block: => R): R = {
+      val start = System.nanoTime()
+      val result = block
+      val elapsed = System.nanoTime() - start
+      println(f"$label: ${elapsed / 1e6}%.2f ms")
+      result
+    }
+    implicit val decoder: Decoder[Person] = deriveDecoder[Person]
+
+    def main: Unit = {
+      val buf = jsonStr.getBytes(StandardCharsets.UTF_8)
+      val runs = 10000000
+
+      // warmup
+      (1 to 5).foreach(_ =>
+        customDecoder.decode(buf, 0, buf.length)
+        decode[Person](jsonStr).getOrElse(sys.error("fail"))
+      )
+      // measure circe
+      time("Circe generic") {
+        var i = 0
+        while i < runs do
+          decode[Person](jsonStr).getOrElse(sys.error("fail"))
+          i += 1
+      }
+      // measure custom
+      time("Custom parser") {
+        var i = 0
+        while i < runs do
+          customDecoder.decode(buf, 0, buf.length)
+          i += 1
+      }
+      time("Jsoniter parser") {
+        var i = 0
+        while i < runs do
+          val deserialized: Person = readFromString[Person](jsonStr)
+
+          i += 1
+      }
+
+    }
+  }
+  BenchmarkManual.main
