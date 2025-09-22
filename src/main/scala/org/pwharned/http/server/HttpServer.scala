@@ -2,6 +2,7 @@ package org.pwharned.http.server
 
 import org.pwharned.http.request.HttpRequestView
 import org.pwharned.http.response.HttpResponse
+import org.pwharned.http.server.TcpServer.{HttpAcceptEvent, HttpReadEvent}
 import org.pwharned.http.server.dsl.{Handler, InlineRouter}
 import org.pwharned.io.IO
 

@@ -1,10 +1,12 @@
 package org.pwharned.http.server
 
+import org.pwharned.http.server.dsl.Handler
 import org.pwharned.io.IO
 
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.{ClosedChannelException, SelectionKey, Selector, ServerSocketChannel, SocketChannel}
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ConcurrentLinkedQueue, ExecutorService, Executors}
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, Future}
@@ -13,13 +15,67 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 
 object  TcpServer  {
+  final case class HttpAcceptEvent(
+                                    key: SelectionKey,
+                                    pools: BufferPoolCollection,
+                                    // Handler now returns HttpResponse[?]
+                                    handler: Handler
+                                  ) extends AcceptEvent(key, pools) {
 
+    @inline override def handleIO(): IO[Unit] = IO.effect {
+      val server = key.channel().asInstanceOf[ServerSocketChannel]
+      val client = server.accept()
+      client.configureBlocking(false)
+
+      val sk = client.register(key.selector(), SelectionKey.OP_READ)
+
+      val state = HttpSessionState.newSession(
+        client,
+        sk,
+        pools,
+        handler // Pass the handler
+      )
+
+      sk.attach(state)
+    }
+  }
+
+
+  // 2) ReadEvent disables OP_READ immediately, then launches the async work
+  final case class HttpReadEvent(
+                                  key: SelectionKey,
+                                  selector: Selector,
+                                  pendingOps: ConcurrentLinkedQueue[() => Unit],
+                                  workerPool: ExecutorService
+                                ) extends ReadEvent(key, selector, pendingOps, workerPool) {
+    @inline override def handleIO(): IO[Unit] = IO.effect {
+      // 1) stop further READ notifications for this key
+      key.interestOps(key.interestOps() & ~SelectionKey.OP_READ)
+      // 2) offload to your workerPool
+      workerPool.submit(new Runnable {
+        override def run(): Unit = {
+          val state = key.attachment().asInstanceOf[HttpSessionState]
+          state.onReadable()
+
+          // 3) if the channel is still alive, re-enable READ and wake up selector
+          if (state.channel.isOpen) {
+            pendingOps.add(() => key.interestOps(key.interestOps() | SelectionKey.OP_READ))
+          }
+          if (wakeupNeeded.compareAndSet(false, true)) {
+            selector.wakeup()
+          }
+        }
+      })
+    }
+
+
+  }
 
   val bufferPools: BufferPoolCollection = Map(
     "small" -> BufferPool.heap(bufferSize = 1024),
     "large" -> BufferPool.direct(bufferSize = 8 * 1024)
   )
-
+  private val wakeupNeeded = new AtomicBoolean(false)
 
 
 
@@ -53,6 +109,7 @@ object  TcpServer  {
         task()
         task = pendingOps.poll()
       }
+      wakeupNeeded.set(false)
 
       // ─── Select and batch events ──────────────────────────
       buf.clear()
