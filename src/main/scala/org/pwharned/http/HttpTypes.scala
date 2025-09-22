@@ -1,7 +1,6 @@
 package org.pwharned.http
 
 import org.pwharned.codec.Codec
-import org.pwharned.http.server.TypedHttpServer
 import org.pwharned.io.IO
 
 import java.net.*

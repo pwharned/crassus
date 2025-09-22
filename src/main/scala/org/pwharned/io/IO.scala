@@ -8,7 +8,7 @@ sealed trait IO[+A]:
   def *>[B](next: => IO[B]): IO[B] =
     this.flatMap(_ => next)
 
-  final def unsafeRunOptimized(): A = {
+  final inline def unsafeRunOptimized(): A = {
     // Simple depth limit to prevent stack overflow
     val maxDepth = 1000
 

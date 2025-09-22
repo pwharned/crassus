@@ -42,16 +42,13 @@ lazy val root = project.in(file("."))
         excludedPrefixes.exists(pathInJar.contains)
       }
     },
-    // in build.sbt
+    libraryDependencies += "org.scala-lang" % "scala3-library_3" % scalaVersion.value,
+    ThisBuild / logLevel := Level.Info,
+      // in build.sbt
     Compile / compile / fork := true,
       Compile / compile / javaOptions ++= Seq(
       "-Xms4G", "-Xmx8G", "-XX:+UseG1GC"
     ),
-
-    libraryDependencies += "io.circe" %% "circe-core" % "0.15.0-M1",
-    libraryDependencies += "io.circe" %% "circe-generic" % "0.15.0-M1",
-    libraryDependencies += "io.circe" %% "circe-parser" % "0.15.0-M1",
-
       Compile / scalacOptions ++= Seq(
       "-deprecation",
       "-encoding", "UTF-8",

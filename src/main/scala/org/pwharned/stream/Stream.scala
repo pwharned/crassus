@@ -158,3 +158,17 @@ object Stream:
 
   def fromIterable[A](iterable: Iterable[A]): Stream[A] =
     fromIterator(iterable.iterator)
+
+implicit class StreamOps[A](private val s: Stream[A]) extends AnyVal {
+  def toIterator: Iterator[A] = new Iterator[A] {
+    private var cur: Stream[A] = s
+    def hasNext: Boolean    = cur.nonEmpty
+    def next(): A = cur match {
+      case Cons(h, t) =>
+        val a = h()
+        cur = t()
+        a
+      case Empty => throw new NoSuchElementException("Stream empty")
+    }
+  }
+}

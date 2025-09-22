@@ -1,6 +1,12 @@
 package org.pwharned
-import org.pwharned.http.HttpResponse
+
+import org.pwharned.experiments.AnimalMacro.dispatchAnimalPathFn
+import org.pwharned.experiments.PrintTree.printTree
+import org.pwharned.http.request.HttpRequestView
+import org.pwharned.http.response.EntitySerializer.{jsonEntitySerializer, stringEntitySerializer}
+import org.pwharned.http.response.HttpResponse
 import org.pwharned.http.server.HttpServer
+import org.pwharned.http.server.dsl.{Dispatcher, InlineRouter, Route}
 import org.pwharned.io.IO
 
 import scala.language.implicitConversions
@@ -10,30 +16,19 @@ import scala.language.implicitConversions
 
 
 
-@main
-def main(): Unit =
+@main def runHttp(): Unit = {
+  // 1) Define your routing logic
 
-  // Domain model
-  case class User(id: Long, name: String, email: String)
+  val httpResponse = "HTTP/1.1 200 OK\r\n" + "Content-Type: text/plain\r\n" + "Content-Length: 13\r\n" + "\r\n" + "Hello, world!"
 
-  // Simple JSON codec for demonstration
-
-
-
-
-  val server = HttpServer(8080)
-
-  server.get("/") { _ =>
-    IO.pure(HttpResponse.ok(""))
-  }
+  val router = InlineRouter
+  InlineRouter.build(new Route("GET","foo",(req: HttpRequestView) =>
+    IO.pure(new HttpResponse("HTTP/1.1 200 OK", Seq.empty, "Hello from foo!"))))
 
 
+  HttpServer.builder(router)
+   .bind("localhost", 8080)
+  .start()
 
 
-
-
-  // Start the server
-  server.start().unsafeRun()
-
-  
-  
+}

@@ -2,10 +2,6 @@ package org.pwharned.codec
 
 
 
-import io.circe.{Decoder, Encoder, Json}
-import io.circe.generic.semiauto.*
-import io.circe.parser.*
-
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
 import scala.deriving.Mirror
@@ -253,93 +249,5 @@ object JsonDecoder:
 
 
 
-@main def runNested(): Unit =
-
-  import com.github.plokhotnyuk.jsoniter_scala.core.*
-  import com.github.plokhotnyuk.jsoniter_scala.macros.*
 
 
-  object Person:
-    given codec: JsonValueCodec[Person] = JsonCodecMaker.make
-
-
-  case class Address(street: String, city: String)
-  case class Person(
-                     name: String,
-                     age: Int,
-                     active: Boolean,
-                     score: Float,
-                   )
-
-  type PersonRow = (name: String,age:Int, active: Boolean, score: Float)
-
-  val json =
-    """
-      |{"name": "Alice",
-      |  "age": 30,
-      |  "active": true,
-      |  "address": { "street": "123 Maple St", "city": "Austin" },
-   "spouse":{"name": "Alice",
-      |  "age": 30,
-      |  "active": true,
-      |  "address": { "street": "123 Maple St", "city": "Austin" }
-    }
-      |}
-    """.stripMargin
-  import JsonDecoder.*
-
-  val personRowJson =
-    """{"name":"Jack","age":1, "active":true, "score": 0.1}
-      |""".stripMargin
-
-  val buf = personRowJson.getBytes(StandardCharsets.UTF_8)
-  val res = summon[JsonDecoder[Person]].decode(buf, 0, buf.length)
-
-  object BenchmarkManual {
-    // sample JSON
-    val jsonStr = """{"name":"Alice","age":30,"active":true, "score": 0.1}"""
-    val customDecoder = summon[JsonDecoder[PersonRow]]
-
-    def time[R](label: String)(block: => R): R = {
-      val start = System.nanoTime()
-      val result = block
-      val elapsed = System.nanoTime() - start
-      println(f"$label: ${elapsed / 1e6}%.2f ms")
-      result
-    }
-    implicit val decoder: Decoder[Person] = deriveDecoder[Person]
-
-    def main: Unit = {
-      val buf = jsonStr.getBytes(StandardCharsets.UTF_8)
-      val runs = 10000000
-
-      // warmup
-      (1 to 5).foreach(_ =>
-        customDecoder.decode(buf, 0, buf.length)
-        decode[Person](jsonStr).getOrElse(sys.error("fail"))
-      )
-      // measure circe
-      time("Circe generic") {
-        var i = 0
-        while i < runs do
-          decode[Person](jsonStr).getOrElse(sys.error("fail"))
-          i += 1
-      }
-      // measure custom
-      time("Custom parser") {
-        var i = 0
-        while i < runs do
-          customDecoder.decode(buf, 0, buf.length)
-          i += 1
-      }
-      time("Jsoniter parser") {
-        var i = 0
-        while i < runs do
-          val deserialized: Person = readFromString[Person](jsonStr)
-
-          i += 1
-      }
-
-    }
-  }
-  BenchmarkManual.main
