@@ -13,6 +13,8 @@ Global / parallelExecution := true
 //  "-H:ResourceConfigurationFiles=../../resource-config.json",
 
 //)
+import pl.project13.scala.sbt.JmhPlugin
+
 lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
   .settings(
     name := "caseClassGenerator",
@@ -24,15 +26,15 @@ lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
 
 
 
-
-
 lazy val excludedPrefixes = Seq(
   "generated","main"
 )
 
+val circeVersion = "0.14.14"
 
 
-lazy val root = project.in(file("."))
+lazy val root = project.in(file(".")).enablePlugins(JmhPlugin)
+
   .settings(
     name := "crassus",
     scalaVersion := "3.7.1",
@@ -43,11 +45,17 @@ lazy val root = project.in(file("."))
       }
     },
     libraryDependencies += "org.scala-lang" % "scala3-library_3" % scalaVersion.value,
-    ThisBuild / logLevel := Level.Info,
+
+libraryDependencies ++= Seq(
+  "io.circe" %% "circe-core",
+  "io.circe" %% "circe-generic",
+  "io.circe" %% "circe-parser"
+).map(_ % circeVersion),
+      ThisBuild / logLevel := Level.Info,
       // in build.sbt
     Compile / compile / fork := true,
       Compile / compile / javaOptions ++= Seq(
-      "-Xms4G", "-Xmx8G", "-XX:+UseG1GC"
+   //   "-Xms4G", "-Xmx8G", "-XX:+UseG1GC"
     ),
       Compile / scalacOptions ++= Seq(
       "-deprecation",

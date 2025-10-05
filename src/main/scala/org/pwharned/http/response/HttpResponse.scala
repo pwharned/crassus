@@ -9,7 +9,7 @@ import java.nio.channels.SocketChannel
 // HttpResponse no longer needs B, as EntitySerializer now writes directly to buffer.
 // We'll assume the entity will be written to a ByteBuffer.
 case class HttpResponse[E](
-                            statusLine: String,
+                            status: Int,
                             headers:    Seq[(String,String)],
                             entity:     E
                           ) 
@@ -17,17 +17,17 @@ case class HttpResponse[E](
 
 object HttpResponse  {
 
-  def apply[E](   statusLine: String,
+  def apply[E](   status: Int,
                headers:    Seq[(String,String)],
-               entity:     E): HttpResponse[E] = new  HttpResponse(statusLine,  headers, entity)
+               entity:     E): HttpResponse[E] = new  HttpResponse(status,  headers, entity)
 
   inline def render[E](writeBuf: ByteBuffer, channel: SocketChannel, response: HttpResponse[E]): Unit = {
     writeBuf.clear() // Clear the pooled buffer for a fresh response
     // 1) Calculate entity size first (may involve temporary allocation by serializer)
     val serialized  = response.entity.toString.getBytes("UTF-8")
     val contentLength = serialized.length
-    // 2) Write status line and headers into the buffer
-    writeBuf.putAscii(response.statusLine).putAscii("\r\n")
+    writeBuf.putAscii(version).putAscii(response.status.toString).putAscii(ok).putAscii("\r\n")
+    
     (response.headers :+  ("Content-Length" -> contentLength.toString) ).foreach { case (k, v) =>
       writeBuf.putAscii(k).putAscii(": ").putAscii(v).putAscii("\r\n")
     }
@@ -53,6 +53,10 @@ object HttpResponse  {
       buf
     }
   }
+
+  inline val version = "HTTP/1.1 "
+  inline val ok = " OK"
+  def ok(entity: String): HttpResponse[String] = new HttpResponse[String](200, Seq.empty, entity)
 
 
 }

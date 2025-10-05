@@ -2,11 +2,12 @@ package org.pwharned.codec
 
 
 
-import java.nio.charset.StandardCharsets
-import scala.annotation.tailrec
-import scala.deriving.Mirror
-import scala.compiletime.{constValueTuple, erasedValue, error, summonInline}
+import org.ibm.pwhaned.codec.IntervalCursor
+import org.pwharned.codec.dispatchBytesMacro
+
 import scala.collection.mutable.ArrayBuffer
+import scala.compiletime.{constValueTuple, erasedValue, summonInline}
+import scala.deriving.Mirror
 import scala.language.implicitConversions
 
 // ─── 1. ByteDecoder Typeclass ─────────────────────────────────────────────────
@@ -14,15 +15,15 @@ import scala.language.implicitConversions
 trait JsonDecoder[T]:
   def decode(buf: Array[Byte], start: Int, end: Int): T
 
-object JsonDecoder:
+object JsonDecoder  {
   import java.nio.charset.StandardCharsets
-  import scala.deriving.*
   import scala.compiletime.*
+  import scala.deriving.*
 
   // ─── Primitive Instances ─────────────────────────────────────────────────────
 
   given JsonDecoder[Int] with
-    inline def decode(buf: Array[Byte], start: Int, end: Int):  Int=
+    def decode(buf: Array[Byte], start: Int, end: Int):  Int=
       var i = start
       var sign = 1
       if buf(i) == '-'.toByte then { sign = -1; i += 1 }
@@ -40,7 +41,7 @@ object JsonDecoder:
       sign * acc
 
   given JsonDecoder[Long] with
-    inline def decode(buf: Array[Byte], start: Int, end: Int): Long =
+    def decode(buf: Array[Byte], start: Int, end: Int): Long =
       var i = start
       var sign = 1
       if buf(i) == '-'.toByte then {
@@ -59,38 +60,65 @@ object JsonDecoder:
       sign * acc
 
   given JsonDecoder[Double] with
-    inline def decode(buf: Array[Byte], start: Int, end: Int): Double =
+    def decode(buf: Array[Byte], start: Int, end: Int): Double =
       var i = start
-      var result = 0.0f
-      var sign = 1.0f
-      var decimalMultiplier = 0.1f
+      var result = 0.0
+      var sign = 1.0
+      var decimalMultiplier = 0.1
       var pastDecimal = false
+      var pastExponent = false
+      var exponent = 0
+      var exponentSign = 1
 
       // Handle sign
       if i < end && buf(i) == '-'.toByte then {
-        sign = -1.0f
+        sign = -1.0
         i += 1
       }
 
       while i < end do
         val b = buf(i)
         if b == '.'.toByte then
-          if pastDecimal then throw new Exception("Multiple decimal points")
+          if pastDecimal || pastExponent then throw new Exception("Invalid decimal point position")
           pastDecimal = true
+        else if (b == 'E'.toByte || b == 'e'.toByte) then
+          if pastExponent then throw new Exception("Multiple exponent markers")
+          pastExponent = true
+          // Check for exponent sign
+          if i + 1 < end then
+            val nextB = buf(i + 1)
+            if nextB == '-'.toByte then
+              exponentSign = -1
+              i += 1
+            else if nextB == '+'.toByte then
+              exponentSign = 1
+              i += 1
         else if b >= '0'.toByte && b <= '9'.toByte then
-          val digit = (b - '0'.toByte).toFloat
-          if pastDecimal then
-            result += digit * decimalMultiplier
-            decimalMultiplier *= 0.1f
+          val digit = (b - '0'.toByte)
+          if pastExponent then
+            exponent = exponent * 10 + digit
           else
-            result = result * 10.0f + digit
-        else
-          throw new Exception("Invalid float character")
+            val digitDouble = digit.toDouble
+            if pastDecimal then
+              result += digitDouble * decimalMultiplier
+              decimalMultiplier *= 0.1
+            else
+              result = result * 10.0 + digitDouble
+        else {
+          val s = new String(buf, start, end - start)
+          throw new Exception(s"Invalid float character at position ${i - start}: $s")
+        }
         i += 1
+      val finalExponent = exponent * exponentSign
+      val finalResult = if finalExponent != 0 then
+        result * math.pow(10.0, finalExponent)
+      else
+        result
 
-      sign * result
+      sign * finalResult
+
   given JsonDecoder[Float] with
-    inline def decode(buf: Array[Byte], start: Int, end: Int): Float =
+    def decode(buf: Array[Byte], start: Int, end: Int): Float =
       var i = start
       var result = 0.0f
       var sign = 1.0f
@@ -122,11 +150,13 @@ object JsonDecoder:
       sign * result
 
   given JsonDecoder[String] with
-    inline def decode(buf: Array[Byte], start: Int, end: Int): String =
-        new String(buf, start + 1, end - start - 2, StandardCharsets.UTF_8)
+    def decode(buf: Array[Byte], start: Int, end: Int): String = {
+
+      new String(buf, start + 1, end - start - 2, StandardCharsets.UTF_8)
+    }
 
   given JsonDecoder[Boolean] with
-    inline def decode(buf: Array[Byte], start: Int, end: Int): Boolean =
+    def decode(buf: Array[Byte], start: Int, end: Int): Boolean =
       val len = end - start
       if len == 4 then true
       else if len == 5 then false
@@ -135,8 +165,19 @@ object JsonDecoder:
 
   // ─── Recursive-safe Option Decoder ───────────────────────────────────────────
 
-  given optionDecoder[T](using dec: => JsonDecoder[T]): JsonDecoder[Option[T]] with
-    inline def decode(buf: Array[Byte], start: Int, end: Int): Option[T] =
+  given listDecoder[T](using dec: JsonDecoder[T]): JsonDecoder[List[T]] with
+    def decode(buf: Array[Byte], start: Int, end: Int): List[T] =
+      val cursor = new IntervalCursor(buf)
+      cursor.skipToArrayStart(start, end)
+
+      val result = ArrayBuffer[T]()
+      while cursor.hasMoreArrayElements do
+        val (elemStart, elemEnd) = cursor.nextArrayElement()
+        result += dec.decode(buf, elemStart, elemEnd)
+
+      result.toList
+  given optionDecoder[T](using dec: JsonDecoder[T]): JsonDecoder[Option[T]] with
+    def decode(buf: Array[Byte], start: Int, end: Int): Option[T] =
       val len = end - start
       if len == 4 &&
         buf(start) == 'n' &&
@@ -145,85 +186,35 @@ object JsonDecoder:
         buf(start + 3) == 'l' then None
       else Some(dec.decode(buf, start, end))
 
-  // ─── Derivation ──────────────────────────────────────────────────────────────
-  inline def isOptional[T]: Boolean =
-    inline erasedValue[T] match
-      case _: Option[?] => true
-      case _ => false
-
-  inline given derived[T](using m: Mirror.ProductOf[T]): JsonDecoder[T] =
-    // 1) Precompute the sum‐of‐bytes for each label
-    val labelSums: Vector[Int] =
-      getLabels[m.MirroredElemLabels].iterator
-        .map(_.getBytes(StandardCharsets.UTF_8).map(b => b & 0xFF).sum)
-        .toVector
+  given productOptional[T<:Product](using dec: JsonDecoder[T]): JsonDecoder[Option[T]] with
+    def decode(buf: Array[Byte], start: Int, end: Int): Option[T] =
+      Option(dec.decode(buf, start, end))
 
 
-    // 2) Build a tiny "perfect hash" table: pick a size > 2*N to avoid collisions
-    val tableSize = labelSums.length * 2 + 1
-    val jump: Array[Int] = Array.fill(tableSize)(-1)
-    for i <- labelSums.indices do
-      val bucket = labelSums(i) % tableSize
-      jump(bucket) = i
-
+  inline given derived[T<:Product](using m: Mirror.ProductOf[T]):  JsonDecoder[T] =
+    // Create field name to index mapping at compile time
+    lazy val matchFunction = dispatchBytesMacro[T]
     lazy val self: JsonDecoder[T] =
-      // decoders in the same order as `labels`
-      val decoders: Vector[JsonDecoder[Any]] =
+      lazy val decoders: Vector[JsonDecoder[Any]] =
         summonInstancesWithTypes[T, m.MirroredElemTypes](self)
           .map(_._1.asInstanceOf[JsonDecoder[Any]])
           .toVector
-
       (buf: Array[Byte], start: Int, end: Int) =>
         val cursor = new IntervalCursor(buf)
-        // position cursor at first '{'
         cursor.skipToObjectStart(start, end)
-
-        // prepare result array
-        val resultArr = Array.ofDim[Any](labelSums.length)
-
-        // parse exactly `labels.length` fields inline
-        var i = 0
-        while i < labelSums.length do
+        val resultArr = Array.ofDim[Any](decoders.length)
+        var fieldsFound = 0
+        while cursor.hasMoreObjectFields && fieldsFound < decoders.length do
           val ((kStart, kEnd), (vStart, vEnd)) = cursor.nextField()
-          var s = 0
-          var j = kStart
-          while j < kEnd do
-            s += buf(j) & 0xFF
-            j += 1
-
-          // perfect-hash dispatch
-          val bucket = s % tableSize
-          val idx = jump(bucket)
-          // collision check
-          if idx < 0 || labelSums(idx) != s then
-            throw new IllegalArgumentException(s"Unknown JSON key sum: $s")
-
-          // decode into the proper slot
-          resultArr(idx) = decoders(idx).decode(buf, vStart, vEnd)
-          i += 1
-
-        // build your product
+          // FIX: Extract only the field name portion, removing quotes
+          val fieldName = new String(buf, kStart, kEnd - kStart, StandardCharsets.UTF_8)
+          val idx = matchFunction(fieldName)
+          if idx >= 0 then
+            resultArr(idx) = decoders(idx).decode(buf, vStart, vEnd)
+            fieldsFound += 1
         m.fromProduct(Tuple.fromArray(resultArr))
-
     self
 
-  // ─── Utilities ───────────────────────────────────────────────────────────────
-  inline def fnv1aHash(inline s: String): Long = {
-    // 64-bit FNV-1a constants
-    val OffsetBasis = 1469598103934665603L
-    val Prime = 1099511628211L
-
-    // recursive, inline loop over string characters
-    @tailrec
-    def loop(i: Int, hash: Long): Long =
-      if i < s.length then
-        // mix in next byte
-        loop(i + 1, (hash ^ s.charAt(i).toLong) * Prime)
-      else
-        hash
-
-    loop(0, OffsetBasis)
-  }
   inline def summonInstances[T, Elems <: Tuple](self: => JsonDecoder[T]): List[JsonDecoder[?]] =
     inline erasedValue[Elems] match
       case _: (elem *: elems) => deriveOrSummon[T, elem](self) :: summonInstances[T, elems](self)
@@ -245,9 +236,12 @@ object JsonDecoder:
   inline def getLabels[T <: Tuple]: List[String] =
     constValueTuple[T].toList.asInstanceOf[List[String]]
 
+  // ─── Derivation ──────────────────────────────────────────────────────────────
+  inline def isOptional[T]: Boolean =
+    inline erasedValue[T] match
+      case _: Option[?] => true
+      case _ => false
 
 
-
-
-
+}
 

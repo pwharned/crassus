@@ -1,12 +1,13 @@
 package org.pwharned.codec
 
+
+
 import org.pwharned.http.HttpTypes
 import org.pwharned.http.HttpTypes.ByteSlice
 
 import java.nio.charset.StandardCharsets
 import scala.deriving.Mirror
 import scala.util.{Try, Right as slice}
-
 
 trait Codec[A]:
   def decode(slice: HttpTypes.ByteSlice): Either[String, A]

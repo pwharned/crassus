@@ -15,6 +15,7 @@ trait EntitySerializer[E] {
    * @return The size in bytes.
    */
   def calculateSize(e: E): Int
+  def serialize(e: E): Array[Byte]
 
   /**
    * Writes the serialized form of entity `e` into the provided `ByteBuffer`.
@@ -45,7 +46,9 @@ object EntitySerializer {
       private def getJsonBytes(e: E): Array[Byte] = {
         summon[Codec[E]].encode(e)
       }
-
+      def serialize(e: E): Array[Byte] = {
+        summon[Codec[E]].encode(e)
+      }
       override def calculateSize(e: E): Int = {
 
         getJsonBytes(e).length
@@ -69,7 +72,9 @@ object EntitySerializer {
       private val UTF8 = StandardCharsets.UTF_8
 
       private def getStringBytes(e: String): Array[Byte] = e.getBytes(UTF8)
-
+      def serialize(e: String): Array[Byte] = {
+        summon[Codec[String]].encode(e)
+      }
       override def calculateSize(e: String): Int = getStringBytes(e).length
 
       override def writeEntity(e: String, writeBuf: ByteBuffer): Unit = {

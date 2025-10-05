@@ -1,8 +1,10 @@
 package org.pwharned.http
 
-opaque type HttpMethod = String
 
-object HttpMethod:
+object HttpMethods:
+  opaque type HttpMethod = String
+  
+
   val GET: HttpMethod = "GET"
   val POST: HttpMethod = "POST"
   val PUT: HttpMethod = "PUT"

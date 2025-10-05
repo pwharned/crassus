@@ -28,7 +28,8 @@ object WriteResponse {
                          ): Unit = {
     // 1) statusLine + headers
     writeBuf.clear()
-    writeBuf.putAscii(resp.statusLine).putAscii("\r\n")
+    val statusLine = s"HTTP/1.1 ${resp.status} OK"
+    writeBuf.putAscii(statusLine).putAscii("\r\n")
     (resp.headers ++ S.headers(resp.entity.toString.length)).foreach { case (k,v) =>
       writeBuf.putAscii(k).putAscii(": ").putAscii(v).putAscii("\r\n")
     }

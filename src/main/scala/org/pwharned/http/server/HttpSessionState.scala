@@ -40,7 +40,7 @@ private class HttpSessionState(
           case None => {
             // println("STUB: HttpSessionState - Malformed request. Returning 400.") // Removed for performance
             // Handle malformed request - create HttpResponse directly
-            val malformedResponse = HttpResponse("HTTP/1.1 400 Bad Request", Seq("Content-Type" -> "text/plain"), "Bad Request!")
+            val malformedResponse = HttpResponse(400, Seq("Content-Type" -> "text/plain"), "Bad Request!")
             HttpResponse.render(writeBuf, channel, malformedResponse)
           }
         }
@@ -77,8 +77,6 @@ object HttpSessionState {
   }
 
   inline def selectPool(ch: SocketChannel, bufferPools:Map[String, BufferPool]): BufferPool = {
-    val hash = ch.getRemoteAddress.toString.hashCode
-    val key = if ((hash & 1) == 0) "small" else "large"
-    bufferPools.getOrElse(key, BufferPool.heap(4096))
+    bufferPools.getOrElse("large", BufferPool.heap(4096))
   }
 }

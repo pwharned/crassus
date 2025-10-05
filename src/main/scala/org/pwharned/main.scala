@@ -1,13 +1,11 @@
 package org.pwharned
 
-import org.pwharned.experiments.AnimalMacro.dispatchAnimalPathFn
-import org.pwharned.experiments.PrintTree.printTree
-import org.pwharned.http.request.HttpRequestView
-import org.pwharned.http.response.EntitySerializer.{jsonEntitySerializer, stringEntitySerializer}
 import org.pwharned.http.response.HttpResponse
 import org.pwharned.http.server.HttpServer
-import org.pwharned.http.server.dsl.{Dispatcher, InlineRouter, Route}
-import org.pwharned.io.IO
+import org.pwharned.http.server.dsl.{InlineRouter, endpoint}
+import org.pwharned.http.server.dsl.Macros.*
+import org.pwharned.http.server.dsl.endpoints.Dispatcher2
+import org.pwharned.io.*
 
 import scala.language.implicitConversions
 
@@ -19,16 +17,28 @@ import scala.language.implicitConversions
 @main def runHttp(): Unit = {
   // 1) Define your routing logic
 
-  val httpResponse = "HTTP/1.1 200 OK\r\n" + "Content-Type: text/plain\r\n" + "Content-Length: 13\r\n" + "\r\n" + "Hello, world!"
+
+  inline def e1 = endpoint.get("/page").serverLogic(
+     x => IO.pure(HttpResponse.ok("Ok") )
+   )
+
+  inline def e2 = endpoint.get("/page/2").serverLogic(
+    x => IO.pure(HttpResponse.ok("Ok"))
+  )
 
   val router = InlineRouter
-  InlineRouter.build(new Route("GET","foo",(req: HttpRequestView) =>
-    IO.pure(new HttpResponse("HTTP/1.1 200 OK", Seq.empty, "Hello from foo!"))))
+  router.build(e1)
 
 
-  HttpServer.builder(router)
-   .bind("localhost", 8080)
-  .start()
+  HttpServer.builder(router).bind("0.0.0.0", 8080).start()
+
+
+
+
+
+
+
+
 
 
 }

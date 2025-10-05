@@ -1,4 +1,4 @@
-import org.pwharned.http.HttpResponse
+import org.pwharned.http.response.HttpResponse
 import org.pwharned.http.request.HttpParser
 
 import java.nio.ByteBuffer
@@ -38,11 +38,4 @@ object  HttpParserTest {
 @main
 def test: Unit =
   HttpParserTest
-  val resp = HttpResponse(
-    "HTTP/1.1 200 OK",
-    Seq("Content-Type" -> "text/plain", "Content-Length" -> "9"),
-    "Hi there!".getBytes("UTF-8")
-  )
 
-  val bytes = HttpResponse.toBytes(resp)
-  println(new String(bytes, "UTF-8"))

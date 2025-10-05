@@ -72,8 +72,7 @@ object  TcpServer  {
   }
 
   val bufferPools: BufferPoolCollection = Map(
-    "small" -> BufferPool.heap(bufferSize = 1024),
-    "large" -> BufferPool.direct(bufferSize = 8 * 1024)
+    "large" -> BufferPool.direct(bufferSize =8* 1024)
   )
   private val wakeupNeeded = new AtomicBoolean(false)
 
