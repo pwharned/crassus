@@ -114,14 +114,17 @@ object Dispatcher:
      * Recursively build a nested `Match` on segment `depth`, using the
      * provided `keyExpr` as the path input.
      */
-    def buildMatch(
+    def buildMatchWithFallback(
                     depth: Int,
                     entries: Seq[(String, List[String], Expr[HttpRequestView => IO[HttpResponse[String]]])],
-                    segmentsExpr: Expr[Array[String]]
+                    segmentsExpr: Expr[Array[String]],
+                    absentFallback: Expr[HttpRequestView => IO[HttpResponse[String]]]
                   )(using Quotes): Expr[HttpRequestView => IO[HttpResponse[String]]] = {
-      val validEntries = entries.filter(_._2.length > depth)
 
-      val scrutinee: Expr[String] = '{ $segmentsExpr(${Expr(depth)}) }
+      val validEntries = entries.filter(_._2.length > depth)
+      val absentSegment = "__ABSENT_SEGMENT__"
+      val scrutinee: Expr[String] = '{ $segmentsExpr.lift(${ Expr(depth) }).getOrElse(${ Expr(absentSegment) }) }
+
 
       val (dynEntries, statEntries) = validEntries.partition {
         case (_, segs, _) => segs.length > depth && isDyn(segs(depth))
@@ -137,6 +140,36 @@ object Dispatcher:
         CaseDef(Literal(StringConstant(seg)), None, body.asTerm)
       }
 
+
+      val matchExpr: Expr[HttpRequestView => IO[HttpResponse[String]]] =
+        Match(scrutinee.asTerm, statCases :+ CaseDef(Literal(StringConstant(absentSegment)), None, absentFallback.asTerm)).asExprOf[HttpRequestView => IO[HttpResponse[String]]]
+
+      matchExpr
+    }
+
+    def buildMatch(
+                    depth: Int,
+                    entries: Seq[(String, List[String], Expr[HttpRequestView => IO[HttpResponse[String]]])],
+                    segmentsExpr: Expr[Array[String]]
+                  )(using Quotes): Expr[HttpRequestView => IO[HttpResponse[String]]] = {
+
+      val validEntries = entries.filter(_._2.length > depth)
+      val absentSegment = "__ABSENT_SEGMENT__"
+      val scrutinee: Expr[String] = '{ $segmentsExpr.lift(${ Expr(depth) }).getOrElse(${ Expr(absentSegment) }) }
+
+
+      val (dynEntries, statEntries) = validEntries.partition {
+        case (_, segs, _) => segs.length > depth && isDyn(segs(depth))
+      }
+
+      val statGroups = statEntries.groupBy(_._2(depth))
+      // routes that end exactly at this depth (they matched up through index `depth`)
+      val terminalEntriesBySegment: Map[String, Seq[Expr[HttpRequestView => IO[HttpResponse[String]]]]] =
+        entries
+          .filter(_._2.length == depth + 1) // route whose last index is `depth`
+          .groupBy(_._2(depth))
+          .view.mapValues(_.map(_._3)).toMap
+
       val wildcardBody: Expr[HttpRequestView => IO[HttpResponse[String]]] =
         if dynEntries.nonEmpty then
           if dynEntries.forall(_._2.size == depth + 1) then dynEntries.head._3
@@ -145,9 +178,43 @@ object Dispatcher:
           (req: HttpRequestView) =>
             IO.pure(new HttpResponse(404, Seq.empty, "The server could not locate a matching resource."))
         }
+      val statCases: List[CaseDef] = statGroups.toList.map { (seg, es) =>
+        // body for deeper static cases (same as before)
+        val innerBody: Expr[HttpRequestView => IO[HttpResponse[String]]] =
+          if es.forall(_._2.size == depth + 1) then es.head._3
+          else buildMatch(depth + 1, es, segmentsExpr)
+
+        // if a terminal handler exists for this segment, use it as the absent-segment fallback
+        val absentForThisSeg: Expr[HttpRequestView => IO[HttpResponse[String]]] =
+          terminalEntriesBySegment.get(seg).flatMap(_.headOption).getOrElse(wildcardBody)
+
+        // build inner match for this segment that uses absentForThisSeg for the absentSegment case
+        val innerCases: List[CaseDef] = {
+          // NOTE: innerBody is what should be used for non-absent deeper cases (you already build that via recursion)
+          // Here we must construct the Match for seg(depth+1), but since you already call buildMatch to create that
+          // innerBody, you can instead inline the absent-case by wrapping innerBody so that when it generates its
+          // absentSegment case it uses absentForThisSeg; easiest approach is to pass the absent handler down as the wildcard
+          // when recursing. To keep changes small, detect whether innerBody was produced by recursion or is terminal:
+          if es.forall(_._2.size == depth + 1) then
+            // no deeper static cases, innerBody itself is the handler for seg when next segment is absent
+            // so simply create a CaseDef for seg that returns innerBody when seg matched and then
+            // rely on outer match to match absentSegment -> absentForThisSeg
+            List(CaseDef(Literal(StringConstant(seg)), None, innerBody.asTerm))
+          else
+            // we need to produce a nested match that, on absentSegment, returns absentForThisSeg.
+            // implement by calling a helper that builds the deeper match but accepts a fallback for absentSegment.
+            List(CaseDef(Literal(StringConstant(seg)), None, buildMatchWithFallback(depth + 1, es, segmentsExpr, absentForThisSeg).asTerm))
+        }
+
+        // return single CaseDef (above) — in the simple code path it's the CaseDef(Literal(seg),...,...)
+        innerCases.head
+      }
+
+
+
 
       val matchExpr: Expr[HttpRequestView => IO[HttpResponse[String]]] =
-        Match(scrutinee.asTerm, statCases :+ CaseDef(Wildcard(), None, wildcardBody.asTerm)).asExprOf[HttpRequestView => IO[HttpResponse[String]]]
+        Match(scrutinee.asTerm, statCases :+ CaseDef(Literal(StringConstant(absentSegment)), None, wildcardBody.asTerm)).asExprOf[HttpRequestView => IO[HttpResponse[String]]]
 
       matchExpr
     }

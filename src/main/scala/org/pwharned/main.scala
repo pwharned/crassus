@@ -27,7 +27,7 @@ import scala.language.implicitConversions
   )
 
   val router = InlineRouter
-  router.build(e1)
+  router.build(e1, e2)
 
 
   HttpServer.builder(router).bind("0.0.0.0", 8080).start()
