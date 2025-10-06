@@ -1,6 +1,6 @@
 package org.pwharned.codec
 trait JsonEncoder[T]:
-  def encode(ent: T): Array[Byte]
+  def encode(ent: T): String
 
 object JsonEncoder:
   import java.nio.charset.StandardCharsets
@@ -8,43 +8,49 @@ object JsonEncoder:
   import scala.compiletime.*
 
 
-  inline def openBrace: Array[Byte] = Array(123) // "{"
 
-  inline def closeBrace: Array[Byte] = Array(125) // "}"
-
-  inline def comma: Array[Byte] = Array(44) // ","
-
-  inline def colon: Array[Byte] = Array(58) // ":"
-
-
+  inline val openBrace = "{"
+  inline val closeBrace = "}"
+  inline val comma = ","
+  inline val colon = ":"
 
   // ─── Primitive Instances ─────────────────────────────────────────────────────
 
   given JsonEncoder[Int] with
-    inline def encode(ent: Int): Array[Byte] = ent.toString.getBytes(StandardCharsets.UTF_8)
+    inline def encode(ent: Int): String = ent.toString
 
   given JsonEncoder[Double] with
-    inline def encode(ent: Double): Array[Byte] = ent.toString.getBytes(StandardCharsets.UTF_8)
+    inline def encode(ent: Double): String = ent.toString
 
   given JsonEncoder[Long] with
-    inline def encode(ent: Long): Array[Byte] = ent.toString.getBytes(StandardCharsets.UTF_8)
+    inline def encode(ent: Long): String = ent.toString
 
   given JsonEncoder[Boolean] with
-    inline def encode(ent: Boolean): Array[Byte] = ent.toString.getBytes(StandardCharsets.UTF_8)
+    inline def encode(ent: Boolean): String = ent.toString
 
   given JsonEncoder[String] with
-    inline def encode(ent: String): Array[Byte] =
-      ("\"" + ent.replaceAll("\"", "\\\"") + "\"").getBytes(StandardCharsets.UTF_8)
+    inline def encode(ent: String): String =ent
 
   // ─── Recursive-safe Option Encoder ───────────────────────────────────────────
 
   given optionEncoder[T](using enc: => JsonEncoder[T]): JsonEncoder[Option[T]] with
-    inline def encode(ent: Option[T]): Array[Byte] =
+    inline def encode(ent: Option[T]): String =
       ent match {
         case Some(value) => enc.encode(value)
-        case None => "null".getBytes(StandardCharsets.UTF_8)
+        case None => "null"
       }
 
+  given iteratorEncoder[T](using enc: => JsonEncoder[T]): JsonEncoder[Iterator[T]] with
+    def encode(ent: Iterator[T]): String =
+      val sb = ent.foldLeft(new StringBuilder("[")) { (sb, item) =>
+        sb.append(enc.encode(item))
+        sb.append(',')
+      }
+      if sb.length ==1 then  sb.append("]").toString else sb.setCharAt(sb.length - 1, ']').toString
+
+
+  given encoder[T](using enc: => JsonEncoder[T]): JsonEncoder[List[T]] with
+    inline def encode(ent: List[T]): String = "[" + ent.map(x => enc.encode(x)) + "]"
   // ─── Derivation ──────────────────────────────────────────────────────────────
   inline def isOptional[T]: Boolean =
     inline erasedValue[T] match
@@ -65,7 +71,7 @@ object JsonEncoder:
             if isOpt && value == None then None
             else {
               val encodedValue = encoder.asInstanceOf[JsonEncoder[Any]].encode(value)
-              val encodedName = s"\"$name\"".getBytes(StandardCharsets.UTF_8)
+              val encodedName = s"\"$name\""
               Some(encodedName ++ colon ++ encodedValue)
             }
         }.flatten

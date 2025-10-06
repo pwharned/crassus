@@ -60,9 +60,9 @@ object Dispatcher:
             val term = strip(routeExpr.asTerm)
             term match
 
-              case Apply(TypeApply(Apply(Ident("serverLogic"), 
+              case Apply(TypeApply(Apply(Ident("serverLogic"),
                     List(Inlined(Some(Apply(Apply(Ident(method),
-                      List(Ident("endpoint"))), 
+                      List(Ident("endpoint"))),
                         List(Typed(Repeated(List(Literal(StringConstant(path))),
                           Inferred()), Inferred())))), Nil,_))),_ ),
                             List(handlerFunction)) => {
@@ -127,6 +127,15 @@ object Dispatcher:
         case (_, segs, _) => segs.length > depth && isDyn(segs(depth))
       }
 
+      // compute wildcard body using dynEntries (similar to buildMatch)
+      val wildcardForThisLevel: Expr[HttpRequestView => IO[HttpResponse[String]]] =
+        if dynEntries.nonEmpty then
+          if dynEntries.forall(_._2.size == depth + 1) then dynEntries.head._3
+          else buildMatch(depth + 1, dynEntries, segmentsExpr)
+        else absentFallback
+
+      // Then build statCases as before and include case for absentSegment to call absentFallback (already done)
+
       val statGroups = statEntries.groupBy(_._2(depth))
 
       val statCases: List[CaseDef] = statGroups.toList.map { (seg, es) =>
@@ -136,10 +145,17 @@ object Dispatcher:
 
         CaseDef(Literal(StringConstant(seg)), None, body.asTerm)
       }
-
+      val finalCases = if (dynEntries.nonEmpty) {
+        // Add both absent segment case AND wildcard case for dynamic entries
+        statCases :+ CaseDef(Literal(StringConstant(absentSegment)), None, absentFallback.asTerm) :+
+          CaseDef(Wildcard(), None, wildcardForThisLevel.asTerm)
+      } else {
+        // Only absent segment case if no dynamic entries
+        statCases :+ CaseDef(Literal(StringConstant(absentSegment)), None, absentFallback.asTerm)
+      }
 
       val matchExpr: Expr[HttpRequestView => IO[HttpResponse[String]]] =
-        Match(scrutinee.asTerm, statCases :+ CaseDef(Literal(StringConstant(absentSegment)), None, absentFallback.asTerm)).asExprOf[HttpRequestView => IO[HttpResponse[String]]]
+        Match(scrutinee.asTerm, finalCases).asExprOf[HttpRequestView => IO[HttpResponse[String]]]
 
       matchExpr
     }
@@ -151,8 +167,12 @@ object Dispatcher:
                   )(using Quotes): Expr[HttpRequestView => IO[HttpResponse[String]]] = {
 
       val validEntries = entries.filter(_._2.length > depth)
-      val absentSegment = "__ABSENT_SEGMENT__"
-      val scrutinee: Expr[String] = '{ $segmentsExpr.lift(${ Expr(depth) }).getOrElse(${ Expr(absentSegment) }) }
+      // at top of method
+      val absentSegLiteral = "__ABSENT_SEGMENT__"
+
+      val scrutinee: Expr[String] =
+        '{ $segmentsExpr.lift(${ Expr(depth) }).getOrElse(${ Expr(absentSegLiteral) }) }
+
 
 
       val (dynEntries, statEntries) = validEntries.partition {
@@ -162,7 +182,7 @@ object Dispatcher:
       val statGroups = statEntries.groupBy(_._2(depth))
       // routes that end exactly at this depth (they matched up through index `depth`)
       val terminalEntriesBySegment: Map[String, Seq[Expr[HttpRequestView => IO[HttpResponse[String]]]]] =
-        entries
+        validEntries
           .filter(_._2.length == depth + 1) // route whose last index is `depth`
           .groupBy(_._2(depth))
           .view.mapValues(_.map(_._3)).toMap
@@ -206,12 +226,18 @@ object Dispatcher:
         // return single CaseDef (above) — in the simple code path it's the CaseDef(Literal(seg),...,...)
         innerCases.head
       }
-      val finalMatch = depth match {
-        case 0 => CaseDef(Wildcard(), None, wildcardBody.asTerm)
-        case _ => CaseDef(Literal(StringConstant(absentSegment)), None, wildcardBody.asTerm)
-      }
 
-
+      val finalMatch =
+        if (dynEntries.nonEmpty) {
+          // Always add wildcard when there are dynamic entries at this depth
+          CaseDef(Wildcard(), None, wildcardBody.asTerm)
+        } else if (depth == 0) {
+          // At root level, still need wildcard for unmatched paths
+          CaseDef(Wildcard(), None, wildcardBody.asTerm)
+        } else {
+          // Only use absent segment case when no dynamic entries exist
+          CaseDef(Literal(StringConstant(absentSegLiteral)), None, wildcardBody.asTerm)
+        }
 
 
       val matchExpr: Expr[HttpRequestView => IO[HttpResponse[String]]] =

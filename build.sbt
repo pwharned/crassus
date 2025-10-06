@@ -30,24 +30,12 @@ lazy val excludedPrefixes = Seq(
 )
 lazy val generateModels = taskKey[Unit]("Generate case classes from SQL schema")
 
-generateModels := {
-  val output = CaseClassGenerator.generateCaseClasses("src/main/resources/schema.sql")
-  val finalOutput = s"""
-                       |package com.myapp.models
-                       |
-                       |import java.sql.Timestamp
-                       |
-                       |$output
-                       |""".stripMargin
-
-  IO.write(file("src/main/scala/org/pwharned/models/Generated.scala"), finalOutput)
-  println("✅ Generated case classes successfully!")
-}
 
 
 lazy val root = project.in(file(".")).enablePlugins(CaseClassGeneratorPlugin)
 
   .settings(
+    tupleTypes:=false,
     name := "crassus",
     scalaVersion := "3.7.1",
     Compile / packageBin / mappings := {

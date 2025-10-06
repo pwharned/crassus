@@ -15,7 +15,7 @@ trait EntitySerializer[E] {
    * @return The size in bytes.
    */
   def calculateSize(e: E): Int
-  def serialize(e: E): Array[Byte]
+  def serialize(e: E): String
 
   /**
    * Writes the serialized form of entity `e` into the provided `ByteBuffer`.
@@ -43,10 +43,10 @@ object EntitySerializer {
       // For JSON, we typically need to serialize to string first to get length
       // This is still an allocation, but it's contained.
       // We'll focus on avoiding the *second* byte[] and ByteBuffer allocation.
-      private def getJsonBytes(e: E): Array[Byte] = {
+      private def getJsonBytes(e: E): String = {
         summon[Codec[E]].encode(e)
       }
-      def serialize(e: E): Array[Byte] = {
+      def serialize(e: E): String = {
         summon[Codec[E]].encode(e)
       }
       override def calculateSize(e: E): Int = {
@@ -56,7 +56,7 @@ object EntitySerializer {
 
       override def writeEntity(e: E, writeBuf: ByteBuffer): Unit = {
         val bytes = getJsonBytes(e) // This is where the byte[] is allocated, but only once per request.
-        writeBuf.put(bytes)
+        writeBuf.put(bytes.getBytes(StandardCharsets.UTF_8))
       }
 
       override def headers(serializedSize: Int): Seq[(String, String)] = {
@@ -72,7 +72,7 @@ object EntitySerializer {
       private val UTF8 = StandardCharsets.UTF_8
 
       private def getStringBytes(e: String): Array[Byte] = e.getBytes(UTF8)
-      def serialize(e: String): Array[Byte] = {
+      def serialize(e: String): String = {
         summon[Codec[String]].encode(e)
       }
       override def calculateSize(e: String): Int = getStringBytes(e).length

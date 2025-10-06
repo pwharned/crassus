@@ -1,5 +1,7 @@
 package org.pwharned
 
+import generated.test
+import org.pwharned.codec.JsonEncoder
 import org.pwharned.config.EnvLoader
 import org.pwharned.database.{ConnectionDetails, Database, DbTypeMapper, PostgresDialect, PostgresTypeMapper, SqlDialect}
 import org.pwharned.database.hkd.{New, Persisted}
@@ -14,7 +16,6 @@ import org.pwharned.database.macros.AliasNameMacro.aliasNameOf
 
 import scala.language.implicitConversions
 import org.pwharned.database.macros.{Macros, Select}
-import org.pwharned.database.models.test
 
 import java.util.concurrent.{ExecutorService, Executors}
 import scala.concurrent.{ExecutionContext, Future}
@@ -36,8 +37,8 @@ import scala.util.{Failure, Success, Try}
 
   given ec: ExecutionContext = ExecutionContext.fromExecutorService(executor)
   def getTest: Future[Try[String]] =          {
-    val select = Select.derived[Persisted[test]].select
-    db.withConnection(x => x.query[Persisted[test]](select).mkString(",")  )
+    given e: JsonEncoder[Iterator[Persisted[test]]] = JsonEncoder.iteratorEncoder[Persisted[test]]
+    db.withConnection(x => e.encode(x.query[Persisted[test]]) )
   }
 
 
@@ -46,19 +47,19 @@ import scala.util.{Failure, Success, Try}
        {
        getTest.map {
            case Failure(exception) => HttpResponse.error(exception.getMessage)
-           case Success(value) =>  HttpResponse.ok(value.mkString(",") )
+           case Success(value) =>  HttpResponse.ok(value)
          }
        }
      }  )
    )
 
-  inline def e2 = endpoint.get("/page/2").serverLogic(
+  inline def e2 = endpoint.get("/page/{id}").serverLogic(
     x => IO.pure(HttpResponse.ok("Ok"))
   )
 
 
   val router = InlineRouter
-  router.build( e1)
+  router.build( e1, e2)
 
 
 

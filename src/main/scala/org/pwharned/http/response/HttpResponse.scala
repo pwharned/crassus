@@ -12,7 +12,7 @@ case class HttpResponse[E](
                             status: Int,
                             headers:    Seq[(String,String)],
                             entity:     E
-                          ) 
+                          )
 
 
 object HttpResponse  {
@@ -27,7 +27,6 @@ object HttpResponse  {
     val serialized  = response.entity.toString.getBytes("UTF-8")
     val contentLength = serialized.length
     writeBuf.putAscii(version).putAscii(response.status.toString).putAscii(ok).putAscii("\r\n")
-    
     (response.headers :+  ("Content-Length" -> contentLength.toString) ).foreach { case (k, v) =>
       writeBuf.putAscii(k).putAscii(": ").putAscii(v).putAscii("\r\n")
     }
@@ -35,7 +34,7 @@ object HttpResponse  {
 
     // 3) Write the serialized entity into the buffer, immediately after headers
     writeBuf.put(serialized)
-    
+
     writeBuf.flip() // Prepare the entire buffer (headers + body) for reading
 
     // 4) Write the entire buffer to the channel in one go (if it fits)
@@ -56,7 +55,7 @@ object HttpResponse  {
 
   inline val version = "HTTP/1.1 "
   inline val ok = " OK"
-  def ok(entity: String): HttpResponse[String] = new HttpResponse[String](200, Seq.empty, entity)
+  def ok[T](entity: T): HttpResponse[T] = new HttpResponse[T](200, Seq.empty, entity)
   def error(entity: String): HttpResponse[String] = new HttpResponse[String](500, Seq.empty, entity)
 
 

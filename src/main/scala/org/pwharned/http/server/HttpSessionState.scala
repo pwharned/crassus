@@ -32,7 +32,7 @@ private class HttpSessionState(
 
             val ioResponse = router.handle(requestView)
             ioResponse.unsafeRunOptimized() match {
-              case response: HttpResponse[?] =>
+              case response: HttpResponse[String] =>
                 // Now, call the render method directly on the HttpResponse instance
                 HttpResponse.render(writeBuf, channel, response)
             }

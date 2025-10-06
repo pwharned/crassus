@@ -15,6 +15,7 @@ object CaseClassGeneratorPlugin extends AutoPlugin {
     val caseClassOutputDir = settingKey[File]("Output directory for generated classes")
     val caseClassPackageName = settingKey[String]("Package name for generated classes")
     val caseClassUseHKD = settingKey[Boolean]("Whether to use HKD types")
+    val tupleTypes = settingKey[Boolean]("Whether to use named tuples or case classes")
   }
 
   import autoImport._
@@ -31,6 +32,7 @@ object CaseClassGeneratorPlugin extends AutoPlugin {
       val outputDir = caseClassOutputDir.value
       val packageName = caseClassPackageName.value
       val useHKD = caseClassUseHKD.value
+      val namedTuples = tupleTypes
 
       log.info(s"Generating case classes from ${schemaFile.getAbsolutePath}")
 
@@ -41,7 +43,7 @@ object CaseClassGeneratorPlugin extends AutoPlugin {
         IO.createDirectory(outputDir)
 
         // Move your generator logic here
-        val generatedCode =     CaseClassGenerator.generateCaseClasses(schemaFile.getAbsolutePath, useHKD)
+        val generatedCode =     CaseClassGenerator.generateCaseClasses(schemaFile.getAbsolutePath, useHKD, tupleTypes.value)
 
 
         val imports = if (useHKD) "import org.pwharned.database.hkd._\n" else ""
