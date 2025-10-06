@@ -57,6 +57,7 @@ object HttpResponse  {
   inline val version = "HTTP/1.1 "
   inline val ok = " OK"
   def ok(entity: String): HttpResponse[String] = new HttpResponse[String](200, Seq.empty, entity)
+  def error(entity: String): HttpResponse[String] = new HttpResponse[String](500, Seq.empty, entity)
 
 
 }

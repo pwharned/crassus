@@ -44,7 +44,7 @@ object CaseClassGeneratorPlugin extends AutoPlugin {
         val generatedCode =     CaseClassGenerator.generateCaseClasses(schemaFile.getAbsolutePath, useHKD)
 
 
-        val imports = if (useHKD) "import org.pwharned.sql.HKD._\n" else ""
+        val imports = if (useHKD) "import org.pwharned.database.hkd._\n" else ""
 
         val code =
           s"""package $packageName

@@ -60,15 +60,12 @@ object Dispatcher:
             val term = strip(routeExpr.asTerm)
             term match
 
-              case Apply(TypeApply(Apply(Ident("serverLogic"),
-                List(Inlined(Some(Apply(Apply(Ident(method),
-                  List(Ident("endpoint"))), List(Typed(Repeated(List(Literal(StringConstant(_))),
-                    Inferred()), Inferred())))), Nil, Typed(Inlined(Some(TypeIdent("Macros$")), Nil,
-                      Apply(Select(Ident("EndpointPath"), "apply"),
-                        List(Inlined(None, Nil, Literal(StringConstant(path))),
-                          Inlined(None, Nil, Inlined(_, Nil,
-                            Ident(_)))))), TypeIdent("EndpointPath"))))), List(Inferred())),
-                              List(handlerFunction))=> {
+              case Apply(TypeApply(Apply(Ident("serverLogic"), 
+                    List(Inlined(Some(Apply(Apply(Ident(method),
+                      List(Ident("endpoint"))), 
+                        List(Typed(Repeated(List(Literal(StringConstant(path))),
+                          Inferred()), Inferred())))), Nil,_))),_ ),
+                            List(handlerFunction)) => {
                 val cleanHandler = handlerFunction match {
                   case fn@Block(List(DefDef(_,
                         List(TermParamClause(List(param))),
@@ -209,12 +206,16 @@ object Dispatcher:
         // return single CaseDef (above) — in the simple code path it's the CaseDef(Literal(seg),...,...)
         innerCases.head
       }
+      val finalMatch = depth match {
+        case 0 => CaseDef(Wildcard(), None, wildcardBody.asTerm)
+        case _ => CaseDef(Literal(StringConstant(absentSegment)), None, wildcardBody.asTerm)
+      }
 
 
 
 
       val matchExpr: Expr[HttpRequestView => IO[HttpResponse[String]]] =
-        Match(scrutinee.asTerm, statCases :+ CaseDef(Literal(StringConstant(absentSegment)), None, wildcardBody.asTerm)).asExprOf[HttpRequestView => IO[HttpResponse[String]]]
+        Match(scrutinee.asTerm, statCases :+ finalMatch ).asExprOf[HttpRequestView => IO[HttpResponse[String]]]
 
       matchExpr
     }

@@ -2,4 +2,4 @@
 addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.7.3")
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.6")
 addSbtPlugin("net.virtual-void" % "sbt-optimizer" % "0.1.2")
-addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.8")
+addSbtPlugin("org.pwharned" % "caseclassgenerator" % "0.1.0-SNAPSHOT")

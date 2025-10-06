@@ -1,3 +1,4 @@
+import org.pwharned.generator.CaseClassGenerator
 
 ThisBuild / version := "0.1.0-SNAPSHOT"
 libraryDependencies += "com.ibm.db2" % "jcc" % "11.5.8.0"
@@ -13,27 +14,38 @@ Global / parallelExecution := true
 //  "-H:ResourceConfigurationFiles=../../resource-config.json",
 
 //)
-import pl.project13.scala.sbt.JmhPlugin
 
 lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
   .settings(
     name := "caseClassGenerator",
     ThisBuild / organization := "org.pwharned",
       scalaVersion := "2.12.18",
-    publish / skip := false
+    publish / skip := false,
+    sbtPlugin := true,        // <--- required
   )  .enablePlugins(SbtPlugin)
-
-
 
 
 lazy val excludedPrefixes = Seq(
   "generated","main"
 )
+lazy val generateModels = taskKey[Unit]("Generate case classes from SQL schema")
 
-val circeVersion = "0.14.14"
+generateModels := {
+  val output = CaseClassGenerator.generateCaseClasses("src/main/resources/schema.sql")
+  val finalOutput = s"""
+                       |package com.myapp.models
+                       |
+                       |import java.sql.Timestamp
+                       |
+                       |$output
+                       |""".stripMargin
+
+  IO.write(file("src/main/scala/org/pwharned/models/Generated.scala"), finalOutput)
+  println("✅ Generated case classes successfully!")
+}
 
 
-lazy val root = project.in(file(".")).enablePlugins(JmhPlugin)
+lazy val root = project.in(file(".")).enablePlugins(CaseClassGeneratorPlugin)
 
   .settings(
     name := "crassus",
@@ -46,11 +58,7 @@ lazy val root = project.in(file(".")).enablePlugins(JmhPlugin)
     },
     libraryDependencies += "org.scala-lang" % "scala3-library_3" % scalaVersion.value,
 
-libraryDependencies ++= Seq(
-  "io.circe" %% "circe-core",
-  "io.circe" %% "circe-generic",
-  "io.circe" %% "circe-parser"
-).map(_ % circeVersion),
+
       ThisBuild / logLevel := Level.Info,
       // in build.sbt
     Compile / compile / fork := true,
