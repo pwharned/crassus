@@ -8,7 +8,6 @@ import org.pwharned.io.IO
 import scala.annotation.tailrec
 import scala.quoted.*
 
-type Path = String &Singleton
 
 object endpoint
 
@@ -103,19 +102,3 @@ object Macros:
         report.errorAndAbort(s"Expected a literal EndpointPath, got: $other")
   
 
-object IntMacros {
-
-  extension (inline x: Int)
-    inline def macroA: Int =
-      ${ macroAImpl('x) }
-
-  private def macroAImpl(xExpr: Expr[Int])(using Quotes): Expr[Int] =
-    '{ $xExpr + 1 }
-
-  extension (inline y: Int)
-    inline def macroB: Int =
-      ${ macroBImpl('y) }
-
-  private def macroBImpl(yExpr: Expr[Int])(using Quotes): Expr[Int] =
-    '{ $yExpr * 2 }
-}

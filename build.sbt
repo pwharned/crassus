@@ -1,4 +1,3 @@
-import org.pwharned.generator.CaseClassGenerator
 
 ThisBuild / version := "0.1.0-SNAPSHOT"
 libraryDependencies += "com.ibm.db2" % "jcc" % "11.5.8.0"
@@ -6,22 +5,22 @@ libraryDependencies += "org.postgresql" % "postgresql" % "42.7.7"
 Compile / mainClass := Some("org.pwharned.main")
 Global / parallelExecution := true
 
-//enablePlugins(ScalaNativePlugin)
-//nativeMode:= "release-fast"
-//enablePlugins(GraalVMNativeImagePlugin)
-//graalVMNativeImageOptions ++= Seq(
-//  "--allow-incomplete-classpath",
-//  "-H:ResourceConfigurationFiles=../../resource-config.json",
 
-//)
 
 lazy val caseClassGenerator = project.in(file("caseClassGenerator"))
   .settings(
+
     name := "caseClassGenerator",
     ThisBuild / organization := "org.pwharned",
       scalaVersion := "2.12.18",
     publish / skip := false,
-    sbtPlugin := true,        // <--- required
+    publishTo := {
+      sys.props.get("publish.repo") match {
+        case Some(path) => Some("Custom Local Repo" at s"file://$path")
+        case None       => None // fallback to default or error
+      }
+    },
+      sbtPlugin := true,        // <--- required
   )  .enablePlugins(SbtPlugin)
 
 
@@ -32,18 +31,11 @@ lazy val generateModels = taskKey[Unit]("Generate case classes from SQL schema")
 
 
 
-lazy val root = project.in(file(".")).enablePlugins(CaseClassGeneratorPlugin)
+lazy val root = project.in(file("."))
 
   .settings(
-    tupleTypes:=false,
     name := "crassus",
     scalaVersion := "3.7.1",
-    Compile / packageBin / mappings := {
-      val original: Seq[(File, String)] = (Compile / packageBin / mappings).value
-      original.filterNot { case (_, pathInJar) =>
-        excludedPrefixes.exists(pathInJar.contains)
-      }
-    },
     libraryDependencies += "org.scala-lang" % "scala3-library_3" % scalaVersion.value,
 
 
