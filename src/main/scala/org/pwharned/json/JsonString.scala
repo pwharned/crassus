@@ -4,29 +4,30 @@ import org.pwharned.openapi.{Schema, schema}
 import org.pwharned.parse.{Parser, Primitives}
 import org.pwharned.parse.QueryDeserializer.QueryFieldDeserializer
 import org.pwharned.sql.database.Rs
-
-opaque type JsonString = String
+import org.pwharned.parse.Parse._
+import scala.deriving.Mirror
+opaque type JsonString[T] = String
 
 object JsonString:
-  def apply(s: String): JsonString = s
+  def apply[T](s: String): JsonString[T] = s
 
-  extension (j: JsonString)
+  extension [T](j: JsonString[T]) // Added [T] parameter
     def value: String = j
-  given JsonSerializer[JsonString] with
-    def toJson(js: JsonString): String = js.value
 
-    override def serialize(obj: JsonString): JsonString = obj.value
-  given Rs[JsonString] with
-    def read(r: java.sql.ResultSet, c: String): JsonString = r.getString(c)
-  given QueryFieldDeserializer[JsonString] with 
-    override def parser: Parser[JsonString] = Primitives.stringNoAmpersand
-  given Schema[JsonString] with
-    def labels: Nil.type = Nil
-    def `type`: Option[JsonString] = Some("string")
+  given [T]: JsonSerializer[JsonString[T]] with // Added [T] parameter
+    def toJson(js: JsonString[T]): String = js.value
+    
+    // Fixed return type - should return String, not JsonString[T]
+    override def serialize(obj: JsonString[T]): String = obj.value
 
-    def toSchema: schema = schema(`type` = `type`)
+  given [T]: Rs[JsonString[T]] with // Added [T] parameter
+    def read(r: java.sql.ResultSet, c: String): JsonString[T] = 
+      JsonString[T](r.getString(c)) // Properly construct JsonString[T]
 
+  given [T]: QueryFieldDeserializer[JsonString[T]] with // Added [T] parameter
+    override def parser: Parser[JsonString[T]] = 
+      Primitives.stringNoAmpersand.map(JsonString[T](_)) // Map to JsonString[T]
 
-// 👇 Implicit conversion from String to JsonString
-given Conversion[String, JsonString] with
-  def apply(s: String): JsonString = JsonString(s)
+  given [T]: Conversion[String, JsonString[T]] with
+    def apply(s: String): JsonString[T] = JsonString[T](s)
+

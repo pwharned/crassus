@@ -1,6 +1,6 @@
 package org.pwharned.sql.database
 
-import org.pwharned.json.{JsonString, given_Conversion_String_JsonString}
+import org.pwharned.json.{JsonString}
 import org.pwharned.sql.HKD._
 
 import java.sql.ResultSet

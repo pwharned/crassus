@@ -1,7 +1,7 @@
 package org.pwharned.json
 
 import org.pwharned.parse.{Parse, ParseError, Parser, Primitives}
-
+import org.pwharned.parse.Parse._
 import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.deriving.*
@@ -33,7 +33,7 @@ trait JsonDeserializer[T]:
   def isOptional: Boolean = false
 
   def defaultValue: Option[T] = None
-object JsonDeserializer extends Parse:
+object JsonDeserializer:
 
 
   given JsonDeserializer[String] with

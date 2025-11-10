@@ -2,9 +2,8 @@ package org.pwharned.parse
 
 import org.pwharned.sql.HKD._
 import org.pwharned.json.JsonString
-import org.pwharned.json.given_Conversion_String_JsonString
 import org.pwharned.parse.{Parse, ParseError, Primitives}
-
+import org.pwharned.parse.Parse._
 import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.deriving.*
@@ -15,7 +14,7 @@ import scala.util.Try
 trait QueryDeserializer[T]:
   def deserialize(s: String): Either[ParseError, T]
 
-object QueryDeserializer extends Parse:
+object QueryDeserializer:
 
   trait QueryFieldDeserializer[A]:
     def parser: Parser[A]
@@ -206,6 +205,7 @@ object QueryDeserializer extends Parse:
         val fieldNames: List[String] =
           constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
         // Build a JSON object parser:
+        println(fieldNames)
         val parser: Parser[m.MirroredElemTypes] =
           for {
             _      <- char('?').optional

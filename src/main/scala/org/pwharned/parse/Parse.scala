@@ -5,7 +5,7 @@ import java.time.Instant
 import scala.annotation.tailrec
 import scala.deriving.*
 import scala.compiletime.*
-import scala.util.Try
+import scala.util.{Success, Try}
 
 case class ParseError(position: Int, input: String, message: String):
   def merge(other: ParseError): ParseError =
@@ -14,7 +14,7 @@ case class ParseError(position: Int, input: String, message: String):
     ParseError(bestPos,input, combined)
 type Parser[T] = String => Either[ParseError, (T, String)]
 
-trait Parse:
+object Parse:
 
   extension [A](p: Parser[A])
     /** parse p, then q, but return p’s result */
@@ -166,7 +166,8 @@ object ParseBuffer extends  ParseBuffer
 
 
 // ──────────────────────────────────────────────
-object Primitives extends Parse:
+object Primitives:
+  import org.pwharned.parse.Parse._
   inline def quotedString: Parser[String] =
     for {
       _ <- char('"')
@@ -209,13 +210,18 @@ object Primitives extends Parse:
           case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
         }
 
+
   def instantParser: Parser[Instant] = {
-    // Regex for full decimal with optional exponent
-    input => Try{java.time.Instant.parse(input)}.toOption match {
-      case Some(tok) => Right((tok, input.substring(tok.toString.length)))
-      case None => Left(ParseError(0, input, s"Expected number, found $input"))
+
+
+    input =>
+      val unquoted = input.toCharArray.dropWhile(x => x=='"').takeWhile(x=> x!='"').mkString
+      Try{java.time.Instant.parse(unquoted)} match {
+      case Success(tok) => Right((tok, unquoted.substring(tok.toString.length)))
+      case scala.util.Failure(exception) => Left(ParseError(0, input, s"Expected a valid instant, found $unquoted with ${exception.getMessage}"))
     }
   }
+
 
   def numberToken(input: String): Either[ParseError, (String, String)] = {
     // Regex for full decimal with optional exponent

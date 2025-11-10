@@ -18,8 +18,8 @@ import org.pwharned.parse.fromQuery
 import org.pwharned.sql.derive.SqlSelect
 
 import scala.concurrent.{ExecutionContext, Future}
-case class assetAttributes(result: JsonString)
-
+case class Field(name: String, value: String)
+case class assetAttributes(asset: Persisted[assets], fields:List[Field] )
 object assetAttributes:
   given SelectStatement[assetAttributes] with
 
@@ -29,12 +29,6 @@ object assetAttributes:
       "    '[]'::json" +
       " )) AS result FROM   ASSETS a"
 
-  // This given will override the derived JsonSerializer[assetAttributes].
-  given JsonSerializer[assetAttributes] with
-    def serialize(a: assetAttributes): String =
-      // assuming JsonString is just a type alias for String,
-      // or has an unwrapped `value: String` inside:
-      a.result.toString
 
   inline def get(using db: Database, enc: BodyEncoder[Http, Iterator[assetAttributes]], ec: ExecutionContext, sw: SocketWriter[Http], ch: ConnectionHandler[Http]) = Route(GET, "/api/assetAttributes".asPath, (req: HttpRequest[Unit])  => {
     val maybeQuery: Option[String] = Option(req.path.query.value).map(_.stripMargin) match {

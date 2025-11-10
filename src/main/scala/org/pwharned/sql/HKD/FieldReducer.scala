@@ -33,7 +33,7 @@ object FieldReducer {
   given default[A]: Aux[Default[A], Option[A]] =
   new FieldReducer[Default[A]] {
     type Out = Option[A]
-    def unwrap(d: Default[A]): Option[A] = Option(d)
+    def unwrap(d: Default[A]): Option[A] = Option(d.value)
     def wrap(o: Option[A]): Default[A]  = Default(o.get)
   }
 
@@ -41,7 +41,7 @@ object FieldReducer {
   given nullable[A]: Aux[Nullable[A], Option[A]] =
   new FieldReducer[Nullable[A]] {
     type Out = Option[A]
-    def unwrap(n: Nullable[A]): Option[A] = Option(n)
+    def unwrap(n: Nullable[A]): Option[A] = Option(n.value)
     def wrap(o: Option[A]): Nullable[A]   = Nullable(o.get)
   }
 

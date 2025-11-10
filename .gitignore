@@ -50,3 +50,6 @@ build/
 target
 .env
 .env
+project/
+.bloop/
+.metals/

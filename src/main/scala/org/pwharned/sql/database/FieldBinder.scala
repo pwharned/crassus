@@ -119,8 +119,8 @@ object FieldBinder:
       stmt.setString(idx, v)
       idx + 1
 
-  given FieldBinder[JsonString] with
-    def bind(stmt: PreparedStatement, idx: Int, v: JsonString): Int =
+  given jsfb[T](using fg: FieldBinder[T]): FieldBinder[JsonString[T]] with
+    def bind(stmt: PreparedStatement, idx: Int, v: JsonString[T]): Int =
       stmt.setString(idx, v.toString)
       idx + 1
   given FieldBinder[java.util.UUID] with
@@ -131,6 +131,9 @@ object FieldBinder:
     def bind(stmt: PreparedStatement, idx: Int, v: java.time.Instant): Int =
       stmt.setTimestamp(idx, java.sql.Timestamp.from(v))
       idx + 1
+  given [T](using fb: FieldBinder[T]): FieldBinder[Default[T]] with
+    def bind(stmt: PreparedStatement, idx: Int, opt: Default[T]): Int =
+        fb.bind(stmt, idx, opt.value)
   given [T](using fb: FieldBinder[T]): FieldBinder[Option[T]] with
     def bind(stmt: PreparedStatement, idx: Int, opt: Option[T]): Int =
       opt match
@@ -146,7 +149,7 @@ object FieldBinder:
         stmt.setNull(idx, Types.VARCHAR)
         idx + 1
       else
-        fb.bind(stmt, idx, v)
+        fb.bind(stmt, idx, v.value)
 
 
 
