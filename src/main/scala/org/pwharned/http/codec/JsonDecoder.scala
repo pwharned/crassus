@@ -1,9 +1,4 @@
-package org.pwharned.codec
-
-
-
-import org.ibm.pwhaned.codec.IntervalCursor
-import org.pwharned.codec.dispatchBytesMacro
+package org.pwharned.http.codec
 
 import scala.collection.mutable.ArrayBuffer
 import scala.compiletime.{constValueTuple, erasedValue, summonInline}

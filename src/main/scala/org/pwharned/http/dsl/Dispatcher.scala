@@ -1,4 +1,4 @@
-package org.pwharned.http.server.dsl
+package org.pwharned.http.dsl
 
 import org.pwharned.http.HttpMethods.GET
 import org.pwharned.http.request.HttpRequestView
@@ -31,14 +31,17 @@ object Dispatcher:
                                      )(using qctx: Quotes): Expr[String => HttpRequestView => IO[HttpResponse[?]] ] =
     import qctx.reflect.*
 
+
+
     def strip(term: Term): Term = term match
-      case Typed(Inlined(Some(callSite), bindings, inner), typeAnnotation) =>
-        callSite.asInstanceOf[Term] // Convert Tree to Term
-      case Typed(Inlined(None, bindings, inner), typeAnnotation) =>
-        strip(inner) // No call site, use inner
-      case Inlined(_, _, inner) => strip(inner)
-      case Block(_, expr) => strip(expr)
+      case Inlined(_, _, expansion) => expansion // Don't recurse - stop at first Inlined
+      case Typed(inner, _) => strip(inner)
+      case Block(Nil, expr) => strip(expr)
       case other => other
+
+
+    val treeStr = s"=== raw RoutesExpr AST ===\n${RoutesExpr.asTerm.show(using Printer.TreeStructure)}"
+    println(treeStr)
 
     def substituteSymbol(body: Term, from: Symbol, to: Symbol)(using Quotes): Term = {
       object SymbolReplacer extends TreeMap {

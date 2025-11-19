@@ -1,8 +1,7 @@
 
 package org.ibm.json
 
-import org.ibm.pwhaned.codec.IntervalCursor
-
+import org.pwharned.http.codec.IntervalCursor
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 

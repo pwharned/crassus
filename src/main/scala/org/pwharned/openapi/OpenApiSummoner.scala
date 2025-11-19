@@ -2,9 +2,9 @@
 package org.pwharned.openapi
 
 import org.pwharned.http.HttpMethods.GET
+import org.pwharned.http.dsl.Route
 import org.pwharned.http.request.HttpRequestView
 import org.pwharned.http.response.HttpResponse
-import org.pwharned.http.server.dsl.Route
 import org.pwharned.io.IO
 
 import scala.quoted.*

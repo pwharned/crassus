@@ -1,6 +1,5 @@
 package org.pwharned.database.derive
 
-import generated.assets
 
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror

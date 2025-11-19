@@ -1,4 +1,5 @@
-package org.pwharned.codec
+package org.pwharned.http.codec
+
 trait JsonEncoder[T]:
   def encode(ent: T): String
 

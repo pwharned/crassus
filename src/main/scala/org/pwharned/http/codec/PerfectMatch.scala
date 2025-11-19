@@ -1,8 +1,4 @@
-package org.pwharned.codec
-
-
-
-
+package org.pwharned.http.codec
 
 import java.nio.charset.StandardCharsets
 import scala.quoted.*

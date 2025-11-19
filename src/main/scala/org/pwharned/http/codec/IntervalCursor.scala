@@ -1,4 +1,4 @@
-package org.ibm.pwhaned.codec
+package org.pwharned.http.codec
 
 import java.nio.charset.StandardCharsets
 import scala.collection.mutable.ArrayBuffer

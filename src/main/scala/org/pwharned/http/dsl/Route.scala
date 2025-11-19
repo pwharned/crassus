@@ -1,8 +1,8 @@
-package org.pwharned.http.server.dsl
+package org.pwharned.http.dsl
 
 import org.pwharned.http.HttpMethods.{GET, HttpMethod, POST}
 import org.pwharned.http.request.HttpRequestView
-import org.pwharned.http.response.{EntitySerializer, HttpResponse}
+import org.pwharned.http.response.HttpResponse
 import org.pwharned.io.IO
 
 // Route now directly produces HttpResponse[E]

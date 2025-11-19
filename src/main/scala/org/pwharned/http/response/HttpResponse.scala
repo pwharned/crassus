@@ -1,62 +1,67 @@
 package org.pwharned.http.response
 
-
-import org.pwharned.codec.Codec
-
 import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 
-// HttpResponse no longer needs B, as EntitySerializer now writes directly to buffer.
-// We'll assume the entity will be written to a ByteBuffer.
+/**
+ * HTTP Response - simple data class.
+ * Rendering strategy determined by entity type E.
+ */
 case class HttpResponse[E](
                             status: Int,
-                            headers:    Seq[(String,String)],
-                            entity:     E
+                            headers: Seq[(String, String)],
+                            entity: E
                           )
 
+object HttpResponse:
 
-object HttpResponse  {
+  /** Convenience constructors */
+  def ok[E](entity: E): HttpResponse[E] =
+    HttpResponse(200, Seq.empty, entity)
 
-  def apply[E](   status: Int,
-               headers:    Seq[(String,String)],
-               entity:     E): HttpResponse[E] = new  HttpResponse(status,  headers, entity)
+  def created[E](entity: E): HttpResponse[E] =
+    HttpResponse(201, Seq.empty, entity)
 
-  inline def render[E](writeBuf: ByteBuffer, channel: SocketChannel, response: HttpResponse[E]): Unit = {
-    writeBuf.clear() // Clear the pooled buffer for a fresh response
-    // 1) Calculate entity size first (may involve temporary allocation by serializer)
-    val serialized  = response.entity.toString.getBytes("UTF-8")
-    val contentLength = serialized.length
-    writeBuf.putAscii(version).putAscii(response.status.toString).putAscii(ok).putAscii("\r\n")
-    (response.headers :+  ("Content-Length" -> contentLength.toString) ).foreach { case (k, v) =>
-      writeBuf.putAscii(k).putAscii(": ").putAscii(v).putAscii("\r\n")
+  def notFound[E](entity: E): HttpResponse[E] =
+    HttpResponse(404, Seq.empty, entity)
+
+  def error[E](entity: E): HttpResponse[E] =
+    HttpResponse(500, Seq.empty, entity)
+
+  /**
+   * Render response to channel.
+   * Uses EntityWriter type class to determine rendering strategy.
+   */
+  def render[E](
+                 buffer: ByteBuffer,
+                 channel: SocketChannel,
+                 response: HttpResponse[E]
+               )(using writer: EntityWriter[E]): Unit =
+    buffer.clear()
+
+    // 1. Write status line and headers
+
+    val allHeaders = response.headers ++ writer.contentHeaders(response.entity)
+
+    buffer.putAscii("HTTP/1.1 ")
+      .putAscii(response.status.toString)
+      .putAscii(" ")
+      .putAscii(EntityWriter.statusText(response.status))
+      .putAscii("\r\n")
+
+    allHeaders.foreach { (k, v) =>
+      buffer.putAscii(k).putAscii(": ").putAscii(v).putAscii("\r\n")
     }
-    writeBuf.putAscii("\r\n") // End of headers
 
-    // 3) Write the serialized entity into the buffer, immediately after headers
-    writeBuf.put(serialized)
+    buffer.putAscii("\r\n")
 
-    writeBuf.flip() // Prepare the entire buffer (headers + body) for reading
+    // 2. Write entity (strategy determined by type)
+    writer.write(response.entity, buffer, channel)
 
-    // 4) Write the entire buffer to the channel in one go (if it fits)
-    while (writeBuf.hasRemaining) {
-      channel.write(writeBuf)
-    }
-  }
-  implicit class ByteBufferAscii(val buf: ByteBuffer) extends AnyVal {
-    inline def putAscii(s: String): ByteBuffer = {
-      var i = 0
-      while (i < s.length) {
-        buf.put(s.charAt(i).toByte)
-        i += 1
-      }
-      buf
-    }
-  }
+    // 3. Flush any remaining
+    if buffer.position() > 0 then
+      EntityWriter.flushBuffer(buffer, channel)
 
-  inline val version = "HTTP/1.1 "
-  inline val ok = " OK"
-  def ok[T](entity: T): HttpResponse[T] = new HttpResponse[T](200, Seq.empty, entity)
-  def error(entity: String): HttpResponse[String] = new HttpResponse[String](500, Seq.empty, entity)
-
-
-}
+  // Make extension available
+  export EntityWriter.putAscii
+  private def statusText = EntityWriter.statusText

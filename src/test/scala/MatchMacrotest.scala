@@ -1,4 +1,4 @@
-import org.pwharned.http.server.dsl.endpoints.generateMatch
+import org.pwharned.http.dsl.endpoints.generateMatch
 
 object MatchMacrotest {
 

@@ -51,3 +51,6 @@ target
 .env
 .env
 .env
+.bloop/
+.metals/
+project/

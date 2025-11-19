@@ -1,4 +1,4 @@
-package org.pwharned.http.server.dsl
+package org.pwharned.http.dsl
 
 import org.pwharned.http.request.HttpRequestView
 import org.pwharned.http.response.HttpResponse

@@ -1,6 +1,4 @@
-package org.pwharned.codec
-
-
+package org.pwharned.http.codec
 
 import org.pwharned.http.HttpTypes
 import org.pwharned.http.HttpTypes.ByteSlice

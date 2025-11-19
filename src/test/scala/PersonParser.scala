@@ -1,5 +1,5 @@
 import io.circe.jawn.decode
-import org.pwharned.codec.{JsonDecoder, JsonEncoder}
+import org.pwharned.http.codec.{JsonDecoder, JsonEncoder}
 
 import java.nio.{ByteBuffer, ByteOrder}
 
