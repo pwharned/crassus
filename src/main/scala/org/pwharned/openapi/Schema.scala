@@ -1,14 +1,14 @@
 package org.pwharned.openapi
 
 
-import org.pwharned.sql.HKD._
-import org.pwharned.sql.database.summonFieldTypes
+import org.pwharned.database.hkd._
+import org.pwharned.database.summonFieldTypes
 
 import java.nio.ByteBuffer
-import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.*
+import scala.language.implicitConversions
 
 trait Schema[T] {
   def labels: List[String]

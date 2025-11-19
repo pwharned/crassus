@@ -1,6 +1,5 @@
 package org.pwharned.openapi
 
-import org.pwharned.json.{serialize, deserialize}
 case class root(
                       openapi: String,
                       info:      info,
@@ -90,25 +89,3 @@ case class schema(
 
 
 case class items(`type`: Option[String], `$ref`: Option[String])
-@main
-def test:Unit =
-  val src     = scala.io.Source.fromFile("petstore.json")("UTF-8")
-  val rawJson = src.mkString.stripPrefix("\uFEFF")
-  src.close()
-  case class nested(a: String)
-  case class test(a: Map[String, nested])
-  val testString  =
-    """{"items":{
-      |
-      |                "type": "string"
-      |}
-
-      |}""".stripMargin
-  import org.pwharned.json.JsonSerializer.given
-  import org.pwharned.json.JsWrap.given
-
-  //rawJson.deserialize[root] match {
-   // case Left(value) => println(value)
-    //case Right(value) => println(value._1.serialize)
-  //}
-

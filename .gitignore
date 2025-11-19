@@ -50,6 +50,13 @@ build/
 target
 .env
 .env
+<<<<<<< HEAD
+.env
+.bloop/
+.metals/
+project/
+=======
 project/
 .bloop/
 .metals/
+>>>>>>> main

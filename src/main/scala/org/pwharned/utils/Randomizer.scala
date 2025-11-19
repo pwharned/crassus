@@ -1,9 +1,10 @@
 package org.pwharned.utils
 
-import scala.deriving.Mirror
-import scala.compiletime.{erasedValue, summonInline}
+import org.pwharned.database.hkd._
 import org.pwharned.utils.RandomValue
-import org.pwharned.sql.HKD._
+
+import scala.compiletime.{erasedValue, summonInline}
+import scala.deriving.Mirror
 
 /**
  * A little typeclass whose single method is inline,

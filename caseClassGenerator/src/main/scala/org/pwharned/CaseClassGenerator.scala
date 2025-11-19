@@ -8,7 +8,7 @@ import scala.io.Source
 
 //case class User[F[_]](id: F[PrimaryKey[Int]], name: F[String])
 object CaseClassGenerator  {
-  def generateCaseClasses(filePath: String, hkd: Boolean= true): String = {
+  def generateCaseClasses(filePath: String, hkd: Boolean= true, tuples: Boolean = true): String = {
     val input = Source.fromFile(filePath)("UTF-8")
 
     val file = new File(filePath)
@@ -49,11 +49,20 @@ object CaseClassGenerator  {
         })
         println(value)
 
+        val typeOrTuple = tuples match {
+          case true => "type"
+          case false => "case class"
+        }
+        val tupleEquals = tuples match {
+          case true => "="
+          case false => ""
+        }
+
         hkd match {
           case true =>  s"""
-                           |case class ${value._1.name}[F[_]] (${columns.map(x => x.toField).mkString(",\n")})""".stripMargin
+                           |$typeOrTuple ${value._1.name}[F[_]] $tupleEquals (${columns.map(x => x.toField).mkString(",\n")})""".stripMargin
           case false =>  s"""
-                            |case class ${value._1.name} (${columns.map(x => x.toFieldLower).mkString(",\n")})""".stripMargin
+                            |$typeOrTuple ${value._1.name} $tupleEquals (${columns.map(x => x.toFieldLower).mkString(",\n")})""".stripMargin
         }
 
     }

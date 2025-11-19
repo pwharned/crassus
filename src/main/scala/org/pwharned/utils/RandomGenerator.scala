@@ -1,8 +1,9 @@
 package org.pwharned.utils
 
-import org.pwharned.sql.HKD._
-import scala.deriving.Mirror
+import org.pwharned.database.hkd._
+
 import scala.compiletime.{erasedValue, summonInline}
+import scala.deriving.Mirror
 import scala.util.Random
 
 /**
