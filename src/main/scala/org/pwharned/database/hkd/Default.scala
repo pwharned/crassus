@@ -1,12 +1,10 @@
 package org.pwharned.database.hkd
 
 
-sealed trait Default[X]:
-  def value: X
 
-object Default:
-  def apply[X](x: X): Default[X] = x
 
-  given [T]: Conversion[T, Default[T]] = x => Default(x)
 
+<<<<<<< HEAD:src/main/scala/org/pwharned/database/hkd/Default.scala
   given [T]: Conversion[Default[T], T] = x => x.value
+=======
+>>>>>>> main:src/main/scala/org/pwharned/sql/HKD/Default.scala

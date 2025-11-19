@@ -1,4 +1,11 @@
+<<<<<<< HEAD:src/main/scala/org/pwharned/database/Rs.scala
 package org.pwharned.database
+=======
+package org.pwharned.sql.database
+
+import org.pwharned.json.{JsonString}
+import org.pwharned.sql.HKD._
+>>>>>>> main:src/main/scala/org/pwharned/sql/database/Rs.scala
 
 import org.pwharned.database.hkd._
 import java.sql.ResultSet

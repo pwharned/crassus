@@ -1,26 +1,32 @@
 package org.pwharned.database.hkd
 
-sealed trait Mode
+sealed trait Constraint
 
-package object GenerationMode {
-  sealed trait Database extends Mode
+package object ConstraintTypes {
+  sealed trait DatabaseGeneratedPrimaryKey extends Constraint
 
-  sealed trait Runtime extends Mode
+  sealed trait RuntimeGeneratedPrimaryKey extends Constraint
+  sealed trait DefaultValue extends Constraint
+  sealed trait Nullable extends Constraint
 }
 
 
-sealed trait KeyType[A, B <:Mode]:
+sealed trait ColumnType[A, B <:Constraint]:
   def value: A
 object KeyType:
-  def apply[A, B<:Mode](a: A): KeyType[A, B] =
-    new KeyType[A,B]:
+  def apply[A, B<:Constraint](a: A): ColumnType[A, B] =
+    new ColumnType[A,B]:
       val value: A = a
 
-  final type DB[A] = KeyType[A, GenerationMode.Database]
-  final type Runtime[A] = KeyType[A, GenerationMode.Runtime]
 
+<<<<<<< HEAD:src/main/scala/org/pwharned/database/hkd/PrimaryKey.scala
 sealed trait PrimaryKey[A] extends KeyType[A, GenerationMode.Runtime]:
   def value: A
+=======
+
+sealed trait PrimaryKey[A] extends ColumnType[A, ConstraintTypes.RuntimeGeneratedPrimaryKey]:
+    def value: A
+>>>>>>> main:src/main/scala/org/pwharned/sql/HKD/PrimaryKey.scala
 
 object PrimaryKey:
   def apply[A](a: A): PrimaryKey[A] =
@@ -28,10 +34,33 @@ object PrimaryKey:
       val value: A = a
 
 
-sealed trait GeneratedPrimaryKey[A] extends KeyType[A, GenerationMode.Database]:
+sealed trait GeneratedPrimaryKey[A] extends ColumnType[A, ConstraintTypes.DatabaseGeneratedPrimaryKey]:
   def value: A
 
 object GeneratedPrimaryKey:
   def apply[A](a: A): GeneratedPrimaryKey[A] =
     new GeneratedPrimaryKey[A]:
       val value: A = a
+<<<<<<< HEAD:src/main/scala/org/pwharned/database/hkd/PrimaryKey.scala
+=======
+
+sealed trait Default[X] extends ColumnType[X, ConstraintTypes.DefaultValue]:
+  def value: X
+
+object Default:
+  def apply[X](x: X): Default[X] =
+    new Default:
+      val value: X = x
+
+sealed trait Nullable[X] extends ColumnType[X, ConstraintTypes.Nullable]:
+  def value: X
+
+object Nullable:
+  def apply[X](x: X): Nullable[X] =
+    new Nullable[X]:
+      val value: X = x
+
+@main
+def main: Unit =
+  summon[PersistedField[PrimaryKey[String]] =:=  PersistedField[PrimaryKey[String]] ]
+>>>>>>> main:src/main/scala/org/pwharned/sql/HKD/PrimaryKey.scala
