@@ -1,9 +1,10 @@
 package org.pwharned.parse
 
-import org.pwharned.sql.HKD._
+import org.pwharned.database.hkd.{GeneratedPrimaryKey, Nullable, PrimaryKey}
 import org.pwharned.json.JsonString
 import org.pwharned.parse.{Parse, ParseError, Primitives}
-import org.pwharned.parse.Parse._
+import org.pwharned.parse.Parse.*
+
 import scala.language.implicitConversions
 import scala.compiletime.*
 import scala.deriving.*

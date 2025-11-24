@@ -1,7 +1,7 @@
 package org.pwharned.database.derive
 
-import org.pwharned.database.FieldBinder
-import org.pwharned.database.hkd._
+import org.pwharned.database.hkd.*
+import org.pwharned.database.sql.FieldBinder
 
 import java.sql.PreparedStatement
 import scala.compiletime.{erasedValue, summonInline}

@@ -1,10 +1,11 @@
 package org.pwharned.json
 
+import org.pwharned.database.sql.Rs
 import org.pwharned.openapi.{Schema, schema}
 import org.pwharned.parse.{Parser, Primitives}
 import org.pwharned.parse.QueryDeserializer.QueryFieldDeserializer
-import org.pwharned.sql.database.Rs
-import org.pwharned.parse.Parse._
+import org.pwharned.parse.Parse.*
+
 import scala.deriving.Mirror
 opaque type JsonString[T] = String
 

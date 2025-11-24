@@ -1,9 +1,9 @@
-package org.pwharned.database
+package org.pwharned.database.sql
 
-import scala.quoted.*
-import scala.io.Source
-import scala.util.matching.Regex
 import java.io.InputStream
+import scala.io.Source
+import scala.quoted.*
+import scala.util.matching.Regex
 
 object TableOrganizationMacro:
 

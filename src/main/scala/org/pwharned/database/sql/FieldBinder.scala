@@ -1,8 +1,9 @@
-package org.pwharned.database
+package org.pwharned.database.sql
 
 import org.postgresql.core.ParameterList
 import org.postgresql.util.PGobject
-import org.pwharned.database.hkd._
+import org.pwharned.database.hkd.*
+import org.pwharned.json.JsonString
 
 import java.sql.{DriverManager, PreparedStatement, Types}
 import java.util.UUID
@@ -118,14 +119,11 @@ object FieldBinder:
       stmt.setString(idx, v)
       idx + 1
 
-<<<<<<< HEAD:src/main/scala/org/pwharned/database/FieldBinder.scala
 
-=======
   given jsfb[T](using fg: FieldBinder[T]): FieldBinder[JsonString[T]] with
     def bind(stmt: PreparedStatement, idx: Int, v: JsonString[T]): Int =
       stmt.setString(idx, v.toString)
       idx + 1
->>>>>>> main:src/main/scala/org/pwharned/sql/database/FieldBinder.scala
   given FieldBinder[java.util.UUID] with
     def bind(stmt: PreparedStatement, idx: Int, v: java.util.UUID): Int =
       stmt.setObject(idx, v, java.sql.Types.OTHER)

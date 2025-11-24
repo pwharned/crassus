@@ -1,7 +1,6 @@
-package org.pwharned.database
+package org.pwharned.database.sql
 
-
-import org.pwharned.database.ConnectionPool
+import org.pwharned.database.*
 
 import java.sql.Connection
 import java.util.concurrent.{ExecutorService, Executors, Semaphore}

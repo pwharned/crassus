@@ -1,12 +1,11 @@
-package org.pwharned.database
+package org.pwharned.database.sql
 
-import org.pwharned.database.Rs
 
 import java.sql.ResultSet
 import scala.compiletime.{constValueTuple, erasedValue, error, summonInline}
 import scala.deriving.Mirror
 import scala.language.implicitConversions
-
+import org.pwharned.database.sql.Rs
 // the row-mapper type class
 trait Row[A]:
   def fromRs(rs: ResultSet): A

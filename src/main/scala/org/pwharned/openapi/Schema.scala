@@ -2,7 +2,6 @@ package org.pwharned.openapi
 
 
 import org.pwharned.database.hkd._
-import org.pwharned.database.summonFieldTypes
 
 import java.nio.ByteBuffer
 import scala.compiletime.*

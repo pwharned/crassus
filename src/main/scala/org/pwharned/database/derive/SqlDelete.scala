@@ -1,10 +1,10 @@
 package org.pwharned.database.derive
 
-import org.pwharned.database.SqlDialect
 
 import scala.compiletime.{constValue, constValueTuple, erasedValue, summonInline}
 import scala.deriving.Mirror
 import org.pwharned.database.hkd.*
+import org.pwharned.database.sql.SqlDialect
 
 import scala.ValueOf
 

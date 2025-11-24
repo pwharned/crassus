@@ -1,4 +1,4 @@
-package org.pwharned.database
+package org.pwharned.database.sql
 
 trait SqlDialect {
   def select(table: String, cols: Seq[String]): String

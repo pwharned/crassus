@@ -1,6 +1,5 @@
-package org.pwharned.database
+package org.pwharned.database.sql
 
-import org.pwharned.database.TableOrganizationMacro
 
 object Db2Dialect extends SqlDialect:
   def select(table: String, cols: Seq[String]) =

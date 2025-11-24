@@ -1,9 +1,10 @@
-package org.pwharned.database
+package org.pwharned.database.sql
 
-import org.pwharned.database.hkd._
-import scala.quoted.*
+import org.pwharned.database.hkd.*
+
 import scala.compiletime.*
 import scala.deriving.*
+import scala.quoted.*
 trait DbTypeMapper:
   def mapType(scalaType: String): String
 
@@ -66,9 +67,8 @@ transparent inline def summonFieldTypes[A <: Tuple]: List[String] =
 /// this code is used for mapping the type of a case class into the appopriate method on a result set.
 transparent inline def unwrappedType[T]: String = ${ unwrappedTypeImpl[T] }
 
-def unwrappedTypeImpl[T: Type](using Quotes): Expr[String] = {
-  import quotes.reflect.*
-
+def unwrappedTypeImpl[T: Type](using q: Quotes): Expr[String] = {
+  import q.reflect.*
   def loop(tpe: TypeRepr): String = tpe.dealias match {
     // Base types: match directly against their dealiased representations.
     case t if t =:= TypeRepr.of[String]  => "String"

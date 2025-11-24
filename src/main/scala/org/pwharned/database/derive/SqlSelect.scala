@@ -1,6 +1,5 @@
 package org.pwharned.database.derive
 
-import org.pwharned.database.{Rs, summonFieldTypes}
 
 import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}

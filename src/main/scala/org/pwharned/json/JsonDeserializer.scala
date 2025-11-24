@@ -1,462 +1,264 @@
 package org.pwharned.json
 
-import org.pwharned.parse.{Parse, ParseError, Parser, Primitives}
-import org.pwharned.parse.Parse._
-import scala.language.implicitConversions
-import scala.compiletime.*
 import scala.deriving.*
-import scala.quoted.*
-import org.pwharned.json
-import org.pwharned.`lazy`.Lazy
-import org.pwharned.sql.HKD._
+import scala.compiletime.*
+import scala.annotation.tailrec
 
-type JsPrimitive = String | Int | Boolean | Long | Null | Double | Float
-
-enum JsonAst:
-  case Obj(fields: Map[String, JsonAst])
-  case Arr(items: List[JsonAst])
-  case JsValue(value: JsPrimitive)
-
-type JsonValue[J <: JsonAst] = J match
-  case JsonAst.Obj => Map[String, JsonValue[JsonAst]]
-  case JsonAst.Arr => List[JsonValue[JsonAst]]
-  case JsonAst.JsValue => JsPrimitive
-
-type ToJson[T] <: JsonAst = T match
-  case JsPrimitive => JsonAst.JsValue
-  case List[x] => JsonAst.Arr
-  case Map[String, x] => JsonAst.Obj
-
-
+// JsonDeserializer typeclass
 trait JsonDeserializer[T]:
-  def deserialize: Parser[T]
-  def isOptional: Boolean = false
+  def decode(buf: Array[Byte], pos: Int): (T, Int)
 
-  def defaultValue: Option[T] = None
+// low-level parsing helpers
 object JsonDeserializer:
+  inline def peek(buf: Array[Byte], pos: Int): Byte =
+    if pos >= buf.length then throw new RuntimeException("Unexpected EOF")
+    buf(pos)
+
+  inline def expect(buf: Array[Byte], pos: Int, expected: Byte, what: String): Int =
+    if peek(buf, pos) != expected then throw new RuntimeException(s"Expected $what at $pos")
+    pos + 1
+
+  inline def advance(pos: Int, n: Int): Int = pos + n
+
+  private inline def skipWhitespace(buf: Array[Byte], start: Int): Int =
+    var pos = start
+    val limit = buf.length
+    while pos < limit && {
+      val b = buf(pos)
+      b == ' '.toByte || b == '\n'.toByte || b == '\r'.toByte || b == '\t'.toByte
+    } do pos += 1
+    pos
 
 
+  def readStringSlice(buf: Array[Byte], start: Int): (Int, Int, Int) =
+    var pos = start
+    if pos >= buf.length || buf(pos) != '"'.toByte then
+      throw new RuntimeException(s"Expected '\"' at $pos")
+    pos += 1 // move past opening quote
+    val s = pos
+    val limit = buf.length
+    var escaped = false
+    while pos < limit do
+      val b = buf(pos)
+      if !escaped then
+        if b == '\\'.toByte then
+          escaped = true
+          pos += 1
+        else if b == '"'.toByte then
+          val e = pos
+          pos += 1 // move past closing quote
+          return (s, e, pos)
+        else pos += 1
+      else
+        // skip escaped char (treat as a single byte in the slice)
+        escaped = false
+        pos += 1
+    throw new RuntimeException("Unterminated string")
+
+  /** Compare a buffer slice buf[s:e] to a literal byte array `lit`.
+   * Returns true if lengths match and every byte equals.
+   * This is minimal and branch-friendly: check length, then loop.
+   */
+  def sliceEqualsBytes(buf: Array[Byte], s: Int, e: Int, lit: Array[Byte]): Boolean =
+    val len = e - s
+    if len != lit.length then false
+    else
+      var i = 0
+      // local val to help JIT eliminate bounds checks
+      val base = s
+      while i < len do
+        if buf(base + i) != lit(i) then return false
+        i += 1
+      true
+
+  inline def readOpenBrace(buf: Array[Byte], pos: Int): Int = expect(buf, pos, '{'.toByte, "'{'")
+  inline def readCloseBrace(buf: Array[Byte], pos: Int): Int = expect(buf, pos, '}'.toByte, "'}'")
+  inline def readColon(buf: Array[Byte], pos: Int): Int = expect(buf, pos, ':'.toByte, "':'")
+  inline def readComma(buf: Array[Byte], pos: Int): Int = expect(buf, pos, ','.toByte, "','")
+  inline def readQuote(buf: Array[Byte], pos: Int): Int = expect(buf, pos, '"'.toByte, "'\"'")
+
+  // decode a JSON string (handles common escapes, no \uXXXX for brevity)
+  inline def readString(buf: Array[Byte], start: Int): (String, Int) =
+    var pos = readQuote(buf, start)
+    val sb = new java.lang.StringBuilder
+    val limit = buf.length
+    var escaped = false
+    var closed = false
+    while pos < limit && !closed do
+      val b = buf(pos)
+      if !escaped then
+        if b == '\\'.toByte then
+          escaped = true
+          pos += 1
+        else if b == '"'.toByte then
+          pos += 1
+          closed = true
+        else
+          sb.append(b.toChar)
+          pos += 1
+      else
+        b match
+          case 34 => sb.append('"')      // '"'
+          case 92 => sb.append('\\')     // '\'
+          case 47 => sb.append('/')      // '/'
+          case 98 => sb.append('\b')     // 'b'
+          case 102 => sb.append('\f')    // 'f'
+          case 110 => sb.append('\n')    // 'n'
+          case 114 => sb.append('\r')    // 'r'
+          case 116 => sb.append('\t')    // 't'
+          case _ => throw new RuntimeException(s"Unsupported escape at $pos")
+        escaped = false
+        pos += 1
+    if !closed then throw new RuntimeException("Unterminated string")
+    (sb.toString, pos)
+
+  // read a literal token (number, true, false, null) as string
+  inline def readLiteral(buf: Array[Byte], start: Int): (String, Int) =
+    var pos = start
+    val sb = new java.lang.StringBuilder
+    val limit = buf.length
+    while pos < limit && {
+      val c = buf(pos).toChar
+      c != ',' && c != '}' && c != ']' && !c.isWhitespace
+    } do
+      sb.append(buf(pos).toChar)
+      pos += 1
+    (sb.toString, pos)
+
+  // utility to skip a value generically (used for unknown fields)
+  def skipValue(buf: Array[Byte], pos0: Int): Int =
+    val pos = skipWhitespace(buf, pos0)
+    if peek(buf, pos) == '"'.toByte then
+      val (_, p) = readString(buf, pos)
+      p
+    else if peek(buf, pos) == '{'.toByte then
+      var depth = 0
+      var p = pos
+      while p < buf.length do
+        val b = buf(p)
+        if b == '{'.toByte then depth += 1
+        else if b == '}'.toByte then
+          depth -= 1
+          if depth == 0 then
+            p += 1
+            return p
+        p += 1
+      throw new RuntimeException("Unterminated object while skipping")
+    else
+      val (_, p) = readLiteral(buf, pos)
+      p
+
+
+  inline def apply[T](using d: JsonDeserializer[T]): JsonDeserializer[T] = d
+
+
+
+  // primitive decoders
   given JsonDeserializer[String] with
-    def deserialize: Parser[String] = Primitives.quotedString
+    def decode(buf: Array[Byte], pos: Int): (String, Int) = JsonDeserializer.readString(buf, pos)
 
   given JsonDeserializer[Int] with
-    def deserialize: Parser[Int] = Primitives.intParser
+    def decode(buf: Array[Byte], pos: Int): (Int, Int) =
+      val (lit, p) = JsonDeserializer.readLiteral(buf, pos)
+      (lit.toInt, p)
 
   given JsonDeserializer[Double] with
-    def deserialize: Parser[Double] = Primitives.doubleParser
+    def decode(buf: Array[Byte], pos: Int): (Double, Int) =
+      val (lit, p) = JsonDeserializer.readLiteral(buf, pos)
+      (lit.toDouble, p)
 
-  given JsonDeserializer[java.time.Instant] with
-    def deserialize: Parser[java.time.Instant] = Primitives.instantParser
-  given JsonDeserializer[Long] with
-    def deserialize: Parser[Long] = Primitives.longParser
   given JsonDeserializer[Boolean] with
-    def deserialize: Parser[Boolean] = Primitives.boolParser
-  given JsonDeserializer[Float] with
-    def deserialize: Parser[Float] = Primitives.floatParser
-  given JsonDeserializer[java.util.UUID] with
-    def deserialize: Parser[java.util.UUID] = Primitives.quotedString.map(x => java.util.UUID.fromString(x))
-  // Wrap a parsed T into PrimaryKey[T]
-  given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[PrimaryKey[T]] with
-    def deserialize: Parser[PrimaryKey[T]] =
-      underlying.deserialize.map(PrimaryKey(_))
-  given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[Nullable[T]] with
-    def deserialize: Parser[Nullable[T]] =
-      underlying.deserialize.map(Nullable(_))
+    def decode(buf: Array[Byte], pos: Int): (Boolean, Int) =
+      val (lit, p) = JsonDeserializer.readLiteral(buf, pos)
+      val v = lit match
+        case "true" => true
+        case "false" => false
+        case other => throw new RuntimeException(s"Invalid boolean: $other")
+      (v, p)
 
-  given jsPrimitiveParser: JsonDeserializer[JsPrimitive] with
-    def deserialize: Parser[JsPrimitive] =
-      summon[JsonDeserializer[String]].deserialize
-        .alt(summon[JsonDeserializer[Int]].deserialize)
-        .alt(summon[JsonDeserializer[Long]].deserialize)
-        .alt(summon[JsonDeserializer[Double]].deserialize)
-        .alt(summon[JsonDeserializer[Float]].deserialize)
-        .alt(summon[JsonDeserializer[Boolean]].deserialize)
-
-// For Option[T], first check for "null"; otherwise delegate.
-  given [T](using underlying: JsonDeserializer[T]): JsonDeserializer[Option[T]] with
-    override def isOptional: Boolean = true
-    def deserialize: Parser[Option[T]] = input =>
-      val trimmed = input.trim
-      if trimmed.startsWith("null") then
-        Right((Some(null.asInstanceOf[T]), trimmed.drop("null".length)))
-      else
-        underlying.deserialize(input) match {
-          case Right((value, rest)) => Right((Some(value), rest))
-          case Left(err)            => Left(err)
-        }
-
-
-  def keyValuePair[A](key: String, valueParser: Parser[A]): Parser[A] =
-    for {
-      _     <- char('"')
-      _     <- string(key)
-      _     <- char('"')
-      _     <- char(':')
-      _     <- whitespace
-      value <-valueParser
-      _ <- comma.optional
-      _ <- whitespace
-    } yield value
-
-
-  /** Parse `{ "a":.., "b":.., ... }` into a Map of raw AST nodes */
-  private def objectAsMap: Parser[Map[String, JsonAst]] =
-    for {
-      _ <- char('{').token
-      pairs <- (
-        for {
-          _ <- char('"')
-          k <- stringInline
-          _ <- char('"').token
-          _ <- char(':').token
-          v <- summon[JsonDeserializer[JsonAst]].deserialize
-        } yield k -> v
-        ).sepBy(comma.token)
-      _ <- char('}').token
-      _ <- whitespace
-    } yield pairs.toMap
-
-  private def renderJson(ast: JsonAst): String = ast match
-    case JsonAst.JsValue(value) => value match
-      case s: String => "\"" + s.replace("\"", "\\\"") + "\""
-      case null => "null"
-      case other => other.toString
-    case JsonAst.Arr(items) =>
-      items.iterator.map(renderJson).mkString("[", ",", "]")
-    case JsonAst.Obj(fields) =>
-      fields.iterator
-        .map { case (k, v) =>
-          "\"" + k.replace("\"", "\\\"") + "\":" + renderJson(v)
-        }
-        .mkString("{", ",", "}")
-
-  // --- 3) Summon a JsonDeserializer[Any] for each element in a Tuple ------
-  transparent inline def summonAllDesers[T <: Tuple]: List[JsonDeserializer[Any]] =
+  // Product derivation (case classes)
+  inline given derived[T<:Product](using m: Mirror.ProductOf[T]): JsonDeserializer[T] = productDecoder[T](m)
+  inline def tupleSize[T <: Tuple]: Int =
     inline erasedValue[T] match
-      case _: (h *: t) =>
-        // summon the h‐th deserializer *lazily*, then recurse
-        summonInline[Lazy[JsonDeserializer[h]]].value
-          .asInstanceOf[JsonDeserializer[Any]] ::
-          summonAllDesers[t]
+      case _: EmptyTuple => 0
+      case _: (h *: t) => 1 + tupleSize[t]
+
+  inline def decodeFieldByIndex[Elems <: Tuple](idx: Int, buf: Array[Byte], pos: Int): (Any, Int) =
+    inline erasedValue[Elems] match
       case _: EmptyTuple =>
-        Nil
-
-  // --- 4) The order‐independent derived[T] -------------------------------
- 
-
-  def keyValuePair[A](valueParser: Parser[A]): Parser[A] =
-        for {
-          _ <- char('"')
-          key <- stringInline
-          _ <- char('"')
-          _ <- char(':')
-          _ <- whitespace
-          value <- valueParser
-          _ <- comma.optional
-          _ <- whitespace
-        } yield value
-
-  // If a key is missing, return None without consuming input.
-  inline def optKeyValuePair[A](key: String, valueParser: Parser[A]): Parser[Option[A]] =
-    input =>
-      if input.trim.startsWith("\"" + key + "\"") then
-        keyValuePair(key, valueParser)(input).map { case (v, rest) => (Some(v), rest) }
-      else
-        Right((None, input))
-
-  // Selects the correct parser based on field type.
-  inline def fieldParser[h](key: String): Parser[h] = {
-    inline erasedValue[h] match {
-
-      case _: Option[t] =>
-
-        optKeyValuePair(key, summonInline[Lazy[JsonDeserializer[t]]].value.deserialize).asInstanceOf[Parser[h]]
-      case _: Product =>keyValuePair(key, summonInline[Lazy[JsonDeserializer[h]]].value.deserialize)
-
-      case _ =>
-        keyValuePair(key, summonInline[Lazy[JsonDeserializer[h]]].value.deserialize)
-    }
-
-  }
-
-
-
-  inline def deriveParsers[T <: Tuple](fieldNames: List[String]): Parser[T] =
-    inline erasedValue[T] match
-      case _: EmptyTuple =>
-        input => Right((EmptyTuple.asInstanceOf[T], input))
+        throw new RuntimeException("No fields to decode")
+      case _: (h *: EmptyTuple) =>
+        if idx == 0 then summonInline[JsonDeserializer[h]].decode(buf, pos).asInstanceOf[(Any, Int)]
+        else throw new RuntimeException("Index out of range")
       case _: (h *: t) =>
-        val key = fieldNames.head
-        val headParser: Parser[h] = fieldParser[h](key)
-        val tailNames = fieldNames.tail
-        input =>
-          headParser(input) match {
-            case Left(err) =>Left(err)
-            case Right((hValue, r)) =>             deriveParsers[t](tailNames)(r) match {
-              case Left(err) => Left(err)
-              case Right((tValues, rFinal)) => Right((hValue *: tValues).asInstanceOf[T], rFinal)
-            }
+        if idx == 0 then summonInline[JsonDeserializer[h]].decode(buf, pos).asInstanceOf[(Any, Int)]
+        else decodeFieldByIndex[t](idx - 1, buf, pos)
 
-          }
+  inline def build[Elems <: Tuple]: Array[JsonDeserializer[Any]] =
+    inline erasedValue[Elems] match
+      case _: EmptyTuple => Array.empty
+      case _: (hh *: tt) =>
+        val hd = summonInline[JsonDeserializer[hh]].asInstanceOf[JsonDeserializer[Any]]
+        val tail = build[tt]
+        val arr = new Array[JsonDeserializer[Any]](1 + tail.length)
+        arr(0) = hd
+        System.arraycopy(tail, 0, arr, 1, tail.length)
+        arr
 
-  given fieldBasedDeserializer[T, R](using
-                                     fr: FieldReducer.Aux[T, R],
-                                     jd: JsonDeserializer[R]
-                                    ): JsonDeserializer[T] with
+  inline def productDecoder[T<:Product](m: Mirror.ProductOf[T]): JsonDeserializer[T] =
+    // build element decoders array at derivation time (one allocation per decoder instance)
+    val length = tupleSize[m.MirroredElemTypes]
 
-    // 1) delegate parsing to the inner parser
-    def deserialize: Parser[T] = (input: String) =>
-      jd.deserialize(input).map { case (r, rest) =>
-        (fr.wrap(r), rest)
-      }
+    (buf: Array[Byte], pos0: Int) =>
+      var pos = JsonDeserializer.skipWhitespace(buf, pos0)
+      pos = JsonDeserializer.readOpenBrace(buf, pos)
+      pos = JsonDeserializer.skipWhitespace(buf, pos)
 
-    // 2) preserve optional/default metadata
-    override def isOptional: Boolean = jd.isOptional
+      val values = new Array[Any](length)
+      var done = false
 
-    override def defaultValue: Option[T] =
-      jd.defaultValue.map(fr.wrap)
+      while !done do
+        pos = JsonDeserializer.skipWhitespace(buf, pos)
+        if pos >= buf.length then throw new RuntimeException("Unexpected EOF")
+        if buf(pos) == '}'.toByte then
+          pos = JsonDeserializer.readCloseBrace(buf, pos)
+          done = true
+        else
+          // read key
+          val (key, posAfterKey) = JsonDeserializer.readString(buf, pos)
+          pos = JsonDeserializer.skipWhitespace(buf, posAfterKey)
+          pos = JsonDeserializer.readColon(buf, pos)
+          pos = JsonDeserializer.skipWhitespace(buf, pos)
 
-  given listDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[List[A]] =
-    new JsonDeserializer[List[A]]:
-      override def defaultValue: Option[List[A]] = Some(Nil)
+          // match field index (assumes macro-generated matchField exists)
+          val idx = JsonMacros.matchField[T](key)
+          if idx >= 0 && idx < length then
+            val (v, newPos) = decodeFieldByIndex[m.MirroredElemTypes](idx, buf, pos)
+            values(idx) = v
+            pos = JsonDeserializer.skipWhitespace(buf, newPos)
 
-      def deserialize: Parser[List[A]] =
-        input =>
-          // 1) parse raw AST array
-          summon[JsonDeserializer[JsonAst]].deserialize(input) match
-            case Left(err) =>
-              Left(err)
+          else
+            pos = JsonDeserializer.skipWhitespace(buf, JsonDeserializer.skipValue(buf, pos))
 
-            case Right((JsonAst.Arr(elems), restAfter)) =>
-              elems.foldLeft(Right(Nil): Either[ParseError, List[A]]) {
-                case (accE, astEl) =>
-                  accE.flatMap { acc =>
-                    val frag = renderJson(astEl)
-                    jd.value.deserialize(frag) match
-                      case Left(parseErr) =>
-                        Left(parseErr)
-                      case Right((a, leftover)) =>
-                        if leftover.trim.nonEmpty then
-                          Left(ParseError(
-                            0,
-                            frag,
-                            s"Leftover in list element: '$leftover'"
-                          ))
-                        else
-                          Right(acc :+ a)
-                  }
-              } match
-                // 3) done!
-                case Left(err) => Left(err)
-                case Right(vList) => Right((vList, restAfter))
+          // consume optional comma
+          pos = JsonDeserializer.skipWhitespace(buf, pos)
+          if pos < buf.length && buf(pos) == ','.toByte then
+            pos = JsonDeserializer.readComma(buf, pos)
+            pos = JsonDeserializer.skipWhitespace(buf, pos)
+          else
+            ()
 
-            case Right((other, _)) =>
-              Left(ParseError(
-                0,
-                input,
-                s"Expected JSON array but got AST node: $other"
-              ))
+      val tuple = Tuple.fromArray(values)
+      val product = m.fromProduct(tuple)
+      (product.asInstanceOf[T], pos)
 
-  given vecDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[Vector[A]] =
-    new JsonDeserializer[Vector[A]]:
-      override def defaultValue: Option[Vector[A]] = Some(Vector.empty)
-
-      def deserialize: Parser[Vector[A]] =
-        input =>
-          // 1) parse raw AST array
-          summon[JsonDeserializer[JsonAst]].deserialize(input) match
-            case Left(err) =>
-              Left(err)
-
-            case Right((JsonAst.Arr(elems), restAfter)) =>
-              elems.foldLeft(Right(Vector.empty): Either[ParseError, Vector[A]]) {
-                case (accE, astEl) =>
-                  accE.flatMap { acc =>
-                    val frag = renderJson(astEl)
-                    jd.value.deserialize(frag) match
-                      case Left(parseErr) =>
-                        Left(parseErr)
-                      case Right((a, leftover)) =>
-                        if leftover.trim.nonEmpty then
-                          Left(ParseError(
-                            0,
-                            frag,
-                            s"Leftover in list element: '$leftover'"
-                          ))
-                        else
-                          Right(acc :+ a)
-                  }
-              } match
-                // 3) done!
-                case Left(err) => Left(err)
-                case Right(vList) => Right((vList, restAfter))
-
-            case Right((other, _)) =>
-              Left(ParseError(
-                0,
-                input,
-                s"Expected JSON array but got AST node: $other"
-              ))
-
-  given mapDeserializer[A](using jd: Lazy[JsonDeserializer[A]]): JsonDeserializer[Map[String, A]] with {
-    override def defaultValue: Option[Map[String, A]] = Some(Map.empty)
-
-    def deserialize: Parser[Map[String, A]] =
-      input =>
-        objectAsMap(input) match {
-          case Left(err) =>
-            Left(err)
-
-          case Right((raw, rest)) =>
-            val folded: Either[ParseError, Map[String, A]] =
-              raw.foldLeft(Right(Map.empty): Either[ParseError, Map[String, A]]) {
-                case (accE, (k, ast)) =>
-                  accE.flatMap { acc =>
-                    val frag = renderJson(ast)
-                    jd.value.deserialize(frag) match {
-                      case Left(err) => Left(err)
-                      case Right((a, leftover)) =>
-                        if leftover.trim.isEmpty then
-                          Right(acc + (k -> a))
-                        else
-                          Left(ParseError(
-                            0,
-                            frag,
-                            s"Nested map‐entry '$k' had leftover: '$leftover'"
-                          ))
-                    }
-                  }
-              }
-
-            // 3) done
-            folded.map((_, rest))
-        }
-  }
-
-  given jsonAstDeserializer: JsonDeserializer[JsonAst] =
-    new JsonDeserializer[JsonAst] {
-      override def deserialize: Parser[JsonAst] =
-
-        // 1) primitive → JsValue
-        val primP =
-          summon[JsonDeserializer[JsPrimitive]].deserialize
-            .map(JsonAst.JsValue.apply)
-            .token
-
-        // 2) array → Arr
-        lazy val arrP =
-          (for
-            _ <- char('[').token
-            xs <- deserialize.sepBy(comma)
-            _ <- char(']')
-          yield JsonAst.Arr(xs.toList))
-            .token
-
-        // 3) object → Obj
-        lazy val objP =
-          (for
-            _ <- char('{').token
-            pairs <- (for
-              _ <- char('"')
-              k <- stringInline
-              _ <- char('"')
-              _ <- char(':')
-              v <- deserialize
-            yield k -> v)
-              .sepBy(comma)
-            _ <- char('}').token
-          yield JsonAst.Obj(pairs.toMap))
-            .token
-
-        objP.alt(arrP).alt(primP)
-    }
-
-
-  transparent inline def ordered[T <: Product](using m: Mirror.ProductOf[T]): JsonDeserializer[T] =
-    new JsonDeserializer[T]:
-      def deserialize: Parser[T] =
-        val fieldNames: List[String] =
-          constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
-
-        val parser: Parser[m.MirroredElemTypes] =
-          for {
-            _ <- whitespace
-            _ <- char('{')
-            _ <- whitespace
-            values <- deriveParsers[m.MirroredElemTypes](fieldNames)
-            _ <- whitespace
-            _ <- char('}')
-          } yield values
-
-        input =>
-          parser(input) match
-            case Right((tuple, rest)) =>
-              try Right((m.fromTuple(tuple), rest))
-              catch case e: Exception =>
-                Left(ParseError(0, input, s"Error constructing instance: ${e.getMessage}"))
-            case Left(err) => Left(err)
-
-
-
-  inline given derived[T <: Product](using
-                                                 m: Mirror.ProductOf[T]
-                                                ): JsonDeserializer[T] =
-    new JsonDeserializer[T]:
-      def deserialize: Parser[T] =
-        input =>
-          // 1) parse the entire object into a Map[String,JsonAst]
-          objectAsMap(input) match
-            case Left(err) =>
-              Left(err)
-
-            case Right((astMap, rest)) =>
-              // 2) summon all the element-type deserializers as erased to Any
-              val labels = constValueTuple[m.MirroredElemLabels].toIArray.toList.map(_.toString)
-              val desersAny = summonAllDesers[m.MirroredElemTypes]
-
-              // 3) for each (label, deser) pull ast, re-render, re-parse
-              def go(
-                      keys: List[String],
-                      ds: List[JsonDeserializer[Any]],
-                      acc: List[Any]
-                    ): Either[ParseError, List[Any]] =
-                (keys, ds) match
-                  case (Nil, Nil) =>
-                    Right(acc.reverse)
-
-                  case (key :: ktail, d :: dtail) =>
-                    astMap.get(key) match
-                      case None if d.isOptional =>go(ktail, dtail, None :: acc)
-                      case None =>
-                        Left(ParseError(0, input, s"Missing required field '$key' ${d.defaultValue}"))
-
-                      case Some(fieldAst) =>
-                        // re-render the fragment back to JSON
-                        val fragment = renderJson(fieldAst)
-                        d.deserialize(fragment) match
-                          case Left(err) =>
-                            Left(err)
-
-                          case Right((value, leftover)) =>
-                            if leftover.trim.nonEmpty then
-                              Left(ParseError(0, fragment, s"Unconsumed input for field '$key': '$leftover'"))
-                            else
-                              go(ktail, dtail, value :: acc)
-
-                  case _ =>
-                    // mismatch in labels vs. desers
-                    Left(ParseError(0, input, s"Internal error: label/deser mismatch"))
-
-              // 4) run it, then rebuild the product instance
-              go(labels, desersAny, Nil) match
-                case Left(err) =>
-                  Left(err)
-
-                case Right(values) =>
-                  // pack into a Tuple and then into T
-                  try
-                    val tuple0 = values.foldRight(EmptyTuple: Tuple){ (v, t) => v *: t } .asInstanceOf[m.MirroredElemTypes]
-                    Right((m.fromTuple(tuple0), rest))
-                  catch
-                    case ex: Exception =>
-                      Left(ParseError(0, input, s"Construction failed: ${ex.getMessage}"))
+@main
+def test(): Unit =
+  case class Person(name: String, age: Int, address: Address)
+  case class Address(street: String)
+  val deserialzier = JsonDeserializer.derived[Person]
+  val string = """ {"name":"bob", "age": 10, "address": {"street":"Laurel Lane"} } """
+  var i = 0
+  while i <10  do
+    val p = deserialzier.decode(string.getBytes,0)
+    println(p)

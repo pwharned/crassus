@@ -1,7 +1,8 @@
 package org.pwharned.database.derive
 
 
-import org.pwharned.database.SqlDialect
+
+import org.pwharned.database.sql.SqlDialect
 
 import scala.compiletime.*
 import scala.deriving.*

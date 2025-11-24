@@ -1,13 +1,10 @@
-<<<<<<< HEAD:src/main/scala/org/pwharned/database/Rs.scala
-package org.pwharned.database
-=======
-package org.pwharned.sql.database
 
-import org.pwharned.json.{JsonString}
-import org.pwharned.sql.HKD._
->>>>>>> main:src/main/scala/org/pwharned/sql/database/Rs.scala
+package org.pwharned.database.sql
 
-import org.pwharned.database.hkd._
+import org.pwharned.json.JsonString
+
+import org.pwharned.database.hkd.*
+
 import java.sql.ResultSet
 import java.util.UUID
 import scala.language.implicitConversions

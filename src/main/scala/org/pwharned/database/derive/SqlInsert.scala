@@ -3,7 +3,7 @@ package org.pwharned.database.derive
 import scala.compiletime.{constValue, erasedValue, summonInline}
 import scala.deriving.Mirror
 import org.pwharned.database.hkd.*
-import org.pwharned.database.{SqlDialect, TableOrganizationMacro}
+import org.pwharned.database.sql.{SqlDialect, TableOrganizationMacro}
 
 import scala.ValueOf
 

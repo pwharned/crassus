@@ -19,14 +19,9 @@ object KeyType:
       val value: A = a
 
 
-<<<<<<< HEAD:src/main/scala/org/pwharned/database/hkd/PrimaryKey.scala
-sealed trait PrimaryKey[A] extends KeyType[A, GenerationMode.Runtime]:
-  def value: A
-=======
 
 sealed trait PrimaryKey[A] extends ColumnType[A, ConstraintTypes.RuntimeGeneratedPrimaryKey]:
     def value: A
->>>>>>> main:src/main/scala/org/pwharned/sql/HKD/PrimaryKey.scala
 
 object PrimaryKey:
   def apply[A](a: A): PrimaryKey[A] =
@@ -41,8 +36,7 @@ object GeneratedPrimaryKey:
   def apply[A](a: A): GeneratedPrimaryKey[A] =
     new GeneratedPrimaryKey[A]:
       val value: A = a
-<<<<<<< HEAD:src/main/scala/org/pwharned/database/hkd/PrimaryKey.scala
-=======
+
 
 sealed trait Default[X] extends ColumnType[X, ConstraintTypes.DefaultValue]:
   def value: X
@@ -63,4 +57,3 @@ object Nullable:
 @main
 def main: Unit =
   summon[PersistedField[PrimaryKey[String]] =:=  PersistedField[PrimaryKey[String]] ]
->>>>>>> main:src/main/scala/org/pwharned/sql/HKD/PrimaryKey.scala

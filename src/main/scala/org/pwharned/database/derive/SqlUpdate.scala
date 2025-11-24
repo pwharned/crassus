@@ -3,8 +3,8 @@ package org.pwharned.database.derive
 
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
-import org.pwharned.database.hkd._
-import org.pwharned.database.SqlDialect
+import org.pwharned.database.hkd.*
+import org.pwharned.database.sql.SqlDialect
 
 import scala.ValueOf
 import scala.compiletime.ops.int.+
