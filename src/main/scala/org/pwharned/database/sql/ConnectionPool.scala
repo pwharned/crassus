@@ -62,8 +62,9 @@ class  ConnectionPool(
   // Helper method to create a new JDBC connection.
   private def createConnection(): Try[Connection] = Try{
 
-    DriverManager.getConnection(jdbcUrl, properties)
-
+    val conn = DriverManager.getConnection(jdbcUrl, properties)
+    conn.setAutoCommit(true) // <-- add this line
+    conn
 
   }
 
