@@ -43,8 +43,10 @@ object SqlSelect:
         sql
 
       def selectWhere: String = {
+        val pkNames = primaryKeyNames[T]
 
-        val primaryKey = PrimaryKeyExtractor.getPrimaryKey[T].map(x => s" $x = ? ").mkString(" AND ")
+
+        val primaryKey = pkNames.map(x => s" $x = ? ").mkString(" AND ")
 
         val sql = s"SELECT ${names.mkString(",")} from $name WHERE $primaryKey"
         sql

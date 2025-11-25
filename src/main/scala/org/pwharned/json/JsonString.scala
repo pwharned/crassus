@@ -27,7 +27,7 @@ object JsonString:
 
   given [T]: QueryFieldDeserializer[JsonString[T]] with // Added [T] parameter
     override def parser: Parser[JsonString[T]] = 
-      Primitives.stringNoAmpersand.map(JsonString[T](_)) // Map to JsonString[T]
+      Primitives.stringNoAmpersand.map(JsonString[T]) // Map to JsonString[T]
 
   given [T]: Conversion[String, JsonString[T]] with
     def apply(s: String): JsonString[T] = JsonString[T](s)

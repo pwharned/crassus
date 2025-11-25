@@ -70,11 +70,11 @@ object Connection:
       } else {
         Iterator.empty
       }
-    def query[A <: Product](using sql: SqlSelect[A], row:Row[A]): Iterator[A] =
+    def query[A](using sql: SqlSelect[A], row:Row[A]): Iterator[A] =
       val stmt = con.prepareStatement(sql.select)
       val rs = stmt.executeQuery()
       Iterator.continually(rs.next()).takeWhile(identity).map(x => row.fromRs(rs) )
-    def query[A <: Product](a:PrimaryKeyFields[A]#Out)(using pkb: PrimaryKeyBinder[A],sql: SqlSelect[A], row: Row[A]): Iterator[A] =
+    def query[A ](a:PrimaryKeyFields[A]#Out)(using pkb: PrimaryKeyBinder[A],sql: SqlSelect[A], row: Row[A]): Iterator[A] =
 
       val stmt = con.prepareStatement(sql.selectWhere)
       val bindValues = pkb.bind(stmt, 1, a)

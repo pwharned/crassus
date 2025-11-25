@@ -117,7 +117,8 @@ type ColumnsToTuple[T <: Tuple] <: Tuple = T match {
   case EmptyTuple => EmptyTuple
   case b *: tail => b *: ColumnsToTuple[tail]
 }
-
+inline def primaryKeyNames[T <: Product]: List[String] =
+  summonLabels[PrimaryKeys[T]]
 // Recurse over the tuple, setting each element on the JDBC Statement.
 // Returns the next prepared-statement index.
 inline def processColumns[T <: Tuple](
@@ -141,9 +142,9 @@ inline def processColumns[T <: Tuple](
       // 3. Recurse on the tail, bumping the index
       processColumns(columns.tail, stmt, idx + 1)
 
-inline def extractPrimaryKeys[T <: Product](values: Seq[Any])(using m: Mirror.ProductOf[T]): PrimaryKeys[T] =
-
-  buildPKsRec[m.MirroredElemLabels, m.MirroredElemTypes](values).asInstanceOf
+inline def extractPrimaryKeys[T <: Product](values: Seq[Any])(using m: Mirror.ProductOf[T]): PrimaryKeyFields[T]#Out =
+  buildPKsRec[m.MirroredElemLabels, m.MirroredElemTypes](values)
+    .asInstanceOf[PrimaryKeyFields[T]#Out]
 
 
 

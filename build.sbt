@@ -37,7 +37,11 @@ lazy val root = project.in(file("."))
     name := "crassus",
     scalaVersion := "3.7.1",
     libraryDependencies += "org.scala-lang" % "scala3-library_3" % scalaVersion.value,
-
+    scalacOptions ++= Seq(
+      "-Xlog-implicits",   // see implicit resolution attempts
+      "-Xprint:typer",     // show expanded code after typer phase
+      "-Ystatistics"       // show phase timings to spot hotspots
+    ),
 
       ThisBuild / logLevel := Level.Info,
       // in build.sbt
