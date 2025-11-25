@@ -151,6 +151,46 @@ object JsonDeserializer:
 
   inline def apply[T](using d: JsonDeserializer[T]): JsonDeserializer[T] = d
 
+  given [A](using d: JsonDeserializer[A]): JsonDeserializer[Option[A]] with
+    def decode(buf: Array[Byte], pos: Int): (Option[A], Int) =
+      val p = JsonDeserializer.skipWhitespace(buf, pos)
+      if p < buf.length && JsonDeserializer.peek(buf, p) == 'n'.toByte then
+        val (lit, next) = JsonDeserializer.readLiteral(buf, p)
+        if lit == "null" then (None, next)
+        else throw new RuntimeException(s"Invalid null literal: $lit")
+      else
+        val (v, next) = d.decode(buf, p)
+        (Some(v), next)
+
+  // Deserializer for List
+  given [A](using d: JsonDeserializer[A]): JsonDeserializer[List[A]] with
+    def decode(buf: Array[Byte], pos: Int): (List[A], Int) =
+      var p = JsonDeserializer.skipWhitespace(buf, pos)
+      p = JsonDeserializer.expect(buf, p, '['.toByte, "'['")
+      p = JsonDeserializer.skipWhitespace(buf, p)
+      val result = scala.collection.mutable.ListBuffer.empty[A]
+      var done = false
+      while !done do
+        p = JsonDeserializer.skipWhitespace(buf, p)
+        if p < buf.length && buf(p) == ']'.toByte then
+          p = JsonDeserializer.expect(buf, p, ']'.toByte, "']'")
+          done = true
+        else
+          val (value, next) = d.decode(buf, p)
+          result += value
+          p = JsonDeserializer.skipWhitespace(buf, next)
+          if p < buf.length && buf(p) == ','.toByte then
+            p = JsonDeserializer.expect(buf, p, ','.toByte, "','")
+            p = JsonDeserializer.skipWhitespace(buf, p)
+          else if p < buf.length && buf(p) == ']'.toByte then
+            p = JsonDeserializer.expect(buf, p, ']'.toByte, "']'")
+            done = true
+          else throw new RuntimeException(s"Unexpected token at $p")
+      (result.toList, p)
+  // Deserializer for HKD Persisted wrapper
+
+
+
 
 
   // primitive decoders
