@@ -389,10 +389,10 @@ object JsonDeserializer:
 
 @main
 def test(): Unit =
-  case class Person(name: Option[String], age: Int, address: Address)
+  case class Person(name: Option[String], age: Float, address: Address)
   case class Address(street: String)
   val deserialzier = JsonDeserializer.derived[Person]
-  val string = """ { "address": {"street":"Laurel Lane"} } """
+  val string = """ { "age":1.23e4, "address": {"street":"Laurel Lane"} } """
   var i = 0
   while i <10  do
     val p = deserialzier.decode(string.getBytes,0)

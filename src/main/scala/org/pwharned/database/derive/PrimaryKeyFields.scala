@@ -1,7 +1,9 @@
 package org.pwharned.database.derive
 
-import org.pwharned.database.hkd._
+import org.pwharned.database.hkd.*
 
+import java.time.Instant
+import java.util.UUID
 import scala.compiletime.{constValue, erasedValue, summonInline}
 import scala.deriving.Mirror
 
@@ -81,37 +83,22 @@ inline def buildPKsRec[Ls <: Tuple, Ts <: Tuple](values: Seq[Any]): FilterPrimar
     case _: ((lh *: lt), (th *: tt)) =>
       inline erasedValue[th] match
         case _: GeneratedPrimaryKey[a] =>
-          // 1) Find index of this label in the full labels list
           val labels = summonLabels[Ls]
           val idx = labels.indexOf(constValue[lh])
-          // 2) Pull the runtime value, cast to `a`
-          val rawValue = values(idx).asInstanceOf[a]
-          // 3) Wrap it into your PK type
-          val pkValue = GeneratedPrimaryKey(rawValue)
-          // 4) Create the head pair (lh ->> th)
-          val head = (constValue[lh], pkValue)
-          val tail: FilterPrimaryKey[lt, tt] =
-            buildPKsRec[lt, tt](values)
-          // 5) Recurse for the tail
+          val rawValue = summonInline[ValueDecoder[a]].fromAny(values(idx))
+          val pkValue  = GeneratedPrimaryKey(rawValue)
+          val head     = (constValue[lh], pkValue)
+          val tail     = buildPKsRec[lt, tt](values)
           (head *: tail).asInstanceOf[FilterPrimaryKey[Ls, Ts]]
-
-        // Field `th` is PrimaryKey[a]
         case _: PrimaryKey[a] =>
-          // 1) Find index of this label in the full labels list
           val labels = summonLabels[Ls]
           val idx = labels.indexOf(constValue[lh])
-          // 2) Pull the runtime value, cast to `a`
-          val rawValue = values(idx).asInstanceOf[a]
-          // 3) Wrap it into your PK type
-          val pkValue = PrimaryKey(rawValue)
-          // 4) Create the head pair (lh ->> th)
-          val head = (constValue[lh], pkValue)
-          val tail: FilterPrimaryKey[lt, tt] =
-            buildPKsRec[lt, tt](values)
-          // 5) Recurse for the tail
+          val rawValue = summonInline[ValueDecoder[a]].fromAny(values(idx))
+          val pkValue  = PrimaryKey(rawValue)
+          val head     = (constValue[lh], pkValue)
+          val tail     = buildPKsRec[lt, tt](values)
           (head *: tail).asInstanceOf[FilterPrimaryKey[Ls, Ts]]
 
-        // Field `th` not a PK: skip it
         case _ =>
           buildPKsRec[lt, tt](values).asInstanceOf[FilterPrimaryKey[Ls, Ts]]
 
@@ -127,6 +114,35 @@ inline def summonLabels[Ls <: Tuple]: List[String] =
   inline erasedValue[Ls] match
     case _: (h *: t) => constValue[h].toString :: summonLabels[t]
     case _: EmptyTuple => Nil
+
+trait ValueDecoder[A] {
+  def fromAny(v: Any): A
+}
+
+object ValueDecoder {
+  given ValueDecoder[String]  with { def fromAny(v: Any): String = v.toString }
+  given ValueDecoder[Int]     with { def fromAny(v: Any): Int = v match {
+    case i: Int => i
+    case s: String => s.toInt
+  }}
+  given ValueDecoder[Long]    with { def fromAny(v: Any): Long = v match {
+    case l: Long => l
+    case s: String => s.toLong
+  }}
+  given ValueDecoder[java.util.UUID] with {
+    def fromAny(v: Any): UUID = v match {
+      case u: java.util.UUID => u
+      case s: String => java.util.UUID.fromString(s)
+    }
+  }
+  given ValueDecoder[java.time.Instant] with {
+    def fromAny(v: Any): Instant = v match {
+      case i: java.time.Instant => i
+      case s: String => java.time.Instant.parse(s)
+    }
+  }
+  // add more as needed
+}
 
 
 inline def primaryKeyNames[T <: Product](using m: Mirror.ProductOf[T]): List[String] =
@@ -163,13 +179,13 @@ inline def extractPrimaryKeys[T <: Product](values: Seq[Any])(using m: Mirror.Pr
 
 @main
 def t: Unit =
-  case class Person[F[_]](name: F[PrimaryKey[String]], age: F[Int])
+  case class Person[F[_]](name: F[PrimaryKey[java.util.UUID]], age: F[Int])
 
   type PersonName = PrimaryKeys[Person[Id]]
   val pkNames = primaryKeyNames[Persisted[Person]]
   println(pkNames)
 
-  def runtimeKeys =  Seq("Bob")
+  def runtimeKeys =  Seq(java.util.UUID.randomUUID())
   println(extractPrimaryKeys[Person[Id]](runtimeKeys))
 
   val cols1 = (42, PrimaryKey("Hello"))
