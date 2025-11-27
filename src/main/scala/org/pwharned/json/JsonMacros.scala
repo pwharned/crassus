@@ -9,12 +9,21 @@ object JsonMacros {
 
   private def matchFieldImpl[T <: Product](keyExpr: Expr[String])(using q: Quotes, t: Type[T]): Expr[Int] =
     import q.reflect.*
+    val tr = TypeRepr.of[T]
 
-    // Ensure T is a product / case class and collect its field names
-    val sym = TypeRepr.of[T].typeSymbol
+    val sym = tr match
+      case AppliedType(tycon, args) =>
+        // tycon is the type constructor (like Option, Either)
+        // args are the type arguments (like Person, String, Int)
+        tycon.typeSymbol
+      case _ =>
+        tr.typeSymbol
+
     if !sym.isClassDef then
-      report.error(s"Not a class or case class: ${Type.show[T]}")
+      report.error(s"Not a class or case class: ${tr.show}")
       return '{ -1 }
+
+
 
     // caseFields returns constructor params for case classes/case objects
     val fieldSyms = sym.caseFields

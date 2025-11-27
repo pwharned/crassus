@@ -9,6 +9,17 @@ trait PrimaryKeyFields[T] {
   type Out <: Tuple
 }
 
+type IsPk[A] <: Boolean = A match
+  case PrimaryKey[t] => true
+  case GeneratedPrimaryKey[t] => true
+  case _ => false
+
+type FilterLabels[Ls <: Tuple, Ts <: Tuple] <: Tuple = (Ls, Ts) match
+  case (EmptyTuple, EmptyTuple) => EmptyTuple
+  case (lh *: lt, th *: tt) =>
+    IsPk[th] match
+      case true  => lh *: FilterLabels[lt, tt]
+      case false => FilterLabels[lt, tt]
 
 given [T](using m: Mirror.ProductOf[T]): PrimaryKeyFields[T] with {
   type Out = Tuple.Filter[m.MirroredElemTypes, [X] =>> X match {
@@ -64,11 +75,6 @@ type ElemTypes[T <: Product] = Mirror.ProductOf[T]#MirroredElemTypes
 type Pick[T <: Product, Keys <: Tuple] =
   Filter[ElemLabels[T], ElemTypes[T], Keys]
 /** Summon `List` of all labels in declaration order */
-inline def summonLabels[Ls <: Tuple]: List[String] =
-  inline erasedValue[Ls] match
-    case _: (h *: t) => constValue[h].toString :: summonLabels[t]
-    case _: EmptyTuple => Nil
-
 
 inline def buildPKsRec[Ls <: Tuple, Ts <: Tuple](values: Seq[Any]): FilterPrimaryKey[Ls, Ts] =
   inline erasedValue[(Ls, Ts)] match
@@ -117,8 +123,14 @@ type ColumnsToTuple[T <: Tuple] <: Tuple = T match {
   case EmptyTuple => EmptyTuple
   case b *: tail => b *: ColumnsToTuple[tail]
 }
-inline def primaryKeyNames[T <: Product]: List[String] =
-  summonLabels[PrimaryKeys[T]]
+inline def summonLabels[Ls <: Tuple]: List[String] =
+  inline erasedValue[Ls] match
+    case _: (h *: t) => constValue[h].toString :: summonLabels[t]
+    case _: EmptyTuple => Nil
+
+
+inline def primaryKeyNames[T <: Product](using m: Mirror.ProductOf[T]): List[String] =
+  summonLabels[FilterLabels[m.MirroredElemLabels, m.MirroredElemTypes]]
 // Recurse over the tuple, setting each element on the JDBC Statement.
 // Returns the next prepared-statement index.
 inline def processColumns[T <: Tuple](
@@ -154,7 +166,8 @@ def t: Unit =
   case class Person[F[_]](name: F[PrimaryKey[String]], age: F[Int])
 
   type PersonName = PrimaryKeys[Person[Id]]
-  
+  val pkNames = primaryKeyNames[Persisted[Person]]
+  println(pkNames)
 
   def runtimeKeys =  Seq("Bob")
   println(extractPrimaryKeys[Person[Id]](runtimeKeys))

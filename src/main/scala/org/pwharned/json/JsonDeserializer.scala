@@ -1,5 +1,7 @@
 package org.pwharned.json
 
+import org.pwharned.database.hkd.{Default, GeneratedPrimaryKey, Nullable, PrimaryKey}
+
 import scala.deriving.*
 import scala.compiletime.*
 import scala.annotation.tailrec
@@ -189,18 +191,71 @@ object JsonDeserializer:
       (result.toList, p)
   // Deserializer for HKD Persisted wrapper
 
-
-
-
-
+  given [A](using d: JsonDeserializer[A]): JsonDeserializer[Vector[A]] with
+    def decode(buf: Array[Byte], pos: Int): (Vector[A], Int) =
+      var p = JsonDeserializer.skipWhitespace(buf, pos)
+      p = JsonDeserializer.expect(buf, p, '['.toByte, "'['")
+      p = JsonDeserializer.skipWhitespace(buf, p)
+      val result = scala.collection.mutable.ListBuffer.empty[A]
+      var done = false
+      while !done do
+        p = JsonDeserializer.skipWhitespace(buf, p)
+        if p < buf.length && buf(p) == ']'.toByte then
+          p = JsonDeserializer.expect(buf, p, ']'.toByte, "']'")
+          done = true
+        else
+          val (value, next) = d.decode(buf, p)
+          result += value
+          p = JsonDeserializer.skipWhitespace(buf, next)
+          if p < buf.length && buf(p) == ','.toByte then
+            p = JsonDeserializer.expect(buf, p, ','.toByte, "','")
+            p = JsonDeserializer.skipWhitespace(buf, p)
+          else if p < buf.length && buf(p) == ']'.toByte then
+            p = JsonDeserializer.expect(buf, p, ']'.toByte, "']'")
+            done = true
+          else throw new RuntimeException(s"Unexpected token at $p")
+      (result.toVector, p)
+  given primaryKey[T](using underlying: JsonDeserializer[T]): JsonDeserializer[PrimaryKey[T]] = (buf: Array[Byte], pos: Int) => {
+    val decoded = underlying.decode(buf, pos)
+    (PrimaryKey(decoded._1), decoded._2)
+  }
+  given default[T](using underlying: JsonDeserializer[T]): JsonDeserializer[Default[T]] = (buf: Array[Byte], pos: Int) => {
+    val decoded = underlying.decode(buf, pos)
+    (Default(decoded._1), decoded._2)
+  }
+  given nullable[T](using underlying: JsonDeserializer[T]): JsonDeserializer[Nullable[T]] = (buf: Array[Byte], pos: Int) => {
+    val decoded = underlying.decode(buf, pos)
+    (Nullable(decoded._1), decoded._2)
+  }
+  given generatedPrimaryKey[T](using underlying: JsonDeserializer[T]): JsonDeserializer[GeneratedPrimaryKey[T]] = (buf: Array[Byte], pos: Int) => {
+    val decoded = underlying.decode(buf, pos)
+    (GeneratedPrimaryKey(decoded._1), decoded._2)
+  }
   // primitive decoders
   given JsonDeserializer[String] with
     def decode(buf: Array[Byte], pos: Int): (String, Int) = JsonDeserializer.readString(buf, pos)
-
+  given JsonDeserializer[java.util.UUID] with
+    def decode(buf: Array[Byte], pos: Int): (java.util.UUID, Int) = {
+      val decoded = JsonDeserializer.readString(buf, pos)
+      (java.util.UUID.fromString(decoded._1), decoded._2)
+    }
+  given JsonDeserializer[java.time.Instant] with
+    def decode(buf: Array[Byte], pos: Int): (java.time.Instant, Int) = {
+      val decoded = JsonDeserializer.readString(buf, pos)
+      (java.time.Instant.parse(decoded._1), decoded._2)
+    }
   given JsonDeserializer[Int] with
     def decode(buf: Array[Byte], pos: Int): (Int, Int) =
       val (lit, p) = JsonDeserializer.readLiteral(buf, pos)
       (lit.toInt, p)
+  given JsonDeserializer[Float] with
+    def decode(buf: Array[Byte], pos: Int): (Float, Int) =
+      val (lit, p) = JsonDeserializer.readLiteral(buf, pos)
+      (lit.toFloat, p)
+  given JsonDeserializer[Long] with
+    def decode(buf: Array[Byte], pos: Int): (Long, Int) =
+      val (lit, p) = JsonDeserializer.readLiteral(buf, pos)
+      (lit.toLong, p)
 
   given JsonDeserializer[Double] with
     def decode(buf: Array[Byte], pos: Int): (Double, Int) =
@@ -245,16 +300,52 @@ object JsonDeserializer:
         System.arraycopy(tail, 0, arr, 1, tail.length)
         arr
 
+  import scala.deriving.Mirror
+  import scala.compiletime.{constValue, constValueTuple, erasedValue, summonInline}
+
+  import scala.deriving.Mirror
+  import scala.compiletime.{constValue, constValueTuple}
+
+  inline def matchField[T](key: String): Int =
+    inline summonInline[Mirror.ProductOf[T]] match
+      case m =>
+        val labels = constValueTuple[m.MirroredElemLabels]
+        matchFieldRec[m.MirroredElemLabels](key, 0)
+
+  inline def matchFieldRec[Labels <: Tuple](key: String, idx: Int): Int =
+    inline erasedValue[Labels] match
+      case _: EmptyTuple => -1
+      case _: (h *: t) =>
+        if key == constValue[h] then idx
+        else matchFieldRec[t](key, idx + 1)
+
+
+  inline def defaultTuple[Elems <: Tuple]: Tuple =
+    inline erasedValue[Elems] match
+      case _: EmptyTuple => EmptyTuple
+      case _: (Option[?] *: tail) =>
+        (None *: defaultTuple[tail])
+      case _: (h *: tail) =>
+        (null *: defaultTuple[tail])
+
+
   inline def productDecoder[T<:Product](m: Mirror.ProductOf[T]): JsonDeserializer[T] =
     // build element decoders array at derivation time (one allocation per decoder instance)
     val length = tupleSize[m.MirroredElemTypes]
+    val defaults = defaultTuple[m.MirroredElemTypes]
+    val values = defaults.toArray.asInstanceOf[Array[Any]]
+    val fieldLabels =
+      constValueTuple[m.MirroredElemLabels] match
+        case labels: Tuple =>
+          labels.toArray.map(_.toString)
+
+
 
     (buf: Array[Byte], pos0: Int) =>
       var pos = JsonDeserializer.skipWhitespace(buf, pos0)
       pos = JsonDeserializer.readOpenBrace(buf, pos)
       pos = JsonDeserializer.skipWhitespace(buf, pos)
 
-      val values = new Array[Any](length)
       var done = false
 
       while !done do
@@ -271,7 +362,7 @@ object JsonDeserializer:
           pos = JsonDeserializer.skipWhitespace(buf, pos)
 
           // match field index (assumes macro-generated matchField exists)
-          val idx = JsonMacros.matchField[T](key)
+          val idx = matchField[T](key)
           if idx >= 0 && idx < length then
             val (v, newPos) = decodeFieldByIndex[m.MirroredElemTypes](idx, buf, pos)
             values(idx) = v
@@ -287,17 +378,21 @@ object JsonDeserializer:
             pos = JsonDeserializer.skipWhitespace(buf, pos)
           else
             ()
-
+      var i = 0
+      while i < length do
+        if values(i) == null then
+          throw new RuntimeException(s"Missing required field: ${fieldLabels(i)}")
+        i += 1
       val tuple = Tuple.fromArray(values)
       val product = m.fromProduct(tuple)
       (product.asInstanceOf[T], pos)
 
 @main
 def test(): Unit =
-  case class Person(name: String, age: Int, address: Address)
+  case class Person(name: Option[String], age: Int, address: Address)
   case class Address(street: String)
   val deserialzier = JsonDeserializer.derived[Person]
-  val string = """ {"name":"bob", "age": 10, "address": {"street":"Laurel Lane"} } """
+  val string = """ { "address": {"street":"Laurel Lane"} } """
   var i = 0
   while i <10  do
     val p = deserialzier.decode(string.getBytes,0)
