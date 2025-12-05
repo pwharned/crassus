@@ -16,6 +16,8 @@ The DSL is not finished but the server works showing tight latency distribution 
 
 The ultimate goal is to have a self documenting framework that does not create performance issues at  compile time or runtime due to too much functional nonsense.
 
+We erase most of the DSL API at compile time through macros to eliminate overhead. As a result, running as a native image is more or less just as fast as running it on the JVM.
+
 ```
 ❯ ~/go/bin/hey -n 1000000 -c 100 http://localhost:8080/users
 
