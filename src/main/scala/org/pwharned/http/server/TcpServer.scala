@@ -16,7 +16,7 @@ import scala.jdk.CollectionConverters.*
  * - Batch event processing
  * - Zero-copy where possible
  */
-class TcpServer[Req, Resp](port: Int)(using proto: Protocol[Req, Resp]):
+class TcpServer[Req](port: Int)(using proto: Protocol[Req]):
   // Core NIO components
   private given selector: Selector = Selector.open()
   private given alloc: BufferAllocator = BufferAllocator.direct(proto.bufferSize)
@@ -31,7 +31,7 @@ class TcpServer[Req, Resp](port: Int)(using proto: Protocol[Req, Resp]):
    * Create new session for accepted connection.
    * Allocates buffers from pool.
    */
-  private inline def createSession(channel: SocketChannel, key: SelectionKey): Session[Req, Resp] =
+  private inline def createSession(channel: SocketChannel, key: SelectionKey): Session[Req] =
     Session(
       channel = channel,
       key = key,
@@ -44,24 +44,25 @@ class TcpServer[Req, Resp](port: Int)(using proto: Protocol[Req, Resp]):
    * Handle read event for a session.
    * Feeds parser, handles request, renders response.
    */
-  private inline def handleRead(session: Session[Req, Resp]): Unit =
+
+  private inline def handleRead(session: Session[Req]): Unit =
+
+
     session.readBuffer.clear()
     val bytesRead = session.channel.read(session.readBuffer)
 
     if bytesRead == -1 then
-      // Client closed connection
       proto.onConnectionClose(session.channel)
       session.close()
     else if bytesRead > 0 then
-      // Feed parser
       session.readBuffer.flip()
       session.parser.feed(session.readBuffer)
 
-      // Handle complete requests
       session.parser.take().foreach { request =>
-        val response = proto.handler.handle(request)
-        proto.renderer.render(response, session.writeBuffer, session.channel)
+        // Simple: just call the handler with the request and buffers
+        proto.handler.handle(request, session.writeBuffer, session.channel)
       }
+
 
   /**
    * Main event loop.
@@ -105,13 +106,14 @@ class TcpServer[Req, Resp](port: Int)(using proto: Protocol[Req, Resp]):
 
             // READ - data available
             else if key.isReadable then
+
               // Disable READ while processing (level-triggered)
               key.interestOps(key.interestOps() & ~SelectionKey.OP_READ)
 
               // Offload to worker thread
               executor.submit(new Runnable {
                 def run(): Unit =
-                  val session = key.attachment().asInstanceOf[Session[Req, Resp]]
+                  val session = key.attachment().asInstanceOf[Session[Req]]
 
                   try
                     handleRead(session)

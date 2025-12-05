@@ -50,6 +50,7 @@ type FilterPrimaryKey[Labels <: Tuple, Types <: Tuple] <: Tuple =
       hT match
     // if this field‐type is a PrimaryKey[_], include (label ->> type)
       case PrimaryKey[t] => (hl ->> hT) *: FilterPrimaryKey[tl, tT]
+      case GeneratedPrimaryKey[t] => (hl ->> hT) *: FilterPrimaryKey[tl, tT]
       case _ => FilterPrimaryKey[tl, tT]
     case _ => EmptyTuple
 
@@ -87,7 +88,8 @@ inline def buildPKsRec[Ls <: Tuple, Ts <: Tuple](values: Seq[Any]): FilterPrimar
           val idx = labels.indexOf(constValue[lh])
           val rawValue = summonInline[ValueDecoder[a]].fromAny(values(idx))
           val pkValue  = GeneratedPrimaryKey(rawValue)
-          val head     = (constValue[lh], pkValue)
+          //val head     = (constValue[lh], pkValue)
+          val head = pkValue
           val tail     = buildPKsRec[lt, tt](values)
           (head *: tail).asInstanceOf[FilterPrimaryKey[Ls, Ts]]
         case _: PrimaryKey[a] =>
@@ -95,16 +97,18 @@ inline def buildPKsRec[Ls <: Tuple, Ts <: Tuple](values: Seq[Any]): FilterPrimar
           val idx = labels.indexOf(constValue[lh])
           val rawValue = summonInline[ValueDecoder[a]].fromAny(values(idx))
           val pkValue  = PrimaryKey(rawValue)
-          val head     = (constValue[lh], pkValue)
+          //val head     = (constValue[lh], pkValue)
+          val head = pkValue
           val tail     = buildPKsRec[lt, tt](values)
           (head *: tail).asInstanceOf[FilterPrimaryKey[Ls, Ts]]
 
         case _ =>
           buildPKsRec[lt, tt](values).asInstanceOf[FilterPrimaryKey[Ls, Ts]]
 
-    // No more fields
+
     case _: (EmptyTuple, EmptyTuple) =>
-      EmptyTuple.asInstanceOf
+      EmptyTuple.asInstanceOf[FilterPrimaryKey[Ls, Ts]]
+
 
 type ColumnsToTuple[T <: Tuple] <: Tuple = T match {
   case EmptyTuple => EmptyTuple
@@ -179,17 +183,14 @@ inline def extractPrimaryKeys[T <: Product](values: Seq[Any])(using m: Mirror.Pr
 
 @main
 def t: Unit =
-  case class Person[F[_]](name: F[PrimaryKey[java.util.UUID]], age: F[Int])
+  case class Person[F[_]](name: F[GeneratedPrimaryKey[java.util.UUID]], age: F[Int])
 
   type PersonName = PrimaryKeys[Person[Id]]
   val pkNames = primaryKeyNames[Persisted[Person]]
   println(pkNames)
 
-  def runtimeKeys =  Seq(java.util.UUID.randomUUID())
-  println(extractPrimaryKeys[Person[Id]](runtimeKeys))
+  def runtimeKeys =  Seq(java.util.UUID.randomUUID().toString)
+  println(extractPrimaryKeys[Persisted[Person]](runtimeKeys))
 
-  val cols1 = (42, PrimaryKey("Hello"))
-  val cols2 = ("world", true)
-  val cols3 = (3.14, 'c')
 
 

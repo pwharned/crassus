@@ -2,25 +2,20 @@ package org.pwharned.http.dsl
 
 import org.pwharned.http.HttpMethods.{GET, HttpMethod, POST}
 import org.pwharned.http.request.HttpRequestView
-import org.pwharned.http.response.HttpResponse
+import org.pwharned.http.response.{EntityWriter, HttpResponse}
 import org.pwharned.io.IO
 
-// Route now directly produces HttpResponse[E]
+// Pure data - no rendering logic
 case class Route[E](
-                     method: HttpMethod,
+                     method: String,
                      path: String,
-                     logic: HttpRequestView => IO[HttpResponse[E]]
-                   ) {
-}
+                     handler: (HttpRequestView) => IO[HttpResponse[E]],
 
-object Route {
-  // Helper methods to define routes more ergonomically
-  // The 'using' clause is implicitly passed through to the HttpResponse constructor
+                   )
+
+object Route:
   def get[E](path: String)(logic: HttpRequestView => IO[HttpResponse[E]]): Route[E] =
-    Route(GET, path, logic)
+    Route("GET", path, logic)
 
-  def post[E](path: String)(logic: HttpRequestView => IO[HttpResponse[E]]): Route[E] =
-    Route(POST, path, logic)
-
-  // ... add other HTTP methods as needed
-}
+  def post[E](path: String)(logic: (HttpRequestView) => IO[HttpResponse[E]]): Route[E] =
+    Route("POST", path, logic)

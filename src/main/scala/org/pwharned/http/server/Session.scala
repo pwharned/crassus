@@ -7,7 +7,7 @@ import java.nio.channels.{SelectionKey, SocketChannel}
  * Immutable session state - pure data, no behavior.
  * One session per TCP connection.
  */
-case class Session[Req, Resp](
+case class Session[Req](
                                channel: SocketChannel,
                                key: SelectionKey,
                                readBuffer: ByteBuffer,

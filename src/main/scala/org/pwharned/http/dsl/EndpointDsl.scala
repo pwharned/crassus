@@ -2,13 +2,15 @@ package org.pwharned.http.dsl
 
 import org.pwharned.http.HttpMethods.*
 import org.pwharned.http.request.HttpRequestView
-import org.pwharned.http.response.HttpResponse
+import org.pwharned.http.response.{EntityWriter, HttpResponse}
 import org.pwharned.io.IO
 
 import scala.annotation.tailrec
 import scala.quoted.*
 
 object endpoint
+
+case class PartialRoute(method: String, segments: List[String])
 
 
 case class EndpointPath(val path: String,val method: HttpMethod)
@@ -124,62 +126,45 @@ object EndpointDsl:
 
   }
 
+  extension (inline ep: endpoint.type)
+    inline def get(inline parts: String*): PartialRoute =
+      ${ getImpl('parts) }
+
+  def getImpl(partsExpr: Expr[Seq[String]])(using Quotes): Expr[PartialRoute] =
+    import quotes.reflect.*
+
+    val segments = partsExpr match
+      case Varargs(es) =>
+        es.map {
+          case Expr(s) => s
+          case _ =>
+            report.errorAndAbort("Path segments must be string literals")
+        }.toList
+      case _ =>
+        report.errorAndAbort("Expected varargs of string literals")
+
+    '{ PartialRoute("GET", ${ Expr(segments) }) }
 
 
-
-  // 1) extension: get -> macro
-  extension (inline ep: endpoint.type )
-    inline def get(inline args: Any*): EndpointPath = ${ getImpl('args) }
-
-  private def getImpl[P<:Type](
-                                                argsExpr: Expr[Seq[Any]])(using q: Quotes): Expr[EndpointPath] =
-    import q.reflect.*
-
-
-    /*
-    val epTerm = epExpr.asTerm
-    val path: String = epTerm match {
-      case Inlined(_,_,inlined) => inlined match {
-        case  Apply(TypeApply(Select(Ident("Endpoint"), "apply"), List(Inferred())), List(Literal(StringConstant(s)))) => s
-      }
-    }
-*/
-    val argNames = argsExpr match
-    case Varargs(es) =>
-      es.map { expr =>
-        expr.asTerm match {
-          case Literal(StringConstant(s)) => s
-          case other =>
-            // Don't use .show here either!
-            report.errorAndAbort("Expected string literal in get() arguments")
-        }
-      }
-    case other =>
-      other.asTerm match {
-        case Literal(StringConstant(s)) => Seq(s)
-        case _ =>
-          report.errorAndAbort("Expected string literal argument")
-      }
-
-    val pathLiteral: Expr[String] = Expr(argNames.mkString("/"))
-    val methodLiteral: Expr[HttpMethod] = Expr(GET)
-    '{  EndpointPath( $pathLiteral, $methodLiteral ) }
-
-  extension (inline ep: EndpointPath)
-     inline def serverLogic[B]( logic: HttpRequestView => IO[HttpResponse[B]]   ): Route[B] = ${ serverLogicImpl[B]('logic, 'ep) }
-
-  private def serverLogicImpl[B: Type](
-                                        logicExpr: Expr[HttpRequestView => IO[HttpResponse[B]]],
-                                        epExpr:  Expr[EndpointPath]
-                                      )(using q: Quotes): Expr[Route[B]] =
-    import q.reflect.*
+  extension (inline pr: PartialRoute)
+    inline def serverLogic[E](
+                               inline logic: HttpRequestView => IO[HttpResponse[E]]
+                             ): (String, String, HttpRequestView => IO[HttpResponse[E]]  ) =
+      ${ serverLogicImpl[E]('pr, 'logic) }
   
-    epExpr match
-      case '{ EndpointPath(${ pathExpr: Expr[String] }, ${ methodExpr: Expr[HttpMethod] }) } =>
-        '{ new Route[B]($methodExpr, $pathExpr, $logicExpr) }
-  
-      case other =>
-        report.errorAndAbort(s"Expected a literal EndpointPath, got: $other")
-  
+  def serverLogicImpl[E: Type](
+                                prExpr: Expr[PartialRoute],
+                                handlerExpr: Expr[HttpRequestView => IO[HttpResponse[E]]],
 
+                              )(using Quotes): Expr[(String, String,  HttpRequestView => IO[HttpResponse[E]]  ) ] =
+    import quotes.reflect.*
   
+    prExpr match
+      case '{ PartialRoute($method, $segments) } =>
+        val path: List[String] = segments.valueOrAbort
+        val p: String = path.mkString("/")
+        val pExpr = Expr(p)
+        '{ (${ Expr(method.valueOrAbort) }, $pExpr, $handlerExpr) }
+  
+      case _ =>
+        report.errorAndAbort("PartialRoute must be literal")

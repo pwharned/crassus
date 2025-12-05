@@ -114,6 +114,7 @@ class  ConnectionPool(
       if (conn.isClosed) then
         totalConnections -= 1
       else
+
         idleConnections.enqueue((conn, System.currentTimeMillis()))
     catch
       case _: SQLException => totalConnections -= 1
@@ -149,19 +150,31 @@ class  ConnectionPool(
    * to the pool after use.
    */
   def withConnection[T](f: Connection => T)(using ec: scala.concurrent.ExecutionContext): Future[Try[T]] = {
-    Future(acquire()) .map {
-      case Failure(exception) => Failure(exception)
-      case con@Success(connection) =>
-        Try(f(connection)).transform(
-          result => {
-            release(connection); Success(result)
-          },
-          error => {
-            release(connection); Failure(error)
+    Future(acquire()).flatMap {
+      case Failure(exception) =>
+        Future.failed(exception)
+
+      case Success(connection) =>
+        Future {
+          try {
+            val result = Try(f(connection))
+            result match {
+              case Success(value) =>
+                try connection.commit() catch { case _: Throwable => () }
+                Success(value)
+              case Failure(err) =>
+                try connection.rollback() catch { case _: Throwable => () }
+                Failure(err)
+            }
+          } finally {
+            try connection.setAutoCommit(true) catch { case _: Throwable => () }
+            release(connection)
           }
-        )
+        }
     }
   }
+
+
 
 
   /**

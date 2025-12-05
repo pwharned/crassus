@@ -7,20 +7,14 @@ trait RequestParser[Request]:
   def feed(buffer: ByteBuffer): Unit
   def take(): Option[Request]
 
-trait RequestHandler[Request, Response]:
-  def handle(request: Request): Response
+trait RequestHandler[Request]:
+  def handle(request: Request, buffer: ByteBuffer, channel: SocketChannel): Unit
 
-// Simplified - just needs to write response
-trait ResponseRenderer[Response]:
-  def render(response: Response, buffer: ByteBuffer, channel: SocketChannel): Unit
-
-trait Protocol[Req, Resp]:
+trait Protocol[Req]:
   type Request = Req
-  type Response = Resp
 
   def parser: RequestParser[Request]
-  def handler: RequestHandler[Request, Response]
-  def renderer: ResponseRenderer[Response]
+  def handler: RequestHandler[Request]
 
   def bufferSize: Int = 8192
   def maxBatch: Int = 128

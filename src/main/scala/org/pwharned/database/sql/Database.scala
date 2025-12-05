@@ -37,7 +37,7 @@ class Database(using sqlDial: SqlDialect, mapper: DbTypeMapper) {
   def withConnection[T](f: java.sql.Connection => T): Future[Try[T]] = {
     // acquire permit before dispatching work so we don't exceed DB connections
     concurrencyLimit.acquire()
-    try pool.withConnection { conn => f(conn) } // adapt to your pool API
+    try pool.withConnection { conn => f(conn) }
     finally concurrencyLimit.release()
   }
 

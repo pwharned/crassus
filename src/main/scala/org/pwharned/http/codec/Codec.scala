@@ -2,6 +2,7 @@ package org.pwharned.http.codec
 
 import org.pwharned.http.HttpTypes
 import org.pwharned.http.HttpTypes.ByteSlice
+import org.pwharned.json.{JsonDeserializer, JsonSerializer}
 
 import java.nio.charset.StandardCharsets
 import scala.deriving.Mirror
@@ -27,16 +28,17 @@ object Codec:
     def contentType: String = "text/plain; charset=utf-8"
 
 
-  inline given entityCodec[A<:Product](using m: Mirror.ProductOf[A]): Codec[A] = new Codec[A]:
+  given entityCodec[A<:Product](using m: Mirror.ProductOf[A], jd: JsonDeserializer[A], js: JsonSerializer[A]): Codec[A] = new Codec[A]:
     def decode(slice: ByteSlice): Either[String, A] =
-      val decoder = summon[JsonDecoder[A]] // Fixed: ByteDecoder not JsonDecoder
       val bytes = slice.toBytes
       Try {
-        decoder.decode(bytes, 0, bytes.length)
-      }.toEither.left.map(_.getMessage)
+        jd.decode(bytes, 0)
+      }.toEither match {
+        case Left(value) => Left(value.getMessage)
+        case Right(value) => Right(value._1)
+      }
     def encode(entity: A): String =
-      val encoder = summon[JsonEncoder[A]]
-      encoder.encode(entity)
+      js.serialize(entity)
 
     def contentType: String = "application/json"
 
