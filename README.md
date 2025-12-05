@@ -1,6 +1,71 @@
 # Crassus
 
-A fully contained, self documenting framework for developing  REST and RPC APIs in scala3. 
+
+There are two experimental projects in this repo. 
+
+1. caseClassGenerator - generate HKD case classes from DDL files and provide type classes for parameter binding, row summoning, and sql generation
+2. Experimental HTTP server
+
+
+# Http Server
+
+The desire here was to produce a very performant Scala 3 Http sever that provides a high level DSL for creating type-checked routes while minimizing the amount of indirection or boxing that typically occurs.
+The result as you can see below is capable of handling way more request than the average scala3 framework
+
+The DSL is not finished but the server works showing tight latency distribution and good throughout. inspired by projects like scalene: (https://github.com/DanSimon/scalene)
+
+The ultimate goal is to have a self documenting framework that does not create performance issues at  compile time or runtime due to too much functional nonsense.
+
+```
+❯ ~/go/bin/hey -n 1000000 -c 100 http://localhost:8080/users
+
+
+
+
+Summary:
+  Total:	5.3867 secs
+  Slowest:	0.0145 secs
+  Fastest:	0.0000 secs
+  Average:	0.0005 secs
+  Requests/sec:	185641.5331
+
+  Total data:	13000000 bytes
+  Size/request:	13 bytes
+
+Response time histogram:
+  0.000 [1]	|
+  0.001 [933771]	|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.003 [55534]	|■■
+  0.004 [8856]	|
+  0.006 [1447]	|
+  0.007 [325]	|
+  0.009 [49]	|
+  0.010 [10]	|
+  0.012 [2]	|
+  0.013 [2]	|
+  0.014 [3]	|
+
+
+Latency distribution:
+  10% in 0.0001 secs
+  25% in 0.0002 secs
+  50% in 0.0003 secs
+  75% in 0.0006 secs
+  90% in 0.0012 secs
+  95% in 0.0017 secs
+  99% in 0.0030 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:	0.0000 secs, 0.0000 secs, 0.0145 secs
+  DNS-lookup:	0.0000 secs, 0.0000 secs, 0.0019 secs
+  req write:	0.0000 secs, 0.0000 secs, 0.0074 secs
+  resp wait:	0.0003 secs, 0.0000 secs, 0.0138 secs
+  resp read:	0.0001 secs, 0.0000 secs, 0.0141 secs
+
+Status code distribution:
+  [200]	1000000 responses
+```
+
 
 
 ```

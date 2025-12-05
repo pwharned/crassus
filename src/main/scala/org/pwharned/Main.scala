@@ -11,18 +11,20 @@ case class User(name: String)
 object User:
   given codec: Codec[User] = Codec.entityCodec[User]
 object Main:
-  @main def run(): Unit =
+  def main(args: Array[String]): Unit =
     // Define routes using your macro DSL
 
 
 
     inline def userRoute = endpoint.get("users").serverLogic { req =>
-      IO.pure(HttpResponse.ok(User.codec.encode(User("alice"))))
+      IO.pure(HttpResponse.ok("Hello, World!"))
     }
     val result = Inspect.inspect(userRoute)
 
     println(result)
     def  handler = Dispatcher.build(userRoute)
+
+    println("Main thread id = " + Thread.currentThread().threadId())
 
 
 
