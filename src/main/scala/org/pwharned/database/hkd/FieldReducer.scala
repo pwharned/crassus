@@ -1,52 +1,49 @@
 package org.pwharned.database.hkd
 
-
-
 trait FieldReducer[T] {
   type Out
-  def unwrap(t: T): Out    // for serialization
-  def wrap(o: Out): T      // for deserialization
+  def unwrap(t: T): Out // for serialization
+  def wrap(o: Out): T // for deserialization
 }
 object FieldReducer {
-  type Aux[T,R] = FieldReducer[T] { type Out = R }
+  type Aux[T, R] = FieldReducer[T] { type Out = R }
 
   // 1) Generated[PrimaryKey[A]]  ⇒  PrimaryKey[A]
   // 2) PrimaryKey[A] ⇒ A
   given generatedPrimaryKey[A]: Aux[GeneratedPrimaryKey[A], A] =
-  new FieldReducer[GeneratedPrimaryKey[A]] {
-    type Out = A
-    def unwrap(pk: GeneratedPrimaryKey[A]): A = pk.value
-    def wrap(a: A): GeneratedPrimaryKey[A]  = GeneratedPrimaryKey(a)
-  }
-
+    new FieldReducer[GeneratedPrimaryKey[A]] {
+      type Out = A
+      def unwrap(pk: GeneratedPrimaryKey[A]): A = pk.value
+      def wrap(a: A): GeneratedPrimaryKey[A] = GeneratedPrimaryKey(a)
+    }
 
   // 2) PrimaryKey[A] ⇒ A
   given primaryKey[A]: Aux[PrimaryKey[A], A] =
-  new FieldReducer[PrimaryKey[A]] {
-    type Out = A
-    def unwrap(pk: PrimaryKey[A]): A = pk.value
-    def wrap(a: A): PrimaryKey[A]  = PrimaryKey(a)
-  }
+    new FieldReducer[PrimaryKey[A]] {
+      type Out = A
+      def unwrap(pk: PrimaryKey[A]): A = pk.value
+      def wrap(a: A): PrimaryKey[A] = PrimaryKey(a)
+    }
 
   // 3) Default[A] ⇒ Option[A]
   given default[A]: Aux[Default[A], Option[A]] =
-  new FieldReducer[Default[A]] {
-    type Out = Option[A]
-    def unwrap(d: Default[A]): Option[A] = Option(d.value)
-    def wrap(o: Option[A]): Default[A]  = Default(o.get)
-  }
+    new FieldReducer[Default[A]] {
+      type Out = Option[A]
+      def unwrap(d: Default[A]): Option[A] = Option(d.value)
+      def wrap(o: Option[A]): Default[A] = Default(o.get)
+    }
 
   // 4) Nullable[A] ⇒ Option[A]
   given nullable[A]: Aux[Nullable[A], Option[A]] =
-  new FieldReducer[Nullable[A]] {
-    type Out = Option[A]
-    def unwrap(n: Nullable[A]): Option[A] = Option(n.value)
-    def wrap(o: Option[A]): Nullable[A]   = Nullable(o.get)
-  }
+    new FieldReducer[Nullable[A]] {
+      type Out = Option[A]
+      def unwrap(n: Nullable[A]): Option[A] = Option(n.value)
+      def wrap(o: Option[A]): Nullable[A] = Nullable(o.get)
+    }
 
   given persistedField[A, R](using
-                             fr: FieldReducer.Aux[A, R]
-                            ): Aux[PersistedField[A], R] =
+      fr: FieldReducer.Aux[A, R]
+  ): Aux[PersistedField[A], R] =
     new FieldReducer[PersistedField[A]] {
       type Out = R
 

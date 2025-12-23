@@ -6,21 +6,21 @@ import scala.collection.mutable.Queue
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
-class  ConnectionPool(
-                          driverClassName: String,
-                          jdbcUrl: String,
-                          user: String,
-                          password: String,
-                          minPoolSize: Int = 5,
-                          maxPoolSize: Int = 10000,
-                          connectionTimeoutMillis: Long = 10000,
-                          // New parameters for eviction
-                          idleTimeoutMillis: Long = 30000,      // Connections idle longer than this are eligible for eviction.
-                          evictionIntervalMillis: Long = 10000  // Frequency at which eviction occurs.
-                        ):
+class ConnectionPool(
+    driverClassName: String,
+    jdbcUrl: String,
+    user: String,
+    password: String,
+    minPoolSize: Int = 5,
+    maxPoolSize: Int = 10000,
+    connectionTimeoutMillis: Long = 10000,
+    // New parameters for eviction
+    idleTimeoutMillis: Long =
+      30000, // Connections idle longer than this are eligible for eviction.
+    evictionIntervalMillis: Long = 10000 // Frequency at which eviction occurs.
+):
   // Load the JDBC driver once during pool creation.
   Class.forName(driverClassName)
-
 
   val properties: java.util.Properties = {
     val props = new java.util.Properties();
@@ -53,14 +53,13 @@ class  ConnectionPool(
 
   // Prepopulate the pool with the minimum number of connections.
   for (_ <- 1 to minPoolSize) do
-    val conn = createConnection().map{
-      c => idleConnections.enqueue((c, System.currentTimeMillis()))
+    val conn = createConnection().map { c =>
+      idleConnections.enqueue((c, System.currentTimeMillis()))
       totalConnections += 1
     }
 
-
   // Helper method to create a new JDBC connection.
-  private def createConnection(): Try[Connection] = Try{
+  private def createConnection(): Try[Connection] = Try {
 
     val conn = DriverManager.getConnection(jdbcUrl, properties)
     conn.setAutoCommit(true) // <-- add this line
@@ -68,13 +67,13 @@ class  ConnectionPool(
 
   }
 
-  /**
-   * Acquires a connection from the pool.
-   *
-   * If an idle connection is available, it is checked for expiration before returning.
-   * If none is available and we're below maxPoolSize, a new connection is created.
-   * Otherwise, the caller waits until a connection becomes available or a timeout occurs.
-   */
+  /** Acquires a connection from the pool.
+    *
+    * If an idle connection is available, it is checked for expiration before
+    * returning. If none is available and we're below maxPoolSize, a new
+    * connection is created. Otherwise, the caller waits until a connection
+    * becomes available or a timeout occurs.
+    */
 
   def acquire(): Try[Connection] = this.synchronized {
     val startTime = System.currentTimeMillis()
@@ -83,7 +82,12 @@ class  ConnectionPool(
     while (idleConnections.isEmpty && totalConnections >= maxPoolSize) do {
       val elapsed = now - startTime
       val remaining = connectionTimeoutMillis - elapsed
-      if (remaining <= 0) return Failure(new TimeoutException("Timeout waiting for a JDBC connection from the pool."))
+      if (remaining <= 0)
+        return Failure(
+          new TimeoutException(
+            "Timeout waiting for a JDBC connection from the pool."
+          )
+        )
 
       wait(remaining)
       now = System.currentTimeMillis()
@@ -92,7 +96,9 @@ class  ConnectionPool(
     if (idleConnections.nonEmpty) then {
       val (conn, returnedTime) = idleConnections.dequeue()
       if (now - returnedTime > idleTimeoutMillis) then {
-        Try(conn.close()).recover { case e: SQLException => println(s"Error closing expired connection: ${e.getMessage}") }
+        Try(conn.close()).recover { case e: SQLException =>
+          println(s"Error closing expired connection: ${e.getMessage}")
+        }
         totalConnections -= 1
         acquire()
       } else Success(conn)
@@ -102,31 +108,28 @@ class  ConnectionPool(
     }
   }
 
-
-  /**
-   * Releases a connection back to the pool.
-   *
-   * If the connection is closed or invalid, it is not reused.
-   * Otherwise, the connection is enqueued along with the current timestamp.
-   */
+  /** Releases a connection back to the pool.
+    *
+    * If the connection is closed or invalid, it is not reused. Otherwise, the
+    * connection is enqueued along with the current timestamp.
+    */
   def release(conn: Connection): Unit = this.synchronized {
     try
-      if (conn.isClosed) then
-        totalConnections -= 1
+      if (conn.isClosed) then totalConnections -= 1
       else
 
         idleConnections.enqueue((conn, System.currentTimeMillis()))
-    catch
-      case _: SQLException => totalConnections -= 1
+    catch case _: SQLException => totalConnections -= 1
     notifyAll() // Signal waiting threads that a connection may be available.
   }
 
-  /**
-   * Evicts idle connections that have been in the pool longer than idleTimeoutMillis.
-   *
-   * This method ensures that the pool does not keep more connections than are needed
-   * after periods of high load, while preserving at least minPoolSize connections.
-   */
+  /** Evicts idle connections that have been in the pool longer than
+    * idleTimeoutMillis.
+    *
+    * This method ensures that the pool does not keep more connections than are
+    * needed after periods of high load, while preserving at least minPoolSize
+    * connections.
+    */
   private def evictIdleConnections(): Unit = this.synchronized {
     val now = System.currentTimeMillis()
     // Since idleConnections is FIFO, we can check the head until we find a connection within timeout.
@@ -134,7 +137,8 @@ class  ConnectionPool(
       val (conn, returnedTime) = idleConnections.head
       if (now - returnedTime > idleTimeoutMillis) {
         idleConnections.dequeue()
-        try conn.close() catch { case _: SQLException => () }
+        try conn.close()
+        catch { case _: SQLException => () }
         totalConnections -= 1
       } else {
         // Since the oldest connection is still valid (idle-wise), later ones must be newer.
@@ -144,12 +148,13 @@ class  ConnectionPool(
     notifyAll()
   }
 
-  /**
-   * Provides a functional “loan” method that automatically acquires a connection,
-   * passes it to the provided function, and ensures that the connection is returned
-   * to the pool after use.
-   */
-  def withConnection[T](f: Connection => T)(using ec: scala.concurrent.ExecutionContext): Future[Try[T]] = {
+  /** Provides a functional “loan” method that automatically acquires a
+    * connection, passes it to the provided function, and ensures that the
+    * connection is returned to the pool after use.
+    */
+  def withConnection[T](
+      f: Connection => T
+  )(using ec: scala.concurrent.ExecutionContext): Future[Try[T]] = {
     Future(acquire()).flatMap {
       case Failure(exception) =>
         Future.failed(exception)
@@ -160,33 +165,34 @@ class  ConnectionPool(
             val result = Try(f(connection))
             result match {
               case Success(value) =>
-                try connection.commit() catch { case _: Throwable => () }
+                try connection.commit()
+                catch { case _: Throwable => () }
                 Success(value)
               case Failure(err) =>
-                try connection.rollback() catch { case _: Throwable => () }
+                try connection.rollback()
+                catch { case _: Throwable => () }
                 Failure(err)
             }
           } finally {
-            try connection.setAutoCommit(true) catch { case _: Throwable => () }
+            try connection.setAutoCommit(true)
+            catch { case _: Throwable => () }
             release(connection)
           }
         }
     }
   }
 
-
-
-
-  /**
-   * Shuts down the pool by stopping the eviction thread and closing all idle connections.
-   *
-   * This should be called during application shutdown to clean up resources.
-   */
+  /** Shuts down the pool by stopping the eviction thread and closing all idle
+    * connections.
+    *
+    * This should be called during application shutdown to clean up resources.
+    */
   def shutdown(): Unit = this.synchronized {
     evictionActive = false
     evictionThread.interrupt()
     while (idleConnections.nonEmpty) do
       val (conn, _) = idleConnections.dequeue()
-      try conn.close() catch { case _: SQLException => () }
+      try conn.close()
+      catch { case _: SQLException => () }
       totalConnections -= 1
   }

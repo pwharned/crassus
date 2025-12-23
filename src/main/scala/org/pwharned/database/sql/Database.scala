@@ -8,14 +8,20 @@ import scala.compiletime.summonInline
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-
-case class ConnectionDetails(url: String, user: String, password: String, cls: String)
+case class ConnectionDetails(
+    url: String,
+    user: String,
+    password: String,
+    cls: String
+)
 
 class Database(using sqlDial: SqlDialect, mapper: DbTypeMapper) {
 
   // dedicated executor and ec for blocking DB work
-  private val executor: ExecutorService =  Executors.newVirtualThreadPerTaskExecutor()
-  private given ec: ExecutionContext  = ExecutionContext.fromExecutorService(executor)
+  private val executor: ExecutorService =
+    Executors.newVirtualThreadPerTaskExecutor()
+  private given ec: ExecutionContext =
+    ExecutionContext.fromExecutorService(executor)
   private val concurrencyLimit: Semaphore = Semaphore(1000)
 
   def getDbConnection(con: ConnectionDetails): java.sql.Connection = {
@@ -43,9 +49,10 @@ class Database(using sqlDial: SqlDialect, mapper: DbTypeMapper) {
 
 }
 object Database:
-  def apply(con: ConnectionDetails)(using sqldial: SqlDialect, typeMapper: DbTypeMapper): Database = {
+  def apply(
+      con: ConnectionDetails
+  )(using sqldial: SqlDialect, typeMapper: DbTypeMapper): Database = {
     val db = new Database()
     db.createPool(con)
     db
   }
-

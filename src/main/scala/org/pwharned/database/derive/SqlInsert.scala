@@ -23,18 +23,17 @@ object InsertField:
   given plain[T]: InsertField[T] with
     def get(v: T) = Some(v)
 
-/**
- * Produces a List of (columnName, "?") for every field
- * your InsertField says “include me.”
- */
+/** Produces a List of (columnName, "?") for every field your InsertField says
+  * “include me.”
+  */
 trait SqlInsert[T]:
-   def sql(orig: T): String
+  def sql(orig: T): String
 
 object SqlInsert:
 
   inline private def loop[
-    Elems  <: Tuple,      // the field‐types tuple
-    Labels <: Tuple       // the field‐names tuple
+      Elems <: Tuple, // the field‐types tuple
+      Labels <: Tuple // the field‐names tuple
   ](orig: Product, idx: Int): List[(String, String)] =
     inline erasedValue[(Elems, Labels)] match
       case _: (EmptyTuple, EmptyTuple) =>
@@ -51,23 +50,31 @@ object SqlInsert:
         val colName = summonInline[ValueOf[l]].value.toString
 
         // 4) recurse to the tail
-        val tail    = loop[t, ls](orig, idx + 1)
+        val tail = loop[t, ls](orig, idx + 1)
 
         // 5) if InsertField said Some(_), prepend (colName, "?")
         included.fold(tail)(_ => tail :+ (colName -> "?"))
 
-  inline given derived[T <: Product](using m: Mirror.ProductOf[T], dial: SqlDialect): SqlInsert[T] =
-    val isColumnOrganized: (String,Boolean) = TableOrganizationMacro.tableInfo[T]
+  inline given derived[T <: Product](using
+      m: Mirror.ProductOf[T],
+      dial: SqlDialect
+  ): SqlInsert[T] =
+    val isColumnOrganized: (String, Boolean) =
+      TableOrganizationMacro.tableInfo[T]
     new SqlInsert[T]:
-       def sql(orig: T): String = {
+      def sql(orig: T): String = {
         val name: String = constValue[m.MirroredLabel]
-        val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
-         isColumnOrganized._2 match {
-           case true =>  f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",") }) "
-           case false => {
-             val sql = dial.insertReturning[T](f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",")}) ")
-             sql
-           }
-         }
+        val namesAndPlaceHoldesr =
+          loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
+        isColumnOrganized._2 match {
+          case true =>
+            f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",")}) "
+          case false => {
+            val sql = dial.insertReturning[T](
+              f"insert into $name (${namesAndPlaceHoldesr.map(_._1).reverse.mkString(",")}) values(${namesAndPlaceHoldesr.map(_._2).mkString(",")}) "
+            )
+            sql
+          }
+        }
 
       }

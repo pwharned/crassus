@@ -1,6 +1,5 @@
 package org.pwharned.database.derive
 
-
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
 import org.pwharned.database.hkd.*
@@ -10,23 +9,22 @@ import scala.ValueOf
 import scala.compiletime.ops.int.+
 import scala.compiletime.ops.boolean
 
-
 type Updatable[V] <: Boolean = V match
-  case Option[t]       => Updatable[t]
-  case PrimaryKey[?]   => false
+  case Option[t]              => Updatable[t]
+  case PrimaryKey[?]          => false
   case GeneratedPrimaryKey[?] => false
-  case _               => true
+  case _                      => true
 
 // emulate a type-level `If`
 type If[C <: Boolean, Then, Else] = C match
-  case true => Then
+  case true  => Then
   case false => Else
 
 // convert a boolean literal to 1 or 0
 type BoolToInt[B <: Boolean] = If[B, 1, 0]
 type CountUpdatable[Elems <: Tuple] <: Int = Elems match
   case EmptyTuple => 0
-  case h *: t => +[BoolToInt[Updatable[h]], CountUpdatable[t]]
+  case h *: t     => +[BoolToInt[Updatable[h]], CountUpdatable[t]]
 
 trait UpdateField[V]:
   def get(v: V): Option[Any]
@@ -53,7 +51,6 @@ object UpdateField:
 trait PrimaryKeyField[V]:
   def get(v: V): Option[Any]
 
-
 object PrimaryKeyField:
   given pk[T]: PrimaryKeyField[PrimaryKey[T]] with
     def get(pk: PrimaryKey[T]) = Some(()) // value doesn't matter
@@ -68,20 +65,18 @@ object PrimaryKeyField:
   given plain[T]: PrimaryKeyField[T] with
     def get(v: T) = None
 
-/**
- * Produces a List of (columnName, "?") for every field
- * your InsertField says “include me.”
- */
+/** Produces a List of (columnName, "?") for every field your InsertField says
+  * “include me.”
+  */
 trait SqlUpdate[T]:
   def sql(orig: T): String
 
 object SqlUpdate:
   inline private def pkeys[
-    Elems <: Tuple, // the field‐types tuple
-    Labels <: Tuple // the field‐names tuple
+      Elems <: Tuple, // the field‐types tuple
+      Labels <: Tuple // the field‐names tuple
   ](orig: Product, idx: Int): List[(String, String)] =
-    
-    inline erasedValue[(Elems, Labels)] match 
+    inline erasedValue[(Elems, Labels)] match
       case _: (EmptyTuple, EmptyTuple) =>
         Nil
 
@@ -96,8 +91,8 @@ object SqlUpdate:
 
         included.fold(tail)(_ => (colName, s"?") :: tail)
   inline private def loop[
-    Elems  <: Tuple,      // the field‐types tuple
-    Labels <: Tuple       // the field‐names tuple
+      Elems <: Tuple, // the field‐types tuple
+      Labels <: Tuple // the field‐names tuple
   ](orig: Product, idx: Int): List[(String, String)] =
     inline erasedValue[(Elems, Labels)] match
       case _: (EmptyTuple, EmptyTuple) =>
@@ -110,14 +105,17 @@ object SqlUpdate:
 
         val colName = summonInline[ValueOf[l]].value.toString
 
-        val tail    = loop[t, ls](orig, idx + 1)
+        val tail = loop[t, ls](orig, idx + 1)
 
         included.fold(tail)(_ => (colName, s"?") :: tail)
 
   /** summon a derived instance */
 
-  inline given derived[T <: Product](using m: Mirror.ProductOf[T], dial: SqlDialect): SqlUpdate[T] =
-    inline val upCount = constValue[ CountUpdatable[m.MirroredElemTypes] ]
+  inline given derived[T <: Product](using
+      m: Mirror.ProductOf[T],
+      dial: SqlDialect
+  ): SqlUpdate[T] =
+    inline val upCount = constValue[CountUpdatable[m.MirroredElemTypes]]
 
     inline if upCount == 0 then
       error(
@@ -126,17 +124,17 @@ object SqlUpdate:
     new SqlUpdate[T]:
       def sql(orig: T): String = {
         val name: String = constValue[m.MirroredLabel]
-        val namesAndPlaceHoldesr = loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
-        val keys = pkeys[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0).map(
-          x => s"${x._1} = ${x._2}"
-        ).mkString(" AND ")
+        val namesAndPlaceHoldesr =
+          loop[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
+        val keys = pkeys[m.MirroredElemTypes, m.MirroredElemLabels](orig, 0)
+          .map(x => s"${x._1} = ${x._2}")
+          .mkString(" AND ")
         // build and then reverse so we keep original order
-        val updates = namesAndPlaceHoldesr.map{
-          x => s"${x._1} = ${x._2}"
+        val updates = namesAndPlaceHoldesr.map { x =>
+          s"${x._1} = ${x._2}"
         }
 
-
-        dial.updateReturning( f"update  $name set ${updates.mkString(",")} where $keys ")
+        dial.updateReturning(
+          f"update  $name set ${updates.mkString(",")} where $keys "
+        )
       }
-
-

@@ -7,15 +7,18 @@ import org.pwharned.io.IO
 
 // Pure data - no rendering logic
 case class Route[E](
-                     method: String,
-                     path: String,
-                     handler: (HttpRequestView) => IO[HttpResponse[E]],
-
-                   )
+    method: String,
+    path: String,
+    handler: (HttpRequestView) => IO[HttpResponse[E]]
+)
 
 object Route:
-  def get[E](path: String)(logic: HttpRequestView => IO[HttpResponse[E]]): Route[E] =
+  def get[E](path: String)(
+      logic: HttpRequestView => IO[HttpResponse[E]]
+  ): Route[E] =
     Route("GET", path, logic)
 
-  def post[E](path: String)(logic: (HttpRequestView) => IO[HttpResponse[E]]): Route[E] =
+  def post[E](path: String)(
+      logic: (HttpRequestView) => IO[HttpResponse[E]]
+  ): Route[E] =
     Route("POST", path, logic)

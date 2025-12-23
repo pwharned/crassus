@@ -7,7 +7,13 @@ import org.pwharned.io.IO
 import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 
-class HttpProtocol(router: (request: HttpRequestView, buffer: ByteBuffer,channel: SocketChannel) => Unit) extends Protocol[HttpRequestView]:
+class HttpProtocol(
+    router: (
+        request: HttpRequestView,
+        buffer: ByteBuffer,
+        channel: SocketChannel
+    ) => Unit
+) extends Protocol[HttpRequestView]:
 
   inline def parser: RequestParser[HttpRequestView] = {
     val parser = new HttpParser()
@@ -20,17 +26,30 @@ class HttpProtocol(router: (request: HttpRequestView, buffer: ByteBuffer,channel
   def handler: RequestHandler[HttpRequestView] =
     new RequestHandler[HttpRequestView]:
       // Get the dispatcher from the router
-      
+
       def handler: RequestHandler[HttpRequestView] =
-        (request: HttpRequestView, buffer: ByteBuffer, channel: SocketChannel) => router(request, buffer, channel)
+        (
+            request: HttpRequestView,
+            buffer: ByteBuffer,
+            channel: SocketChannel
+        ) => router(request, buffer, channel)
 
-      override def handle(request: HttpRequestView, buffer: ByteBuffer, channel: SocketChannel): Unit = handler.handle(request, buffer, channel)
-
+      override def handle(
+          request: HttpRequestView,
+          buffer: ByteBuffer,
+          channel: SocketChannel
+      ): Unit = handler.handle(request, buffer, channel)
 
 // Execute it (unsafeRunOptimized blocks until complete)
 
 object HttpServer:
-  class Builder(handler: (request: HttpRequestView, buffer: ByteBuffer,channel: SocketChannel) => Unit):  // Changed parameter type
+  class Builder(
+      handler: (
+          request: HttpRequestView,
+          buffer: ByteBuffer,
+          channel: SocketChannel
+      ) => Unit
+  ): // Changed parameter type
     private var host: String = "0.0.0.0"
     private var port: Int = 8080
     private var bufferSize: Int = 8192
@@ -58,5 +77,10 @@ object HttpServer:
       val server = new TcpServer[HttpRequestView](port)
       server.start()
 
-  def builder(handler: (request: HttpRequestView, buffer: ByteBuffer,channel: SocketChannel) => Unit): Builder = new Builder(handler) // Changed parameter type
-
+  def builder(
+      handler: (
+          request: HttpRequestView,
+          buffer: ByteBuffer,
+          channel: SocketChannel
+      ) => Unit
+  ): Builder = new Builder(handler) // Changed parameter type

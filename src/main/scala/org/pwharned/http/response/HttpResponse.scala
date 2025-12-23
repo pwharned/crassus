@@ -5,10 +5,10 @@ import java.nio.channels.SocketChannel
 
 // Pure data - no behavior
 case class HttpResponse[E](
-                            status: Int,
-                            headers: Seq[(String, String)],
-                            entity: E
-                          )
+    status: Int,
+    headers: Seq[(String, String)],
+    entity: E
+)
 
 object HttpResponse:
   // Convenience constructors
@@ -23,4 +23,3 @@ object HttpResponse:
 
   def error[E](entity: E): HttpResponse[E] =
     HttpResponse(500, Seq.empty, entity)
-

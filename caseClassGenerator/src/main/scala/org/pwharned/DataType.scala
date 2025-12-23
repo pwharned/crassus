@@ -7,20 +7,20 @@ sealed trait SqlDataType extends Parse {
   def parse: Parser[SqlDataType]
   def scalaType: String
 }
-case object SqlInteger extends SqlDataType  {
+case object SqlInteger extends SqlDataType {
   val sqlNames: Seq[String] = Seq("INTEGER", "INT")
   def scalaType: String = "Int"
   def parse: Parser[SqlDataType] =
     (stringInsensitive("INTEGER") or stringInsensitive("INT")).map(_ => this)
 }
-case object SqlUuid extends  SqlDataType {
-  val sqlNames: Seq[String] = Seq( "UUID")
+case object SqlUuid extends SqlDataType {
+  val sqlNames: Seq[String] = Seq("UUID")
   def scalaType: String = "java.util.UUID"
   def parse: Parser[SqlDataType] = stringInsensitive("UUID").map(x => this)
 
 }
-case object SqlVector extends SqlDataType  {
-  val sqlNames: Seq[String] = Seq( "Vector")
+case object SqlVector extends SqlDataType {
+  val sqlNames: Seq[String] = Seq("Vector")
   def scalaType: String = "Vector[Float]"
 
   val db2vectorParser = for {
@@ -50,12 +50,11 @@ case object SqlVector extends SqlDataType  {
     close <- char(')')
   } yield ch + open + number.mkString + close
   def parse: Parser[SqlDataType] =
-    ( db2vectorParser.or(vectorParser)).map(_ => this)
+    (db2vectorParser.or(vectorParser)).map(_ => this)
 }
-case object SqlString extends SqlDataType  {
-  val sqlNames: Seq[String] = Seq( "TEXT")
+case object SqlString extends SqlDataType {
+  val sqlNames: Seq[String] = Seq("TEXT")
   def scalaType: String = "String"
-
 
   val varcharparser = for {
     _ <- whitespace
@@ -70,12 +69,11 @@ case object SqlString extends SqlDataType  {
     close <- char(')')
   } yield va + open + number.mkString + close
   def parse: Parser[SqlDataType] =
-    ( stringInsensitive("TEXT") or varcharparser).map(_ => this)
+    (stringInsensitive("TEXT") or varcharparser).map(_ => this)
 }
-case object SqlVarChar extends SqlDataType  {
-  val sqlNames: Seq[String] = Seq( "TEXT")
+case object SqlVarChar extends SqlDataType {
+  val sqlNames: Seq[String] = Seq("TEXT")
   def scalaType: String = "String"
-
 
   val varcharparser = for {
     _ <- whitespace
@@ -88,22 +86,20 @@ case object SqlVarChar extends SqlDataType  {
     close <- char(')')
   } yield ch + open + number.mkString + close
   def parse: Parser[SqlDataType] =
-    ( stringInsensitive("TEXT") or varcharparser).map(_ => this)
+    (stringInsensitive("TEXT") or varcharparser).map(_ => this)
 }
 
-case object SqlTextArray extends SqlDataType  {
-  val sqlNames: Seq[String] = Seq( "TEXT[]")
+case object SqlTextArray extends SqlDataType {
+  val sqlNames: Seq[String] = Seq("TEXT[]")
   def scalaType: String = "List[String]"
 
   def parse: Parser[SqlDataType] =
-    stringInsensitive("TEXT[]") .map(x => this)
+    stringInsensitive("TEXT[]").map(x => this)
 }
-
 
 case object SqlBoolean extends SqlDataType {
   val sqlNames: Seq[String] = Seq("BOOLEAN")
   def scalaType: String = "Boolean"
-
 
   def parse: Parser[SqlDataType] = stringInsensitive("BOOLEAN").map(_ => this)
 }
@@ -111,14 +107,14 @@ case object SqlFloat extends SqlDataType {
   val sqlNames: Seq[String] = Seq("DOUBLE PRECISION", "FLOAT")
   def scalaType: String = "Float"
 
-
   def parse: Parser[SqlDataType] =
-    (stringInsensitive("DOUBLE PRECISION") or stringInsensitive("FLOAT")).map(_ => this)
+    (stringInsensitive("DOUBLE PRECISION") or stringInsensitive("FLOAT")).map(
+      _ => this
+    )
 }
-case object SqlDate extends SqlDataType  {
+case object SqlDate extends SqlDataType {
   val sqlNames = Seq("DATE")
   def scalaType: String = "Date"
-
 
   def parse: Parser[SqlDataType] = stringInsensitive("DATE").map(_ => this)
 }
@@ -127,17 +123,26 @@ case object SqlTimestamp extends SqlDataType {
   def scalaType: String = "java.time.Instant"
 
   def parse: Parser[SqlDataType] =
-    (stringInsensitive("TIMESTAMP WITH TIME ZONE") or stringInsensitive("TIMESTAMP"))
+    (stringInsensitive("TIMESTAMP WITH TIME ZONE") or stringInsensitive(
+      "TIMESTAMP"
+    ))
       .map(_ => this)
 
 }
 
 object SqlDataType extends Parse {
   val values: List[SqlDataType] = List(
-    SqlInteger,SqlTextArray, SqlString, SqlBoolean, SqlFloat, SqlDate, SqlTimestamp, SqlUuid, SqlVector,
-      SqlVarChar
+    SqlInteger,
+    SqlTextArray,
+    SqlString,
+    SqlBoolean,
+    SqlFloat,
+    SqlDate,
+    SqlTimestamp,
+    SqlUuid,
+    SqlVector,
+    SqlVarChar
   )
-
 
   // Helper method to find a DataType by its SQL name
   def fromString(s: String): Option[SqlDataType] =

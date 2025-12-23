@@ -39,7 +39,9 @@ object HttpTypes:
         buffer.position(pos)
         bytes
 
-      def toString(charset: java.nio.charset.Charset = StandardCharsets.UTF_8): String =
+      def toString(
+          charset: java.nio.charset.Charset = StandardCharsets.UTF_8
+      ): String =
         new String(toBytes, charset)
 
       inline def charAt(index: Int): Byte =
@@ -69,7 +71,8 @@ object HttpTypes:
 
     extension (header: HeaderName)
       inline def value: String = header
-      inline def matches(other: String): Boolean = header.equalsIgnoreCase(other)
+      inline def matches(other: String): Boolean =
+        header.equalsIgnoreCase(other)
 
   // Type-safe paths
   opaque type HttpPath = String
@@ -88,7 +91,3 @@ object HttpTypes:
       inline def queryString: Option[String] =
         val queryIndex = path.indexOf("?")
         if queryIndex == -1 then None else Some(path.substring(queryIndex + 1))
-
-
-
-

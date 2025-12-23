@@ -1,4 +1,3 @@
-
 package org.pwharned.http.response
 
 import java.nio.ByteBuffer
@@ -12,10 +11,10 @@ trait EntityWriter[E]:
 
   // Writes the *entire* HTTP response, not just the entity.
   final def writeResponse(
-                           response: HttpResponse[E],
-                           buffer: ByteBuffer,
-                           channel: SocketChannel
-                         ): Unit =
+      response: HttpResponse[E],
+      buffer: ByteBuffer,
+      channel: SocketChannel
+  ): Unit =
     buffer.clear()
 
     // -----------------------------
@@ -50,16 +49,13 @@ trait EntityWriter[E]:
 
     // final flush if anything left
     buffer.flip()
-    while buffer.hasRemaining do
-      channel.write(buffer)
-
+    while buffer.hasRemaining do channel.write(buffer)
 
   // Implemented by specific writers (strict, chunked, SSE, etc.)
   def write(entity: E, buffer: ByteBuffer, channel: SocketChannel): Unit
 
   // Extra headers needed by this writer
   def contentHeaders(entity: E): Seq[(String, String)]
-
 
   // --------------------------------------------
   // Helpers (lifted unchanged from your old code)
@@ -79,16 +75,19 @@ trait EntityWriter[E]:
     case 403 => "Forbidden"
     case 404 => "Not Found"
     case 500 => "Internal Server Error"
-    case _ => "Unknown"
+    case _   => "Unknown"
 
 object EntityWriter:
   given stringWriter: EntityWriter[String] with
-  
-    def write(entity: String, buffer: ByteBuffer, channel: SocketChannel): Unit =
+
+    def write(
+        entity: String,
+        buffer: ByteBuffer,
+        channel: SocketChannel
+    ): Unit =
       val bytes = entity.getBytes(StandardCharsets.UTF_8)
-  
-      if bytes.length <= buffer.remaining() then
-        buffer.put(bytes)
+
+      if bytes.length <= buffer.remaining() then buffer.put(bytes)
       else
         var off = 0
         while off < bytes.length do
@@ -98,10 +97,10 @@ object EntityWriter:
           while buffer.hasRemaining do channel.write(buffer)
           buffer.clear()
           off += chunk
-  
+
     def contentHeaders(entity: String): Seq[(String, String)] =
       val len = entity.getBytes(StandardCharsets.UTF_8).length
       Seq(
-        "Content-Type"   -> "text/plain; charset=utf-8",
+        "Content-Type" -> "text/plain; charset=utf-8",
         "Content-Length" -> len.toString
       )

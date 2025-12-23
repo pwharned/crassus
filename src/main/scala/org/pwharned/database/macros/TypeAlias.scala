@@ -14,8 +14,7 @@ object Macros:
     def nameFromTr(t: TypeRepr): String =
       // Prefer the symbol name if present (this preserves alias names)
       val sym = t.typeSymbol
-      if sym != Symbol.noSymbol && sym.name.nonEmpty then
-        sym.name
+      if sym != Symbol.noSymbol && sym.name.nonEmpty then sym.name
       else
         // Handle common trees that don't expose a direct symbol name
         t match
@@ -25,12 +24,13 @@ object Macros:
             val csym = tycon.typeSymbol
             if csym != Symbol.noSymbol && csym.name.nonEmpty then csym.name
             else if args.nonEmpty then nameFromTr(args.head)
-            else tycon.show.split(Array('.', '$')).lastOption.getOrElse(tycon.show)
-          case TypeRef(_, name) => name
-          case TermRef(_, name) => name
+            else
+              tycon.show.split(Array('.', '$')).lastOption.getOrElse(tycon.show)
+          case TypeRef(_, name)        => name
+          case TermRef(_, name)        => name
           case AnnotatedType(under, _) => nameFromTr(under)
-          case ByNameType(under) => nameFromTr(under)
-          case other =>
+          case ByNameType(under)       => nameFromTr(under)
+          case other                   =>
             // fallback: last segment of the shown type
             other.show.split(Array('.', '$')).lastOption.getOrElse(other.show)
 

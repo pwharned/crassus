@@ -10,33 +10,30 @@ package object ConstraintTypes {
   sealed trait Nullable extends Constraint
 }
 
-
-sealed trait ColumnType[A, B <:Constraint]:
+sealed trait ColumnType[A, B <: Constraint]:
   def value: A
 object KeyType:
-  def apply[A, B<:Constraint](a: A): ColumnType[A, B] =
-    new ColumnType[A,B]:
+  def apply[A, B <: Constraint](a: A): ColumnType[A, B] =
+    new ColumnType[A, B]:
       val value: A = a
 
-
-
-sealed trait PrimaryKey[A] extends ColumnType[A, ConstraintTypes.RuntimeGeneratedPrimaryKey]:
-    def value: A
+sealed trait PrimaryKey[A]
+    extends ColumnType[A, ConstraintTypes.RuntimeGeneratedPrimaryKey]:
+  def value: A
 
 object PrimaryKey:
   def apply[A](a: A): PrimaryKey[A] =
     new PrimaryKey[A]:
       val value: A = a
 
-
-sealed trait GeneratedPrimaryKey[A] extends ColumnType[A, ConstraintTypes.DatabaseGeneratedPrimaryKey]:
+sealed trait GeneratedPrimaryKey[A]
+    extends ColumnType[A, ConstraintTypes.DatabaseGeneratedPrimaryKey]:
   def value: A
 
 object GeneratedPrimaryKey:
   def apply[A](a: A): GeneratedPrimaryKey[A] =
     new GeneratedPrimaryKey[A]:
       val value: A = a
-
 
 sealed trait Default[X] extends ColumnType[X, ConstraintTypes.DefaultValue]:
   def value: X
@@ -56,4 +53,6 @@ object Nullable:
 
 @main
 def main: Unit =
-  summon[PersistedField[PrimaryKey[String]] =:=  PersistedField[PrimaryKey[String]] ]
+  summon[
+    PersistedField[PrimaryKey[String]] =:= PersistedField[PrimaryKey[String]]
+  ]

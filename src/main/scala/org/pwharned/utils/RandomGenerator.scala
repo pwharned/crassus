@@ -6,11 +6,10 @@ import scala.compiletime.{erasedValue, summonInline}
 import scala.deriving.Mirror
 import scala.util.Random
 
-/**
- * A typeclass that knows how to produce a random T. 
- * You can summon it for primitives, options, PrimaryKey[T], nullable, or any
- * Product (i.e. case‐class) whose fields themselves have RandomValue instances.
- */
+/** A typeclass that knows how to produce a random T. You can summon it for
+  * primitives, options, PrimaryKey[T], nullable, or any Product (i.e.
+  * case‐class) whose fields themselves have RandomValue instances.
+  */
 trait RandomValue[T]:
   def generate: T
 
@@ -18,10 +17,10 @@ object RandomValue:
   /** summon helper */
   def apply[T](using rv: RandomValue[T]): RandomValue[T] = rv
 
-  //–– 1) Base instances for “plain” types
+  // –– 1) Base instances for “plain” types
   given RandomValue[String] with
     def generate = Random.alphanumeric.take(10).mkString
-    
+
   given RandomValue[java.time.Instant] with
     def generate = java.time.Instant.now()
 
@@ -45,7 +44,7 @@ object RandomValue:
   given RandomValue[java.util.UUID] with
     def generate = java.util.UUID.randomUUID()
 
-  //–– 2) Wrapper‐type instances for HKD
+  // –– 2) Wrapper‐type instances for HKD
   given [T](using rv: RandomValue[T]): RandomValue[Option[T]] with
     def generate = Some(rv.generate)
 
@@ -64,8 +63,7 @@ object RandomValue:
   // given [T](using rv: RandomValue[T]): RandomValue[UpdatedField[T]] with
   //   def generate = UpdatedField(rv.generate)
 
-
-  //–– 3) Tuple‐level recursion (for case‐class elements)
+  // –– 3) Tuple‐level recursion (for case‐class elements)
   inline given derivedTuple[X <: Tuple]: RandomValue[X] =
     (
       inline erasedValue[X] match
@@ -78,13 +76,13 @@ object RandomValue:
           val tailGen = summonInline[RandomValue[t]]
           new RandomValue[h *: t]:
             def generate = headGen.generate *: tailGen.generate
-      ).asInstanceOf[RandomValue[X]] // <= cast
+    ).asInstanceOf[RandomValue[X]] // <= cast
 
-  //–– 4) Case‐class (Product) derivation
+  // –– 4) Case‐class (Product) derivation
   inline given derivedProduct[CC <: Product](using
-                                             m: Mirror.ProductOf[CC],
-                                             rv: RandomValue[m.MirroredElemTypes]
-                                            ): RandomValue[CC] =
+      m: Mirror.ProductOf[CC],
+      rv: RandomValue[m.MirroredElemTypes]
+  ): RandomValue[CC] =
     new RandomValue[CC]:
       def generate: CC =
         // generate the tuple of all fields…
@@ -92,17 +90,17 @@ object RandomValue:
         // …then build the case‐class
         m.fromProduct(elems)
 
-
-/**
- * A tiny shim if you really want to keep your `RandomGenerator[T<:Product]`
- * name and interface. It simply delegates to RandomValue[T].
- */
+/** A tiny shim if you really want to keep your `RandomGenerator[T<:Product]`
+  * name and interface. It simply delegates to RandomValue[T].
+  */
 trait RandomGenerator[T <: Product]:
   def generate: T
 
 object RandomGenerator:
   def apply[T <: Product](using rg: RandomValue[T]): RandomValue[T] = rg
 
-  inline given derived[T <: Product](using rv: RandomValue[T]): RandomGenerator[T] =
+  inline given derived[T <: Product](using
+      rv: RandomValue[T]
+  ): RandomGenerator[T] =
     new RandomGenerator[T]:
       def generate = rv.generate

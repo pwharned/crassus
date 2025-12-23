@@ -1,7 +1,5 @@
 package org.pwharned.database.derive
 
-
-
 import org.pwharned.database.sql.SqlDialect
 
 import scala.compiletime.*
@@ -15,13 +13,16 @@ trait SelectStatement[T] {
 
 // you could also
 object SelectStatement:
-  inline given derived[T<: Product] (using m: Mirror.ProductOf[T], s: SqlDialect):SelectStatement[T] =
+  inline given derived[T <: Product](using
+      m: Mirror.ProductOf[T],
+      s: SqlDialect
+  ): SelectStatement[T] =
     val name: String = constValue[m.MirroredLabel]
 
-    val columnNames = constValueTuple[m.MirroredElemLabels].productIterator.toList.map(_.toString)
-    val statement  = s.select(name,columnNames)
+    val columnNames =
+      constValueTuple[m.MirroredElemLabels].productIterator.toList
+        .map(_.toString)
+    val statement = s.select(name, columnNames)
     lazy val self: SelectStatement[T] =
       () => statement
     self
-
-    

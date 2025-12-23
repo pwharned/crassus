@@ -21,8 +21,11 @@ object FromString:
 
   given [T](using underlying: FromString[T]): FromString[PrimaryKey[T]] with
     def parse(s: String): PrimaryKey[T] = PrimaryKey(underlying.parse(s))
-  given [T](using underlying: FromString[T]): FromString[GeneratedPrimaryKey[T]] with
-    def parse(s: String): GeneratedPrimaryKey[T] = GeneratedPrimaryKey(underlying.parse(s))
+  given [T](using underlying: FromString[T]): FromString[GeneratedPrimaryKey[T]]
+  with
+    def parse(s: String): GeneratedPrimaryKey[T] = GeneratedPrimaryKey(
+      underlying.parse(s)
+    )
 
 inline def listToTuple[T <: Tuple](list: List[String]): T = {
   inline erasedValue[T] match

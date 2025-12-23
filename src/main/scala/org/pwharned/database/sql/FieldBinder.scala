@@ -21,8 +21,6 @@ object FieldBinder:
 
   def apply[T](using fb: FieldBinder[T]): FieldBinder[T] = fb
 
-
-
   inline given derivedTuple[X <: Tuple]: FieldBinder[X] =
     (
       inline erasedValue[X] match
@@ -40,20 +38,20 @@ object FieldBinder:
             def bind(stmt: PreparedStatement, idx: Int, tup: h *: t): Int =
               val next = headFb.bind(stmt, idx, tup.head)
               tailFb.bind(stmt, next, tup.tail)
-      ).asInstanceOf[FieldBinder[X]]
+    ).asInstanceOf[FieldBinder[X]]
 
-  //--------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
   // 2. Case-class derivation
-  //--------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
 
-  //–– recursive helper over an element‐type tuple
+  // –– recursive helper over an element‐type tuple
 
   private inline def bindProduct[Types <: Tuple](
-                                                  stmt: PreparedStatement,
-                                                  idx0: Int,
-                                                  cc: Product,
-                                                  offset: Int
-                                                ): Int =
+      stmt: PreparedStatement,
+      idx0: Int,
+      cc: Product,
+      offset: Int
+  ): Int =
     inline erasedValue[Types] match
       // no more fields
       case _: EmptyTuple =>
@@ -66,20 +64,18 @@ object FieldBinder:
         val nextIdx = fbH.bind(stmt, idx0, headValue)
         bindProduct[t](stmt, nextIdx, cc, offset + 1)
 
-
-  //–– single derivedProduct that walks each element directly
+  // –– single derivedProduct that walks each element directly
   inline given derivedProduct[CC <: Product](using
-                                             m: Mirror.ProductOf[CC]
-                                            ): FieldBinder[CC] =
+      m: Mirror.ProductOf[CC]
+  ): FieldBinder[CC] =
     new FieldBinder[CC]:
       def bind(
-                stmt: PreparedStatement,
-                idx: Int,
-                cc: CC
-              ): Int =
+          stmt: PreparedStatement,
+          idx: Int,
+          cc: CC
+      ): Int =
         // start recursion at element‐index 0
         bindProduct[m.MirroredElemTypes](stmt, idx, cc, 0)
-
 
   given FieldBinder[Int] with
     def bind(stmt: PreparedStatement, idx: Int, v: Int): Int =
@@ -93,11 +89,15 @@ object FieldBinder:
       idx + 1
   given [T](using fb: FieldBinder[T]): FieldBinder[PrimaryKey[T]] with
     def bind(stmt: PreparedStatement, idx: Int, v: PrimaryKey[T]): Int =
-      fb.bind(stmt,idx,v.value)
+      fb.bind(stmt, idx, v.value)
 
   given [T](using fb: FieldBinder[T]): FieldBinder[GeneratedPrimaryKey[T]] with
-    def bind(stmt: PreparedStatement, idx: Int, v: GeneratedPrimaryKey[T]): Int =
-      fb.bind(stmt,idx,v.value)
+    def bind(
+        stmt: PreparedStatement,
+        idx: Int,
+        v: GeneratedPrimaryKey[T]
+    ): Int =
+      fb.bind(stmt, idx, v.value)
 
   given FieldBinder[Boolean] with
     def bind(stmt: PreparedStatement, idx: Int, v: Boolean): Int =
@@ -107,8 +107,8 @@ object FieldBinder:
     def bind(stmt: PreparedStatement, idx: Int, v: Vector[Float]): Int =
       val vecObj = new PGobject()
       vecObj.setType("ibm_extension.vector")
-      vecObj.setValue(v.mkString("[", ",", "]") )
-      stmt.setObject(idx,   vecObj)
+      vecObj.setValue(v.mkString("[", ",", "]"))
+      stmt.setObject(idx, vecObj)
       idx + 1
   given FieldBinder[Float] with
     def bind(stmt: PreparedStatement, idx: Int, v: Float): Int =
@@ -118,7 +118,6 @@ object FieldBinder:
     def bind(stmt: PreparedStatement, idx: Int, v: String): Int =
       stmt.setString(idx, v)
       idx + 1
-
 
   given jsfb[T](using fg: FieldBinder[T]): FieldBinder[JsonString[T]] with
     def bind(stmt: PreparedStatement, idx: Int, v: JsonString[T]): Int =
@@ -134,14 +133,14 @@ object FieldBinder:
       idx + 1
   given [T](using fb: FieldBinder[T]): FieldBinder[Default[T]] with
     def bind(stmt: PreparedStatement, idx: Int, opt: Default[T]): Int =
-        fb.bind(stmt, idx, opt.value)
+      fb.bind(stmt, idx, opt.value)
   given [T](using fb: FieldBinder[T]): FieldBinder[Option[T]] with
     def bind(stmt: PreparedStatement, idx: Int, opt: Option[T]): Int =
       opt match
         case Some(v) => fb.bind(stmt, idx, v)
         case None    => idx
-          //stmt.setNull(idx, Types.VARCHAR)
-          //idx + 1
+        // stmt.setNull(idx, Types.VARCHAR)
+        // idx + 1
 
   // Nullable marker trait
   given [T](using fb: FieldBinder[T]): FieldBinder[Nullable[T]] with
@@ -149,10 +148,7 @@ object FieldBinder:
       if v.asInstanceOf[AnyRef] == null then
         stmt.setNull(idx, Types.VARCHAR)
         idx + 1
-      else
-        fb.bind(stmt, idx, v.value)
-
-
+      else fb.bind(stmt, idx, v.value)
 
 trait JdbcArray[T]:
   def sqlType: String
@@ -172,4 +168,5 @@ object JdbcArray:
 
   given JdbcArray[UUID] with
     val sqlType = "uuid"
-    def toArray(v: Seq[UUID]): Array[AnyRef] = v.map(_.asInstanceOf[AnyRef]).toArray
+    def toArray(v: Seq[UUID]): Array[AnyRef] =
+      v.map(_.asInstanceOf[AnyRef]).toArray

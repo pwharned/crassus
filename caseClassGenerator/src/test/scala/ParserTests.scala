@@ -1,10 +1,7 @@
 import org.pwharned.{SQLParser, SqlDataType, SqlString}
-object ParserTests extends  App {
+object ParserTests extends App {
 
-
-
-
-  val actions  = """
+  val actions = """
                    |CREATE TABLE public.actions (
                    |    action_id uuid DEFAULT gen_random_uuid() NOT NULL,
                    |    action_user text NOT NULL,
@@ -14,7 +11,7 @@ object ParserTests extends  App {
                    |)""".stripMargin
 
   SQLParser.createTableParser(actions) match {
-    case Left(value) => println(value)
+    case Left(value)  => println(value)
     case Right(value) => println(value)
   }
 
@@ -25,16 +22,16 @@ ALTER TABLE ONLY public.products ADD CONSTRAINT products_pkey PRIMARY KEY (produ
       |""".stripMargin
 
   SQLParser.alterTablePrimaryKeyParser(alterTable) match {
-    case Left(value) => println(value)
+    case Left(value)  => println(value)
     case Right(value) => println(value)
   }
 
   SQLParser.defaultParser("DEFAULT 0.0") match {
-    case Left(value) => println(value)
+    case Left(value)  => println(value)
     case Right(value) => println(value)
   }
   SQLParser.columnparser(" asset_market text") match {
-    case Left(value) => print(value)
+    case Left(value)  => print(value)
     case Right(value) => println(value)
   }
 
@@ -59,12 +56,12 @@ ALTER TABLE ONLY public.products ADD CONSTRAINT products_pkey PRIMARY KEY (produ
                  |    asset_market text
                  |)""".stripMargin
   SQLParser.createTableParser(assets) match {
-    case Left(value) => println(value)
+    case Left(value)  => println(value)
     case Right(value) => println(value)
   }
 
   SqlString.parse("character varying(255)") match {
-    case Left(value) => println(value)
+    case Left(value)  => println(value)
     case Right(value) => println(value)
   }
 
@@ -76,10 +73,9 @@ ALTER TABLE ONLY public.products ADD CONSTRAINT products_pkey PRIMARY KEY (produ
       |);
       |""".stripMargin
   SQLParser.createTableParser(embeddingTable) match {
-    case Left(value) => println(value)
+    case Left(value)  => println(value)
     case Right(value) => println(value)
   }
-
 
   val primaryKey =
     """
@@ -87,17 +83,19 @@ ALTER TABLE ONLY public.products ADD CONSTRAINT products_pkey PRIMARY KEY (produ
       |""".stripMargin
 
   SQLParser.alterTablePrimaryKeyParser(primaryKey) match {
-    case Left(value) => println(value)
+    case Left(value)  => println(value)
     case Right(value) => println(value)
   }
-
 
   val vectorpasrings =
     """vector(768, FLOAT32)
       |""".stripMargin
 
-  SqlDataType.values.find( x=> x.scalaType=="Vector[Float]").get.parse(vectorpasrings) match {
-    case Left(value) => println(value)
+  SqlDataType.values
+    .find(x => x.scalaType == "Vector[Float]")
+    .get
+    .parse(vectorpasrings) match {
+    case Left(value)  => println(value)
     case Right(value) => println(value)
   }
 }

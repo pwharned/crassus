@@ -6,20 +6,25 @@ object SQLParser extends Parse {
     def toField: String = {
       val typeStr = column.nullable.getOrElse(true) match {
         case true => s"Nullable[${column.dataType.scalaType}]"
-        case false => column.default.getOrElse(false) match {
-          case true => s"Default[${column.dataType.scalaType}]"
-          case false =>   column.dataType.scalaType
-        }
-        }
+        case false =>
+          column.default.getOrElse(false) match {
+            case true  => s"Default[${column.dataType.scalaType}]"
+            case false => column.dataType.scalaType
+          }
+      }
 
-      val defaultOrGenerated = column.default.getOrElse(false) | column.generated_always_as_identity.getOrElse(false)
+      val defaultOrGenerated = column.default.getOrElse(
+        false
+      ) | column.generated_always_as_identity.getOrElse(false)
 
       // Add annotation for primary key fields
       column.primary_key match {
         case Some(true) => {
           defaultOrGenerated match {
-            case true => s" `${column.name}`: F[GeneratedPrimaryKey[${column.dataType.scalaType}]]"
-            case false => s" `${column.name}`: F[PrimaryKey[${column.dataType.scalaType}]]"
+            case true =>
+              s" `${column.name}`: F[GeneratedPrimaryKey[${column.dataType.scalaType}]]"
+            case false =>
+              s" `${column.name}`: F[PrimaryKey[${column.dataType.scalaType}]]"
           }
 
         }
@@ -28,48 +33,49 @@ object SQLParser extends Parse {
     }
     def toFieldLower: String = {
       val typeStr = column.nullable.getOrElse(true) match {
-        case true => s"Option[${column.dataType.scalaType}]"
+        case true  => s"Option[${column.dataType.scalaType}]"
         case false => s"${column.dataType.scalaType}"
       }
 
       // Add annotation for primary key fields
       column.primary_key match {
         case Some(true) => s" `${column.name}`: ${column.dataType.scalaType}"
-        case _ => s"`${column.name}`: $typeStr"
+        case _          => s"`${column.name}`: $typeStr"
       }
     }
   }
 
-
-
-
   def typeParser: Parser[SqlDataType] = {
-   val allParsers =  SqlDataType.values.map( x=> x.parse)
-    def tryParsers(remaining: List[Parser[SqlDataType]], p: Parser[SqlDataType]): Parser[SqlDataType] = {
-      if (remaining.isEmpty){
-         p
+    val allParsers = SqlDataType.values.map(x => x.parse)
+    def tryParsers(
+        remaining: List[Parser[SqlDataType]],
+        p: Parser[SqlDataType]
+    ): Parser[SqlDataType] = {
+      if (remaining.isEmpty) {
+        p
       } else {
-         tryParsers(remaining.tail, p.or(remaining.head))
+        tryParsers(remaining.tail, p.or(remaining.head))
       }
     }
 
     tryParsers(allParsers.tail, allParsers.head)
   }
 
-  val functionParser : Parser[String] =
-    for{
+  val functionParser: Parser[String] =
+    for {
       f <- identifier
       _ <- char('(')
       _ <- char(')')
     } yield f + "()"
 
   val doubleParser: Parser[String] =
-    for{
+    for {
       m <- numeric
       _ <- char('.')
       n <- numeric
     } yield s"$m.$n"
-  val booleanParser: Parser[String] = stringInsensitive("true").or(stringInsensitive("false"))
+  val booleanParser: Parser[String] =
+    stringInsensitive("true").or(stringInsensitive("false"))
 
   val defaultParser: Parser[String] =
     for {
@@ -81,7 +87,7 @@ object SQLParser extends Parse {
 
   val createTableParser: Parser[Table] =
     for {
-      _ <-whitespace
+      _ <- whitespace
       _ <- stringInsensitive("create")
       _ <- whitespace
       _ <- stringInsensitive("table")
@@ -107,7 +113,7 @@ object SQLParser extends Parse {
       n <- stringInsensitive("NULL").optional
     } yield (not, n) match {
       case (Some(_), Some(_)) => "NOT NULL"
-      case (None,   Some(_)) => "NULL"
+      case (None, Some(_))    => "NULL"
       case _                  => ""
     }
 
@@ -117,7 +123,7 @@ object SQLParser extends Parse {
       name <- identifier
       _ <- whitespace
       dtype <- typeParser
-      _ <-whitespace
+      _ <- whitespace
       default <- defaultParser.optional
       _ <- whitespace
       nullable <- nullableParser.optional
@@ -126,23 +132,27 @@ object SQLParser extends Parse {
       _ <- whitespace
       identity <- stringInsensitive("GENERATED ALWAYS AS IDENTITY").optional
       _ <- whitespace.optional
-    } yield Column(name, dtype, nullable.map {
-      case "NOT NULL" => false
-      case "NULL" => true
-      case _ => true
-    }, primary_key.map{
-      case "PRIMARY KEY" => true
-      case _ => false
-    },
-      identity.map{
-      case "GENERATED ALWAYS AS IDENTITY" => true
-      case _ => false
-    },
+    } yield Column(
+      name,
+      dtype,
+      nullable.map {
+        case "NOT NULL" => false
+        case "NULL"     => true
+        case _          => true
+      },
+      primary_key.map {
+        case "PRIMARY KEY" => true
+        case _             => false
+      },
+      identity.map {
+        case "GENERATED ALWAYS AS IDENTITY" => true
+        case _                              => false
+      },
       Some(default.isDefined)
-    
     )
 
-  val alterTableAddGeneratedAlwaysAsIdentity: Parser[GeneratedAlwaysAsIdentity] =
+  val alterTableAddGeneratedAlwaysAsIdentity
+      : Parser[GeneratedAlwaysAsIdentity] =
     for {
       _ <- whitespace
       _ <- stringInsensitive("ALTER")
@@ -176,8 +186,7 @@ object SQLParser extends Parse {
       _ <- char('(')
       _ <- takeUntilString(")")
 
-    } yield GeneratedAlwaysAsIdentity(schema, table,colName)
-
+    } yield GeneratedAlwaysAsIdentity(schema, table, colName)
 
   val columnListParser: Parser[List[Column]] =
     for {
@@ -221,6 +230,6 @@ object SQLParser extends Parse {
       columns <- columnNameListParser
       _ <- whitespace
       _ <- char(')')
-    } yield PrimaryKey(schema, table,columns)
+    } yield PrimaryKey(schema, table, columns)
 
 }

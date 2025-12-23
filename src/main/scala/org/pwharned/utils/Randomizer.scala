@@ -6,20 +6,17 @@ import org.pwharned.utils.RandomValue
 import scala.compiletime.{erasedValue, summonInline}
 import scala.deriving.Mirror
 
-/**
- * A little typeclass whose single method is inline,
- * so calls to it will be inlined & the tuple‐match eliminated.
- */
+/** A little typeclass whose single method is inline, so calls to it will be
+  * inlined & the tuple‐match eliminated.
+  */
 trait Randomizer[T]:
   def randomize(orig: T): T
 
 object Randomizer:
 
-  /**
-   * Top-level inline recursion.
-   * Peels off one field at a time from the Product,
-   * preserving PrimaryKey[_] and Option[PrimaryKey[_]].
-   */
+  /** Top-level inline recursion. Peels off one field at a time from the
+    * Product, preserving PrimaryKey[_] and Option[PrimaryKey[_]].
+    */
   inline private def loop[Elems <: Tuple](orig: Product, idx: Int): Elems =
     inline erasedValue[Elems] match
       // no more fields
@@ -35,7 +32,7 @@ object Randomizer:
           inline erasedValue[h] match
             case _: PrimaryKey[?]         => old
             case _: Option[PrimaryKey[?]] => old
-            case _                        => summonInline[RandomValue[h]].generate
+            case _ => summonInline[RandomValue[h]].generate
 
         val tail: t = loop[t](orig, idx + 1)
         (newHead *: tail).asInstanceOf[Elems]
@@ -43,11 +40,12 @@ object Randomizer:
   /** Summon helper */
   def apply[T](using r: Randomizer[T]): Randomizer[T] = r
 
-  /**
-   * Derive a Randomizer for any case-class T.
-   * Reassembles T from a fresh tuple of field values.
-   */
-  inline given derived[T <: Product](using m: Mirror.ProductOf[T]): Randomizer[T] =
+  /** Derive a Randomizer for any case-class T. Reassembles T from a fresh tuple
+    * of field values.
+    */
+  inline given derived[T <: Product](using
+      m: Mirror.ProductOf[T]
+  ): Randomizer[T] =
     new Randomizer[T]:
       def randomize(orig: T): T =
         // build a fresh tuple of randomized/preserved fields

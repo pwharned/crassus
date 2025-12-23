@@ -1,37 +1,44 @@
 package org.pwharned.http.server.tcp
 
 import java.net.InetSocketAddress
-import java.nio.channels.{SelectionKey, Selector, ServerSocketChannel, SocketChannel}
+import java.nio.channels.{
+  SelectionKey,
+  Selector,
+  ServerSocketChannel,
+  SocketChannel
+}
 import java.util.concurrent.{ConcurrentLinkedQueue, ExecutorService, Executors}
 import scala.jdk.CollectionConverters.*
 
-/**
- * Generic NIO-based TCP server.
- * Type-parameterized over request/response types.
- *
- * Performance characteristics:
- * - Non-blocking NIO with selector
- * - Buffer pooling via BufferAllocator
- * - Virtual threads for request processing
- * - Batch event processing
- * - Zero-copy where possible
- */
+/** Generic NIO-based TCP server. Type-parameterized over request/response
+  * types.
+  *
+  * Performance characteristics:
+  *   - Non-blocking NIO with selector
+  *   - Buffer pooling via BufferAllocator
+  *   - Virtual threads for request processing
+  *   - Batch event processing
+  *   - Zero-copy where possible
+  */
 class TcpServer[Req](port: Int)(using proto: Protocol[Req]):
   // Core NIO components
   private given selector: Selector = Selector.open()
-  private given alloc: BufferAllocator = BufferAllocator.direct(proto.bufferSize)
+  private given alloc: BufferAllocator =
+    BufferAllocator.direct(proto.bufferSize)
 
   // Async execution
-  private val executor: ExecutorService = Executors.newVirtualThreadPerTaskExecutor()
+  private val executor: ExecutorService =
+    Executors.newVirtualThreadPerTaskExecutor()
   private val pendingOps = new ConcurrentLinkedQueue[() => Unit]()
 
   private val serverChannel = ServerSocketChannel.open()
 
-  /**
-   * Create new session for accepted connection.
-   * Allocates buffers from pool.
-   */
-  private inline def createSession(channel: SocketChannel, key: SelectionKey): Session[Req] =
+  /** Create new session for accepted connection. Allocates buffers from pool.
+    */
+  private inline def createSession(
+      channel: SocketChannel,
+      key: SelectionKey
+  ): Session[Req] =
     Session(
       channel = channel,
       key = key,
@@ -40,13 +47,11 @@ class TcpServer[Req](port: Int)(using proto: Protocol[Req]):
       parser = proto.parser
     )
 
-  /**
-   * Handle read event for a session.
-   * Feeds parser, handles request, renders response.
-   */
+  /** Handle read event for a session. Feeds parser, handles request, renders
+    * response.
+    */
 
   private inline def handleRead(session: Session[Req]): Unit =
-
 
     session.readBuffer.clear()
     val bytesRead = session.channel.read(session.readBuffer)
@@ -63,11 +68,8 @@ class TcpServer[Req](port: Int)(using proto: Protocol[Req]):
         proto.handler.handle(request, session.writeBuffer, session.channel)
       }
 
-
-  /**
-   * Main event loop.
-   * Processes accept/read events, offloads work to executor.
-   */
+  /** Main event loop. Processes accept/read events, offloads work to executor.
+    */
   def start(): Unit =
     serverChannel.configureBlocking(false)
     serverChannel.bind(new InetSocketAddress(port))
@@ -121,7 +123,9 @@ class TcpServer[Req](port: Int)(using proto: Protocol[Req]):
                     // Re-enable READ if still open
                     if session.isOpen then
                       pendingOps.add(() =>
-                        key.interestOps(key.interestOps() | SelectionKey.OP_READ)
+                        key.interestOps(
+                          key.interestOps() | SelectionKey.OP_READ
+                        )
                       )
                       selector.wakeup()
                   catch

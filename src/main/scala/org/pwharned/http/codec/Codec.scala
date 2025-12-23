@@ -19,7 +19,7 @@ object Codec:
     def decode(slice: HttpTypes.ByteSlice): Either[String, Unit] = Right(())
     def encode(value: Unit): String = ""
     def contentType: String = "text/plain"
- 
+
   // String codec for simple text
   given stringCodec: Codec[String] with
     def decode(slice: HttpTypes.ByteSlice): Either[String, String] =
@@ -27,19 +27,20 @@ object Codec:
     def encode(value: String): String = value
     def contentType: String = "text/plain; charset=utf-8"
 
-
-  given entityCodec[A<:Product](using m: Mirror.ProductOf[A], jd: JsonDeserializer[A], js: JsonSerializer[A]): Codec[A] = new Codec[A]:
+  given entityCodec[A <: Product](using
+      m: Mirror.ProductOf[A],
+      jd: JsonDeserializer[A],
+      js: JsonSerializer[A]
+  ): Codec[A] = new Codec[A]:
     def decode(slice: ByteSlice): Either[String, A] =
       val bytes = slice.toBytes
       Try {
         jd.decode(bytes, 0)
       }.toEither match {
-        case Left(value) => Left(value.getMessage)
+        case Left(value)  => Left(value.getMessage)
         case Right(value) => Right(value._1)
       }
     def encode(entity: A): String =
       js.serialize(entity)
 
     def contentType: String = "application/json"
-
-

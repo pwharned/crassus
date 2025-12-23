@@ -1,6 +1,5 @@
 package org.pwharned.openapi
 
-
 import org.pwharned.database.hkd._
 
 import java.nio.ByteBuffer
@@ -11,21 +10,21 @@ import scala.language.implicitConversions
 
 trait Schema[T] {
   def labels: List[String]
-  def `type`: Option[String] 
-  def format: Option[String]  = None
+  def `type`: Option[String]
+  def format: Option[String] = None
   def toSchema: schema
 }
-
-
 
 object Schema:
 
   private inline def summonAll[Elems <: Tuple]: List[Schema[?]] =
     inline erasedValue[Elems] match
       case _: EmptyTuple => Nil
-      case _: (h *: t) => summonInline[Schema[h]] :: summonAll[t]
+      case _: (h *: t)   => summonInline[Schema[h]] :: summonAll[t]
 
-  transparent inline given derived[T <: Product](using m: Mirror.ProductOf[T]): Schema[T] =
+  transparent inline given derived[T <: Product](using
+      m: Mirror.ProductOf[T]
+  ): Schema[T] =
     new Schema[T] {
       // the field names of the case class
       def labels: List[String] =
@@ -62,7 +61,6 @@ object Schema:
 
     def toSchema: schema = sch.toSchema
 
-
   // 2) Give a Schema for Default[A] (if you have a Default wrapper)
   given [A](using sch: Schema[A]): Schema[Default[A]] with
     def labels: List[String] = Nil
@@ -74,25 +72,25 @@ object Schema:
     def toSchema: schema = sch.toSchema
   given Schema[Boolean] with
     def labels = Nil
-  
+
     def `type` = Some("boolean")
-  
+
     def toSchema = schema(`type` = `type`)
   given Schema[Float] with
     def labels = Nil
-  
+
     def `type` = Some("number")
-  
+
     def toSchema = schema(`type` = `type`, format = Some("float"))
   given Schema[Int] with
     def labels = Nil
-    def `type`  = Some("integer")
+    def `type` = Some("integer")
     override def format = Some("int32")
     def toSchema = schema(`type` = `type`, format = format)
-  
+
   given Schema[String] with
     def labels = Nil
-    def `type`  = Some("string")
+    def `type` = Some("string")
     def toSchema = schema(`type` = `type`)
 
   given Schema[java.time.Instant] with
@@ -104,28 +102,28 @@ object Schema:
 
   given Schema[Unit] with
     def labels = Nil
-  
+
     def `type` = None
-  
+
     def toSchema = schema(`type` = `type`)
-  
+
   given Schema[ByteBuffer] with
     def labels = Nil
-  
+
     def `type` = None
-  
+
     def toSchema = schema(`type` = `type`)
-  
+
   given Schema[java.util.UUID] with
     def labels = Nil
-  
+
     def `type` = Some("string")
-  
+
     def toSchema = schema(`type` = `type`, format = Some("UUID4"))
-  
+
   given [A](using sch: Schema[A]): Schema[Iterator[A]] with
     def labels = Nil
-    def `type`  = Some("array")
+    def `type` = Some("array")
     def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
 
   given [A](using sch: Schema[A]): Schema[Vector[A]] with
@@ -137,16 +135,16 @@ object Schema:
 
   given [A](using sch: Schema[A]): Schema[List[A]] with
     def labels = Nil
-  
+
     def `type` = Some("array")
-  
+
     def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
-  
+
   given [A](using sch: Schema[A]): Schema[PrimaryKey[A]] with
     def labels = Nil
-  
+
     def `type` = sch.`type`
-  
+
     def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
 
   given [A](using sch: Schema[A]): Schema[GeneratedPrimaryKey[A]] with
@@ -157,9 +155,9 @@ object Schema:
     def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
   given [A](using sch: Schema[A]): Schema[Option[A]] with
     def labels = Nil
-  
+
     def `type` = sch.`type`
-  
+
     def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
 
   given [A](using sch: Schema[A]): Schema[Nullable[A]] with
@@ -169,13 +167,11 @@ object Schema:
 
     def toSchema = schema(`type` = `type`, items = Some(sch.toSchema))
 
-
   given [A](using sch: Schema[A]): Schema[Map[String, A]] with
-    def labels: List[String]           = Nil
-    def `type`: Option[String]         = Some("object")
+    def labels: List[String] = Nil
+    def `type`: Option[String] = Some("object")
     override def toSchema: schema =
       schema(
-        `type`                 = `type`,
-        additionalProperties   = Some(sch.toSchema)
+        `type` = `type`,
+        additionalProperties = Some(sch.toSchema)
       )
-  

@@ -1,9 +1,7 @@
 package org.pwharned.http
 
-
 object HttpMethods:
   opaque type HttpMethod = String
-  
 
   val GET: HttpMethod = "GET"
   val POST: HttpMethod = "POST"
@@ -19,12 +17,12 @@ object HttpMethods:
     inline def value: String = method
     inline def isIdempotent: Boolean = method match
       case "GET" | "HEAD" | "PUT" | "DELETE" | "OPTIONS" => true
-      case _ => false
+      case _                                             => false
     inline def expectsBody: Boolean = method match
       case "POST" | "PUT" | "PATCH" => true
-      case _ => false
+      case _                        => false
 
-// Type-safe status codes  
+// Type-safe status codes
 opaque type StatusCode = Int
 
 object StatusCode:
@@ -62,4 +60,4 @@ object StatusCode:
       case 500 => "Internal Server Error"
       case 502 => "Bad Gateway"
       case 503 => "Service Unavailable"
-      case _ => "Unknown"
+      case _   => "Unknown"

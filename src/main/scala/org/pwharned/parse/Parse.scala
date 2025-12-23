@@ -11,7 +11,7 @@ case class ParseError(position: Int, input: String, message: String):
   def merge(other: ParseError): ParseError =
     val bestPos = this.position max other.position
     val combined = (this.message ++ other.message).distinct
-    ParseError(bestPos,input, combined)
+    ParseError(bestPos, input, combined)
 type Parser[T] = String => Either[ParseError, (T, String)]
 
 object Parse:
@@ -35,7 +35,10 @@ object Parse:
           // We got a head, now loop for more
           case Right((head, rest0)) =>
             @tailrec
-            def loop(acc: List[A], in: String): Either[ParseError, (List[A], String)] =
+            def loop(
+                acc: List[A],
+                in: String
+            ): Either[ParseError, (List[A], String)] =
               sep(in) match {
                 // no separator ⇒ we're done
                 case Left(_) =>
@@ -66,35 +69,35 @@ object Parse:
     def many: Parser[List[A]] = input =>
       p(input) match
         case Right((value, rest)) =>
-          many(rest).map { case (values, remaining) => (value :: values, remaining) }
+          many(rest).map { case (values, remaining) =>
+            (value :: values, remaining)
+          }
         case Left(_) => Right((Nil, input))
-
 
     def optional: Parser[Option[A]] = input =>
       p(input) match
         case Right((value, rest)) => Right((Some(value), rest))
-        case Left(_) => Right((None, input))
+        case Left(_)              => Right((None, input))
 
-    def alt(pAlt: Parser[A]): Parser[A] = input =>
-      p(input).orElse(pAlt(input))
+    def alt(pAlt: Parser[A]): Parser[A] = input => p(input).orElse(pAlt(input))
 
     def or[B >: A](other: Parser[B]): Parser[B] = new Parser[B]:
       override def apply(input: String): Either[ParseError, (B, String)] =
         // 1. try the first parser
-        this (input) match
-          case right@Right(_) =>
+        this(input) match
+          case right @ Right(_) =>
             right
-  
+
           case Left(err1) =>
             // 2. on failure, backtrack: feed the original input to `other`
             other(input) match
-              case right2@Right(_) =>
+              case right2 @ Right(_) =>
                 right2
-  
+
               case Left(err2) =>
                 // 3. both failed: combine errors (see below)
                 Left(err1.merge(err2))
-    
+
     def token: Parser[A] =
       for {
         _ <- whitespace
@@ -105,24 +108,27 @@ object Parse:
   def char(c: Char): Parser[Char] = input =>
     input.headOption match
       case Some(value) if value == c => Right((value, input.tail))
-      case Some(value) => Left(ParseError(0, input, s"Expected '$c', found '$value'"))
-      case None => Left(ParseError(0, input, s"Unexpected end of input, expected '$c'"))
-
+      case Some(value) =>
+        Left(ParseError(0, input, s"Expected '$c', found '$value'"))
+      case None =>
+        Left(ParseError(0, input, s"Unexpected end of input, expected '$c'"))
 
   def string(s: String): Parser[String] = input =>
     if input.startsWith(s) then Right((s, input.drop(s.length)))
     else Left(ParseError(0, input, s"Expected '$s'"))
 
   def stringInsensitive(s: String): Parser[String] = input =>
-    if input.toLowerCase.startsWith(s.toLowerCase) then Right((s, input.drop(s.length)))
+    if input.toLowerCase.startsWith(s.toLowerCase) then
+      Right((s, input.drop(s.length)))
     else Left(ParseError(0, input, s"Expected '$s'"))
 
   def whitespace: Parser[String] = input =>
-    val spaces = input.takeWhile( x=> x.isWhitespace || x == '\n')
+    val spaces = input.takeWhile(x => x.isWhitespace || x == '\n')
     Right((spaces, input.drop(spaces.length)))
 
   def comma: Parser[Unit] = input =>
-    if input.startsWith(",") then Right(((), input.drop(1).dropWhile(_.isWhitespace)))
+    if input.startsWith(",") then
+      Right(((), input.drop(1).dropWhile(_.isWhitespace)))
     else Left(ParseError(0, input, "Expected ',' separator"))
 
   def identifier: Parser[String] = input =>
@@ -130,13 +136,10 @@ object Parse:
     Right((id, input.drop(id.length)))
 
   def stringInline: Parser[String] = input =>
-    val id = input.takeWhile(c => c!= '"')
+    val id = input.takeWhile(c => c != '"')
     Right((id, input.drop(id.length)))
 
-
-
 trait ParseBuffer:
-
 
   type Parser[T] = ByteBuffer => Either[ParseError, (T, ByteBuffer)]
 
@@ -149,10 +152,22 @@ trait ParseBuffer:
         buffer.position(pos + 1)
         Right((c.toChar, buffer))
       } else {
-        Left(ParseError(pos,buffer.get().toString, s"Expected '${c.toChar}', found '${b.toChar}'"))
+        Left(
+          ParseError(
+            pos,
+            buffer.get().toString,
+            s"Expected '${c.toChar}', found '${b.toChar}'"
+          )
+        )
       }
     } else {
-      Left(ParseError(buffer.position(), buffer.get().toString, "Unexpected end of input"))
+      Left(
+        ParseError(
+          buffer.position(),
+          buffer.get().toString,
+          "Unexpected end of input"
+        )
+      )
     }
   extension [A](p: Parser[A])
     inline def flatMap[B](f: A => Parser[B]): Parser[B] = input =>
@@ -161,9 +176,7 @@ trait ParseBuffer:
     inline def map[B](f: A => B): Parser[B] = input =>
       p(input).map { case (value, rest) => (f(value), rest) }
 
-
-object ParseBuffer extends  ParseBuffer
-
+object ParseBuffer extends ParseBuffer
 
 // ──────────────────────────────────────────────
 object Primitives:
@@ -175,7 +188,7 @@ object Primitives:
       _ <- char('"')
     } yield s
   def stringNoAmpersand: Parser[String] = input =>
-    val id = input.takeWhile(c => c!= '&')
+    val id = input.takeWhile(c => c != '&')
     Right((id, input.drop(id.length)))
 
   def nullParser[T]: Parser[Option[T]] =
@@ -187,41 +200,50 @@ object Primitives:
     input =>
       val neg = if input.startsWith("-") then "-" else ""
       val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
-      val digits = inputAfterNeg.takeWhile( x => x.isDigit || x =='.')
-      if digits.isEmpty || digits.contains('.') then Left(ParseError(0, input, s"Expected integer, found $input"))
+      val digits = inputAfterNeg.takeWhile(x => x.isDigit || x == '.')
+      if digits.isEmpty || digits.contains('.') then
+        Left(ParseError(0, input, s"Expected integer, found $input"))
       else
         try {
           val value = (neg + digits).toInt
           Right((value, inputAfterNeg.drop(digits.length)))
         } catch {
-          case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
+          case _: Exception =>
+            Left(ParseError(0, input, "Invalid integer format"))
         }
   def longParser: Parser[Long] =
     input =>
       val neg = if input.startsWith("-") then "-" else ""
       val inputAfterNeg = if neg.nonEmpty then input.drop(1) else input
-      val digits = inputAfterNeg.takeWhile( x => x.isDigit || x =='.')
-      if digits.isEmpty || digits.contains('.') then Left(ParseError(0, input, s"Expected Long, found $input"))
+      val digits = inputAfterNeg.takeWhile(x => x.isDigit || x == '.')
+      if digits.isEmpty || digits.contains('.') then
+        Left(ParseError(0, input, s"Expected Long, found $input"))
       else
         try {
           val value = (neg + digits).toInt
           Right((value, inputAfterNeg.drop(digits.length)))
         } catch {
-          case _: Exception => Left(ParseError(0, input, "Invalid integer format"))
+          case _: Exception =>
+            Left(ParseError(0, input, "Invalid integer format"))
         }
 
-
-  def instantParser: Parser[Instant] = {
-
-
-    input =>
-      val unquoted = input.toCharArray.dropWhile(x => x=='"').takeWhile(x=> x!='"').mkString
-      Try{java.time.Instant.parse(unquoted)} match {
+  def instantParser: Parser[Instant] = { input =>
+    val unquoted = input.toCharArray
+      .dropWhile(x => x == '"')
+      .takeWhile(x => x != '"')
+      .mkString
+    Try { java.time.Instant.parse(unquoted) } match {
       case Success(tok) => Right((tok, unquoted.substring(tok.toString.length)))
-      case scala.util.Failure(exception) => Left(ParseError(0, input, s"Expected a valid instant, found $unquoted with ${exception.getMessage}"))
+      case scala.util.Failure(exception) =>
+        Left(
+          ParseError(
+            0,
+            input,
+            s"Expected a valid instant, found $unquoted with ${exception.getMessage}"
+          )
+        )
     }
   }
-
 
   def numberToken(input: String): Either[ParseError, (String, String)] = {
     // Regex for full decimal with optional exponent
@@ -235,7 +257,8 @@ object Primitives:
   def boolParser: Parser[Boolean] =
     input =>
       if input.startsWith("true") then Right((true, input.drop("true".length)))
-      else if input.startsWith("false") then Right((false, input.drop("false".length)))
+      else if input.startsWith("false") then
+        Right((false, input.drop("false".length)))
       else Left(ParseError(0, input, s"Expected boolean, found $input"))
 
   def doubleParser: Parser[Double] = input =>

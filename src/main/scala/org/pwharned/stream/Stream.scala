@@ -11,7 +11,7 @@ sealed trait Stream[+A]:
   final def fold[B](zero: B)(f: (B, A) => B): B = {
     @annotation.tailrec
     def loop(stream: Stream[A], acc: B): B = stream match {
-      case Empty => acc
+      case Empty      => acc
       case Cons(h, t) => loop(t(), f(acc, h()))
     }
     loop(this, zero)
@@ -30,13 +30,13 @@ sealed trait Stream[+A]:
   }
 
   final def headOption: Option[A] = this match {
-    case Empty => None
+    case Empty      => None
     case Cons(h, _) => Some(h())
   }
 
   final def isEmpty: Boolean = this match {
     case Empty => true
-    case _ => false
+    case _     => false
   }
 
   final def nonEmpty: Boolean = !isEmpty
@@ -44,7 +44,7 @@ sealed trait Stream[+A]:
   final def toList: List[A] = {
     @annotation.tailrec
     def loop(stream: Stream[A], acc: List[A]): List[A] = stream match {
-      case Empty => acc.reverse
+      case Empty      => acc.reverse
       case Cons(h, t) => loop(t(), h() :: acc)
     }
     loop(this, Nil)
@@ -62,17 +62,18 @@ sealed trait Stream[+A]:
     @annotation.tailrec
     def loop(stream: Stream[A], remaining: Int): Stream[A] =
       if remaining <= 0 then stream
-      else stream match {
-        case Empty => Empty
-        case Cons(_, t) => loop(t(), remaining - 1)
-      }
+      else
+        stream match {
+          case Empty      => Empty
+          case Cons(_, t) => loop(t(), remaining - 1)
+        }
     loop(this, n)
   }
 
   final def exists(p: A => Boolean): Boolean = {
     @annotation.tailrec
     def loop(stream: Stream[A]): Boolean = stream match {
-      case Empty => false
+      case Empty      => false
       case Cons(h, t) => if p(h()) then true else loop(t())
     }
     loop(this)
@@ -81,7 +82,7 @@ sealed trait Stream[+A]:
   final def forall(p: A => Boolean): Boolean = {
     @annotation.tailrec
     def loop(stream: Stream[A]): Boolean = stream match {
-      case Empty => true
+      case Empty      => true
       case Cons(h, t) => if p(h()) then loop(t()) else false
     }
     loop(this)
@@ -92,12 +93,13 @@ sealed trait Stream[+A]:
     @annotation.tailrec
     def loop(stream: Stream[A], remaining: Int): Unit = {
       if remaining <= 0 then ()
-      else stream match {
-        case Empty => ()
-        case Cons(h, t) =>
-          f(h())
-          loop(t(), remaining - 1)
-      }
+      else
+        stream match {
+          case Empty => ()
+          case Cons(h, t) =>
+            f(h())
+            loop(t(), remaining - 1)
+        }
     }
     loop(this, maxElements)
   }
@@ -133,7 +135,7 @@ object Stream:
 
   def unfold[A, S](seed: S)(f: S => Option[(A, S)]): Stream[A] =
     f(seed) match
-      case None => Empty
+      case None         => Empty
       case Some((a, s)) => Cons(() => a, () => unfold(s)(f))
 
   // Utility constructors
@@ -162,7 +164,7 @@ object Stream:
 implicit class StreamOps[A](private val s: Stream[A]) extends AnyVal {
   def toIterator: Iterator[A] = new Iterator[A] {
     private var cur: Stream[A] = s
-    def hasNext: Boolean    = cur.nonEmpty
+    def hasNext: Boolean = cur.nonEmpty
     def next(): A = cur match {
       case Cons(h, t) =>
         val a = h()

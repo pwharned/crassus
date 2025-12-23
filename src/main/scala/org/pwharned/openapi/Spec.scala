@@ -1,91 +1,89 @@
 package org.pwharned.openapi
 
 case class root(
-                      openapi: String,
-                      info:      info,
-                      servers:   List[server],
-                      paths:     Map[String, pathItem],
-                      components: Option[components]
-                    )
+    openapi: String,
+    info: info,
+    servers: List[server],
+    paths: Map[String, pathItem],
+    components: Option[components]
+)
 
 // info
 case class info(
-                 version: String,
-                 title:   String,
-                 description: String,
-                 license: Option[license] =  None
-               )
+    version: String,
+    title: String,
+    description: String,
+    license: Option[license] = None
+)
 
 case class license(
-                    name: String
-                  )
+    name: String
+)
 
 // servers
 case class server(
-                   url: String
-                 )
+    url: String
+)
 
 // paths
 case class pathItem(
-                     get:  Option[operation] = None,
-                     post: Option[operation] = None,
-                     patch:  Option[operation] = None,
-                     delete: Option[operation] = None,
-                     put:  Option[operation] = None
-                   )
+    get: Option[operation] = None,
+    post: Option[operation] = None,
+    patch: Option[operation] = None,
+    delete: Option[operation] = None,
+    put: Option[operation] = None
+)
 
 case class operation(
-                      summary:     String,
-                      operationId: String,
-                      tags:        List[String],
-                      parameters:  Option[List[parameter]] = None,
-                      responses:   Map[String, response],
-                      requestBody:  Option[request] = None
-
-                    )
+    summary: String,
+    operationId: String,
+    tags: List[String],
+    parameters: Option[List[parameter]] = None,
+    responses: Map[String, response],
+    requestBody: Option[request] = None
+)
 
 case class parameter(
-                      name:        String,
-                      in:          String,
-                      description: String,
-                      required:    Option[Boolean]=None,
-                      schema:      schema
-                    )
+    name: String,
+    in: String,
+    description: String,
+    required: Option[Boolean] = None,
+    schema: schema
+)
 
 case class response(
-                     description: String,
-                     headers:     Option[Map[String, header]]    = None,
-                     content:     Option[Map[String, mediaType]] = None
-                   )
+    description: String,
+    headers: Option[Map[String, header]] = None,
+    content: Option[Map[String, mediaType]] = None
+)
 
 case class request(
-                     description: Option[String],
-                     headers: Option[Map[String, header]] = None,
-                     content: Option[Map[String, mediaType]] = None
-                   )
+    description: Option[String],
+    headers: Option[Map[String, header]] = None,
+    content: Option[Map[String, mediaType]] = None
+)
 case class header(
-                   description: String,
-                   schema:      schema
-                 )
+    description: String,
+    schema: schema
+)
 
 case class mediaType(
-                      schema: schema
-                    )
+    schema: schema
+)
 
 // components
 case class components(
-                       schemas: Map[String, schema]
-                     )
+    schemas: Map[String, schema]
+)
 
 // a fully generic schema node
 case class schema(
-                   `type`:     Option[String]              = None,
-                   format:     Option[String]              = None,
-                   `$ref`:     Option[String]              = None,
-                   items: Option[schema] = None,
-                   additionalProperties: Option[schema] = None,
-                   properties: Option[Map[String, schema]] = None
-                 )
-
+    `type`: Option[String] = None,
+    format: Option[String] = None,
+    `$ref`: Option[String] = None,
+    items: Option[schema] = None,
+    additionalProperties: Option[schema] = None,
+    properties: Option[Map[String, schema]] = None
+)
 
 case class items(`type`: Option[String], `$ref`: Option[String])
