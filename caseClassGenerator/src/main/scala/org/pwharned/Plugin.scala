@@ -24,6 +24,12 @@ object CaseClassGeneratorPlugin extends AutoPlugin {
     val schemaFile = settingKey[String](
       "The path to the schema file relative to the project directory"
     )
+    val addTapirSchema = settingKey[Boolean](
+      "Add schema derivication using tapir to the companion object"
+    )
+    val addJsoniterCodec =
+      SettingKey[Boolean]("add jsoniter codec to the companion object")
+
   }
 
   import autoImport._
@@ -57,7 +63,9 @@ object CaseClassGeneratorPlugin extends AutoPlugin {
         val generatedCode = CaseClassGenerator.generateCaseClasses(
           schemaFile.getAbsolutePath,
           useHKD,
-          tupleTypes.value
+          tupleTypes.value,
+          addTapirSchema.value,
+          addJsoniterCodec.value
         )
 
         val code =

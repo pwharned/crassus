@@ -48,6 +48,23 @@ trait Parse {
         Left(ParseError(0, input, s"Unexpected end of input , expected digit"))
     }
 
+  def singleQuotedString: Parser[String] = input => {
+    if (!input.startsWith("'"))
+      Left(ParseError(0, input, "Expected starting single quote"))
+    else {
+      val afterQuote = input.drop(1)
+
+      val closingIndex = afterQuote.indexOf("'")
+      if (closingIndex == -1)
+        Left(ParseError(0, input, "Unterminated single‑quoted string"))
+      else {
+        val inside = afterQuote.substring(0, closingIndex)
+        val rest = afterQuote.drop(closingIndex + 1)
+        Right((inside, rest))
+      }
+    }
+  }
+
   def takeUntilString(delim: String): Parser[String] = { input =>
     {
       @annotation.tailrec

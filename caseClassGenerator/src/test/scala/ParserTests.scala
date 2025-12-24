@@ -98,4 +98,26 @@ ALTER TABLE ONLY public.products ADD CONSTRAINT products_pkey PRIMARY KEY (produ
     case Left(value)  => println(value)
     case Right(value) => println(value)
   }
+
+  val distibutedDDL = """CREATE TABLE EPM.DIM_AIR_CARRIER_DISCOUNT (
+    SK_AIR_CARRIER_DISCOUNT INTEGER NOT NULL,
+    AIR_CARRIER_DISCOUNT_CODE VARCHAR(10) NOT NULL,
+    AIR_CARRIER_DISCOUNT_TERMS VARCHAR(370) NOT NULL,
+    AIR_CARRIER_DISCOUNT_ORIGIN_DESTINATION_MAPPED VARCHAR(7) NOT NULL,
+    AIR_CARRIER_DISCOUNT_ORIGIN_DESTINATION_LEVEL VARCHAR(18) NOT NULL,
+    AIR_CARRIER_DISCOUNT_TRIP_TYPE VARCHAR(5) NOT NULL,
+    AUDIT_TIMESTAMP TIMESTAMP NOT NULL
+) DISTRIBUTE BY HASH (SK_AIR_CARRIER_DISCOUNT) IN TS_EPMEDS;
+"""
+  val parsed = SQLParser.createTableParser(distibutedDDL) match {
+    case Left(value)  => println(value)
+    case Right(value) => println(value)
+  }
+
+  val comment =
+    """COMMENT ON TABLE EPM.DIM_AIR_CARRIER_DISCOUNT IS 'Contains all air travel discounts for air carriers';"""
+  SQLParser.commentParser(comment) match {
+    case Left(value)  => println(value)
+    case Right(value) => println(value)
+  }
 }

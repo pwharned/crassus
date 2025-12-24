@@ -60,7 +60,55 @@ object SQLParser extends Parse {
 
     tryParsers(allParsers.tail, allParsers.head)
   }
+  
+  val commentOnTableParser: Parser[Comment] = {
+    for {
+      schema <- identifier
+      _ <- whitespace
+      _ <- char('.')
+      _ <- whitespace
+      tableName <- identifier
+      _ <- whitespace
+      _ <- stringInsensitive("IS")
+      _ <- whitespace
+      comment <- singleQuotedString
+    } yield Comment(schema, tableName, None, comment)
+  }
 
+ val commentOnColumnParser : Parser[Comment]= {
+    for {
+      schema <- identifier
+      _ <- whitespace
+      _ <- char('.')
+      _ <- whitespace
+      tableName <- identifier
+      _ <- whitespace
+      _ <- char('.')
+      _ <- whitespace
+      columnName <- identifier
+      _ <- whitespace
+      _ <- stringInsensitive("IS")        // you forgot this in your code
+      _ <- whitespace
+      comment <- singleQuotedString
+
+    }yield Comment(schema, tableName, Some(columnName), comment) 
+
+  }
+
+
+  val commentParser: Parser[Comment] = 
+    for {
+      _ <- whitespace
+      _ <- stringInsensitive("COMMENT ON")
+      _ <- whitespace
+      kind <- stringInsensitive("TABLE").or(stringInsensitive("COLUMN"))
+      _ <- whitespace
+      comment <- kind.toLowerCase match {
+      case "table"  => commentOnTableParser
+      case "column" => commentOnColumnParser
+    }
+    }
+  yield comment
   val functionParser: Parser[String] =
     for {
       f <- identifier
@@ -76,7 +124,7 @@ object SQLParser extends Parse {
     } yield s"$m.$n"
   val booleanParser: Parser[String] =
     stringInsensitive("true").or(stringInsensitive("false"))
-
+  
   val defaultParser: Parser[String] =
     for {
       _ <- whitespace
