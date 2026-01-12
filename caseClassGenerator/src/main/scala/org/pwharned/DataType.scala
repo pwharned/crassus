@@ -88,6 +88,23 @@ case object SqlVarChar extends SqlDataType {
   def parse: Parser[SqlDataType] =
     (stringInsensitive("TEXT") or varcharparser).map(_ => this)
 }
+case object SqlChar extends SqlDataType {
+  val sqlNames: Seq[String] = Seq("TEXT")
+  def scalaType: String = "String"
+
+  val varcharparser = for {
+    _ <- whitespace
+    ch <- stringInsensitive("CHAR")
+    _ <- whitespace
+    open <- char('(')
+    _ <- whitespace
+    number <- numeric.many
+    _ <- whitespace
+    close <- char(')')
+  } yield ch + open + number.mkString + close
+  def parse: Parser[SqlDataType] =
+    (stringInsensitive("TEXT") or varcharparser).map(_ => this)
+}
 
 case object SqlTextArray extends SqlDataType {
   val sqlNames: Seq[String] = Seq("TEXT[]")
@@ -133,6 +150,7 @@ case object SqlTimestamp extends SqlDataType {
 object SqlDataType extends Parse {
   val values: List[SqlDataType] = List(
     SqlInteger,
+    SqlChar,
     SqlTextArray,
     SqlString,
     SqlBoolean,

@@ -38,6 +38,7 @@ object CaseClassGenerator {
       .filter(x => x.trim.toUpperCase.startsWith("COMMENT"))
       .map(x => SQLParser.commentParser(x))
     createTableStatements.map {
+
       case Left(value) => { System.out.println(value) }
       case Right(value) =>
         val alterations = alterTableStatements
@@ -59,15 +60,14 @@ object CaseClassGenerator {
           }
           .map(x => x.toOption.get)
           .filter(x => x._1.tableName.toUpperCase == value._1.name.toUpperCase)
-
         val columns = value._1.columns.map(x => {
           val generated =
             generated_always.find(y => y._1.colName == x.name) match {
               case Some(value) => true
               case None        => false
-
             }
           val comment = c.find(y => y._1.column.getOrElse("") == x.name)
+
           alterations.find(y => y._1.columns.contains(x.name)) match {
             case Some(value) =>
               Column(
@@ -79,11 +79,18 @@ object CaseClassGenerator {
                 x.default,
                 comment.map(x => x._1)
               )
-            case None => x
+            case None =>
+              Column(
+                x.name,
+                x.dataType,
+                x.nullable,
+                x.nullable,
+                Some(generated),
+                x.default,
+                comment.map(x => x._1) // <-- This was missing
+              )
           }
-
         })
-        println(value)
 
         val typeOrTuple = tuples match {
           case true  => "type"
@@ -93,37 +100,46 @@ object CaseClassGenerator {
           case true  => "="
           case false => ""
         }
-
         hkd match {
           case true =>
             s"""
-                |$typeOrTuple ${value._1.name}[F[_]] $tupleEquals (${columns
+             |case class ${value._1.name}[F[_]](${columns
                 .map(x => x.toField)
                 .mkString(",\n")})
-                object ${value._1.name} {
-                  val docs = Map("comment" -> "${c
+             |
+             |object ${value._1.name} {
+             |  val docs = Map(
+             |    "comment" -> "${c
                 .find(x => x._1.column.isEmpty)
                 .map(x => x._1.comment)
-                .getOrElse("")}", ${columns
-                .map(x => s"${x.name} -> ${x.comment.getOrElse("")} ")
-                .mkString(",")}
-                ${
-                if (addJsoniterCodec) {
-                  s"given JsonValueCodec[${value._1.name}] = JsonCodecMaker.make"
-                }
+                .getOrElse("")}"${
+                if (columns.exists(_.comment.isDefined)) "," else ""
               }
-                ${
-                if (addTapirSchema) {
-                  s"given Schema[${value._1.name}] = Schema.derived"
-                }
+             |    ${columns
+                .filter(_.comment.isDefined)
+                .map(x =>
+                  s""""${x.name}" -> "${x.comment
+                      .map(_.comment)
+                      .getOrElse("")}""""
+                )
+                .mkString(",\n    ")}
+             |  )
+             |  ${
+                if (addJsoniterCodec)
+                  s"given JsonValueCodec[${value._1.name}[Id]] = JsonCodecMaker.make"
+                else ""
               }
-                }
-                  
-                """.stripMargin
+             |  ${
+                if (addTapirSchema)
+                  s"given Schema[${value._1.name}[Id]] = Schema.derived"
+                else ""
+              }
+             |}
+             |""".stripMargin
 
           case false =>
             s"""
-                            |$typeOrTuple ${value._1.name} $tupleEquals (${columns
+             |case class ${value._1.name}(${columns
                 .map(x => x.toFieldLower)
                 .mkString(",\n")})""".stripMargin
         }

@@ -30,6 +30,46 @@ class ConnectionPool(
     props
   }
 
+  /** Performs a health‑check by attempting to acquire & release a connection.
+    *
+    * Returns: healthy = true if a connection could be acquired healthy = false
+    * + error info if not
+    */
+  def healthCheck(): HealthStatus = {
+    acquire() match {
+      case Success(conn) =>
+        // Immediately release; we just wanted to test the pool
+        release(conn)
+        HealthStatus(healthy = true, None, None)
+
+      case Failure(ex) =>
+        // Capture root cause message
+        val root = Iterator
+          .iterate(ex)(_.getCause)
+          .takeWhile(_ != null)
+          .toList
+          .lastOption
+
+        HealthStatus(
+          healthy = false,
+          error = Some(ex.getMessage),
+          rootCause = Some(root.map(_.getMessage).getOrElse("unknown"))
+        )
+    }
+  }
+
+  /** Simple status container for health checks */
+  case class HealthStatus(
+      healthy: Boolean,
+      error: Option[String],
+      rootCause: Option[String]
+  ) {
+    override def toString: String =
+      if healthy then "ConnectionPool healthy"
+      else
+        s"ConnectionPool UNHEALTHY\n error: ${error.getOrElse("")}\n rootCause: ${rootCause.getOrElse("")}"
+  }
+
   // Internal state holds idle connections along with the timestamp (in millis) when they were returned.
   private val idleConnections: Queue[(Connection, Long)] = Queue.empty
   private var totalConnections: Int = 0
