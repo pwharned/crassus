@@ -71,6 +71,50 @@ case object SqlString extends SqlDataType {
   def parse: Parser[SqlDataType] =
     (stringInsensitive("TEXT") or varcharparser).map(_ => this)
 }
+
+case object SqlDecimal extends SqlDataType {
+  val sqlNames: Seq[String] = Seq("DECIMAL")
+  def scalaType: String = "scala.math.BigDecimal"
+  val numbers: Parser[List[String]] =
+    for {
+      first <- number
+
+      rest <- (comma.flatMap(_ => whitespace.flatMap(_ => number))).many
+    } yield first :: rest
+
+  val decimalParser = for {
+    _ <- whitespace
+    ch <- stringInsensitive("DECIMAL")
+    _ <- whitespace
+    open <- char('(')
+    _ <- whitespace
+    numbers <- numbers
+    _ <- whitespace
+
+    close <- char(')')
+  } yield ch + open + numbers.mkString(",") + close
+  def parse: Parser[SqlDataType] =
+    (decimalParser).map(_ => this)
+}
+
+case object SqlNVarChar extends SqlDataType {
+  val sqlNames: Seq[String] = Seq("VARCHAR")
+  def scalaType: String = "String"
+
+  val varcharparser = for {
+    _ <- whitespace
+    ch <- stringInsensitive("NVARCHAR")
+    _ <- whitespace
+    open <- char('(')
+    _ <- whitespace
+    number <- numeric.many
+    _ <- whitespace
+    close <- char(')')
+  } yield ch + open + number.mkString + close
+  def parse: Parser[SqlDataType] =
+    (stringInsensitive("TEXT") or varcharparser).map(_ => this)
+}
+
 case object SqlVarChar extends SqlDataType {
   val sqlNames: Seq[String] = Seq("TEXT")
   def scalaType: String = "String"
@@ -150,6 +194,7 @@ case object SqlTimestamp extends SqlDataType {
 object SqlDataType extends Parse {
   val values: List[SqlDataType] = List(
     SqlInteger,
+    SqlDecimal,
     SqlChar,
     SqlTextArray,
     SqlString,
@@ -159,7 +204,8 @@ object SqlDataType extends Parse {
     SqlTimestamp,
     SqlUuid,
     SqlVector,
-    SqlVarChar
+    SqlVarChar,
+    SqlNVarChar
   )
 
   // Helper method to find a DataType by its SQL name

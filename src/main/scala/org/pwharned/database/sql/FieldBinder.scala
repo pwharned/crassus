@@ -118,6 +118,18 @@ object FieldBinder:
     def bind(stmt: PreparedStatement, idx: Int, v: String): Int =
       stmt.setString(idx, v)
       idx + 1
+  given FieldBinder[java.sql.Date] with
+    def bind(stmt: PreparedStatement, idx: Int, v: java.sql.Date): Int =
+      stmt.setDate(idx, v)
+      idx + 1
+  given FieldBinder[java.math.BigDecimal] with
+    def bind(stmt: PreparedStatement, idx: Int, v: java.math.BigDecimal): Int =
+      stmt.setBigDecimal(idx, v)
+      idx + 1
+  given sbd: FieldBinder[scala.math.BigDecimal] with
+    def bind(stmt: PreparedStatement, idx: Int, v: scala.math.BigDecimal): Int =
+      stmt.setBigDecimal(idx, v.bigDecimal)
+      idx + 1
 
   given jsfb[T](using fg: FieldBinder[T]): FieldBinder[JsonString[T]] with
     def bind(stmt: PreparedStatement, idx: Int, v: JsonString[T]): Int =

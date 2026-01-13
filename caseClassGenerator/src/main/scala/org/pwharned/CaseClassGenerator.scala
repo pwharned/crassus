@@ -100,10 +100,14 @@ object CaseClassGenerator {
           case true  => "="
           case false => ""
         }
+        val caseClassName = value._1.schema match {
+          case Some(sc) => s"`${sc}.${value._1.name}`"
+          case None     => value._1.name
+        }
         hkd match {
           case true =>
             s"""
-             |case class ${value._1.name}[F[_]](${columns
+            |case class ${caseClassName}[F[_]](${columns
                 .map(x => x.toField)
                 .mkString(",\n")})
              |

@@ -48,6 +48,11 @@ trait Parse {
         Left(ParseError(0, input, s"Unexpected end of input , expected digit"))
     }
 
+  def number: Parser[String] = input =>
+    numeric.many(input).map { case (chars, rest) =>
+      (chars.mkString(""), rest)
+    }
+
   def singleQuotedString: Parser[String] = input => {
     if (!input.startsWith("'"))
       Left(ParseError(0, input, "Expected starting single quote"))

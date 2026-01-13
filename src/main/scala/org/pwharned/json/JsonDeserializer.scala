@@ -287,6 +287,10 @@ object JsonDeserializer:
     def decode(buf: Array[Byte], pos: Int): (Long, Int) =
       val (lit, p) = JsonDeserializer.readLiteral(buf, pos)
       (lit.toLong, p)
+  given JsonDeserializer[scala.math.BigDecimal] with
+    def decode(buf: Array[Byte], pos: Int): (scala.math.BigDecimal, Int) =
+      val (lit, p) = JsonDeserializer.readLiteral(buf, pos)
+      (scala.math.BigDecimal(lit), p)
 
   given JsonDeserializer[Double] with
     def decode(buf: Array[Byte], pos: Int): (Double, Int) =

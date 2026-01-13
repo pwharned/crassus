@@ -100,6 +100,8 @@ object JsonSerializer:
     def serialize(ob: java.util.UUID): String = s"\"${ob.toString}\""
   given JsonSerializer[java.time.Instant] with
     def serialize(ob: java.time.Instant): String = s"\"${ob.toString}\""
+  given JsonSerializer[scala.math.BigDecimal] with
+    def serialize(ob: scala.math.BigDecimal): String = s"\"${ob.toString}\""
 
   given mapSerializer[A](using
       base: JsonSerializer[A]

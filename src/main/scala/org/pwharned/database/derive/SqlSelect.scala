@@ -4,7 +4,6 @@ import scala.compiletime.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.deriving.*
 import scala.language.implicitConversions
-
 trait SqlSelect[T] {
 
   def select: String
@@ -18,7 +17,11 @@ object SqlSelect:
   inline given derived[T <: Product](using
       m: Mirror.ProductOf[T]
   ): SqlSelect[T] = {
-    val name: String = constValue[m.MirroredLabel]
+    val tableName: String = summon[SqlTableName[T]].name()
+    val schemaName: Option[String] = summon[SqlSchemaName[T]].schema()
+    val name = schemaName match
+      case Some(value) => s"${value}.${tableName}"
+      case None        => tableName
 
     val names: List[String] =
       constValueTuple[m.MirroredElemLabels].productIterator.toList
