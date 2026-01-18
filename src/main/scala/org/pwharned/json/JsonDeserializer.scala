@@ -262,6 +262,12 @@ object JsonDeserializer:
       (GeneratedPrimaryKey(decoded._1), decoded._2)
     }
   // primitive decoders
+  given JsonDeserializer[java.sql.Date] with
+    def decode(buf: Array[Byte], pos: Int): (java.sql.Date, Int) =
+      val decoded = JsonDeserializer.readString(buf, pos)
+      val instant = java.time.Instant.parse(decoded._1)
+      val date = new java.sql.Date(instant.getEpochSecond())
+      (date, decoded._2)
   given JsonDeserializer[String] with
     def decode(buf: Array[Byte], pos: Int): (String, Int) =
       JsonDeserializer.readString(buf, pos)

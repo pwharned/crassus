@@ -108,8 +108,12 @@ object Connection:
       } else {
         Iterator.empty
       }
-    def query[A](using sql: SqlSelect[A], row: Row[A]): Iterator[A] =
-      val stmt = con.prepareStatement(sql.select)
+    def query[A](limit:Option[Int] = None)(using sql: SqlSelect[A], row: Row[A]): Iterator[A] =
+      val select = limit match
+        case Some(value) => s"select * from (${sql.select}) limit ${value}"
+        case None => sql.select
+      
+      val stmt = con.prepareStatement(select)
       val rs = stmt.executeQuery()
       Iterator
         .continually(rs.next())

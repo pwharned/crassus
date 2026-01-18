@@ -16,7 +16,7 @@ object SqlSchemaName:
       m: Mirror.ProductOf[T]
   ): SqlSchemaName[T] =
     val fullName: String = constValue[m.MirroredLabel]
-    val schemaAndTable = fullName.split(".")
+    val schemaAndTable = fullName.split("\\.")
     val schemaName = schemaAndTable.length match
       case 1 => None
       case 2 => Some(schemaAndTable(0))

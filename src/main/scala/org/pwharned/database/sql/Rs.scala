@@ -31,6 +31,9 @@ object SqlWrap:
 object Rs:
 
   // 2) your leaf instances
+  given Rs[Long] with
+    def read(r: java.sql.ResultSet, c: String): Long =
+      r.getLong(c)
   given Rs[java.math.BigDecimal] with
     def read(r: java.sql.ResultSet, c: String): java.math.BigDecimal =
       r.getBigDecimal(c)

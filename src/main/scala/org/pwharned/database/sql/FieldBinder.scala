@@ -114,6 +114,11 @@ object FieldBinder:
     def bind(stmt: PreparedStatement, idx: Int, v: Float): Int =
       stmt.setFloat(idx, v)
       idx + 1
+  given FieldBinder[Long] with
+    def bind(stmt: PreparedStatement, idx: Int, v: Long): Int =
+      stmt.setLong(idx, v)
+      idx + 1
+
   given FieldBinder[String] with
     def bind(stmt: PreparedStatement, idx: Int, v: String): Int =
       stmt.setString(idx, v)
