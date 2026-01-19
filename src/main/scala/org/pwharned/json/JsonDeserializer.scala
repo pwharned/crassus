@@ -281,6 +281,11 @@ object JsonDeserializer:
       val decoded = JsonDeserializer.readString(buf, pos)
       (java.time.Instant.parse(decoded._1), decoded._2)
     }
+  given JsonDeserializer[java.time.LocalDate] with
+    def decode(buf: Array[Byte], pos: Int): (java.time.LocalDate, Int) =
+      val (lit, p) = JsonDeserializer.readLiteral(buf, pos)
+      (java.time.LocalDate.parse(lit), p)
+
   given JsonDeserializer[Int] with
     def decode(buf: Array[Byte], pos: Int): (Int, Int) =
       val (lit, p) = JsonDeserializer.readLiteral(buf, pos)

@@ -8,6 +8,7 @@ import java.sql.ResultSet
 import java.util.UUID
 import scala.language.implicitConversions
 import scala.util.Try
+import java.time.ZoneId
 
 trait Rs[T]:
   def read(rs: ResultSet, col: String): T
@@ -40,6 +41,12 @@ object Rs:
   given sbd: Rs[scala.math.BigDecimal] with
     def read(r: java.sql.ResultSet, c: String): scala.math.BigDecimal =
       r.getBigDecimal(c)
+  given Rs[java.time.LocalDate] with
+    def read(r: java.sql.ResultSet, c: String): java.time.LocalDate =
+      r.getDate(c)
+        .toInstant()
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate();
 
   given Rs[String] with
     def read(r: java.sql.ResultSet, c: String): String = r.getString(c)

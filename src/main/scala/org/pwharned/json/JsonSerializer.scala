@@ -7,6 +7,9 @@ import scala.compiletime.*
 import scala.deriving.*
 import org.pwharned.database.hkd._
 
+trait LowPriorityJsonSerializer:
+  given fallbackSerializer[T]: JsonSerializer[T] with
+    def serialize(ob: T): String = "\"" + ob.toString + "\""
 trait JsWrap[F[_], A]:
   def wrap(fa: F[A], serializeA: A => String): String
 
@@ -25,7 +28,7 @@ object JsWrap:
 trait JsonSerializer[T]:
   def serialize(obj: T): String
 
-object JsonSerializer:
+object JsonSerializer extends LowPriorityJsonSerializer:
   def escapeJsonString(s: String): String =
     s.flatMap {
       case '"'          => "\\\""
@@ -101,7 +104,7 @@ object JsonSerializer:
   given JsonSerializer[java.time.Instant] with
     def serialize(ob: java.time.Instant): String = s"\"${ob.toString}\""
   given JsonSerializer[scala.math.BigDecimal] with
-    def serialize(ob: scala.math.BigDecimal): String = s"\"${ob.toString}\""
+    def serialize(ob: scala.math.BigDecimal): String = { ob.toString }
 
   given mapSerializer[A](using
       base: JsonSerializer[A]
