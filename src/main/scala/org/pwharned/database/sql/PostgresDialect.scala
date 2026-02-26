@@ -17,3 +17,17 @@ object PostgresDialect extends SqlDialect:
     val cs = cols.mkString(", ")
     val ps = List.fill(cols.size)("?").mkString(", ")
     s"INSERT INTO $table ($cs) VALUES ($ps)"
+  inline def limitAndOffset(
+      raw: String,
+      limit: Option[Int],
+      offset: Option[Int]
+  ): String =
+    (limit, offset) match
+      case (Some(l), Some(o)) =>
+        s"$raw limit $l offset $o"
+      case (Some(l), None) =>
+        s"$raw limit $l"
+      case (None, Some(o)) =>
+        s"$raw offset $o"
+      case _ =>
+        raw

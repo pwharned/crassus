@@ -71,6 +71,7 @@ object PrimaryKeyBinder:
 inline given updateBinder[CC <: Product](using
     m: Mirror.ProductOf[CC]
 ): FieldBinder[CC] = new FieldBinder[CC]:
+  def sqlType: Int = -1
   def bind(stmt: PreparedStatement, idx: Int, cc: CC): Int =
     bindUpdate[m.MirroredElemTypes, m.MirroredElemLabels](stmt, idx, cc, 0)
 

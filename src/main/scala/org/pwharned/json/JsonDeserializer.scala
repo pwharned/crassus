@@ -167,7 +167,20 @@ object JsonDeserializer:
             p += 1
             return p
         p += 1
-      throw new RuntimeException("Unterminated object while skipping")
+      throw new RuntimeException(s"Unterminated object while skipping at $pos")
+    else if peek(buf, pos) == '['.toByte then // Added array skipping
+      var depth = 0
+      var p = pos
+      while p < buf.length do
+        val b = buf(p)
+        if b == '['.toByte then depth += 1
+        else if b == ']'.toByte then
+          depth -= 1
+          if depth == 0 then
+            p += 1
+            return p
+        p += 1
+      throw new RuntimeException(s"Unterminated array while skipping at $pos")
     else
       val (_, p) = readLiteral(buf, pos)
       p
@@ -261,13 +274,16 @@ object JsonDeserializer:
       val decoded = underlying.decode(buf, pos)
       (GeneratedPrimaryKey(decoded._1), decoded._2)
     }
-  // primitive decoders
   given JsonDeserializer[java.sql.Date] with
     def decode(buf: Array[Byte], pos: Int): (java.sql.Date, Int) =
       val decoded = JsonDeserializer.readString(buf, pos)
+      // Note: Instant.parse expects ISO 8601 format with time (e.g., "2023-01-20T00:00:00Z")
+      // If the input is just "YYYY-MM-DD", consider using java.time.LocalDate.parse and then converting.
       val instant = java.time.Instant.parse(decoded._1)
-      val date = new java.sql.Date(instant.getEpochSecond())
+      val date =
+        new java.sql.Date(instant.toEpochMilli()) // Corrected toEpochMilli
       (date, decoded._2)
+
   given JsonDeserializer[String] with
     def decode(buf: Array[Byte], pos: Int): (String, Int) =
       JsonDeserializer.readString(buf, pos)
@@ -452,6 +468,86 @@ object JsonDeserializer:
       val tuple = Tuple.fromArray(values)
       val product = m.fromProduct(tuple)
       (product.asInstanceOf[T], pos)
+
+  // --- New additions for Map[String, Any] and Any ---
+
+  /** Deserializer for `Any`. This dynamically determines the JSON type based on
+    * the first character and delegates to the appropriate specific
+    * deserializer.
+    */
+  given JsonDeserializer[Any] with
+    def decode(buf: Array[Byte], pos: Int): (Any, Int) =
+      val p = JsonDeserializer.skipWhitespace(buf, pos)
+      val firstChar = JsonDeserializer.peek(buf, p)
+
+      firstChar match
+        case '"' => // String
+          JsonDeserializer[String].decode(buf, p)
+        case '{' => // Object (Map[String, Any])
+          JsonDeserializer[Map[String, Any]].decode(buf, p)
+        case '[' => // Array (List[Any])
+          // The existing List[A] deserializer will pick up JsonDeserializer[Any] for A
+          JsonDeserializer[List[Any]].decode(buf, p)
+        case 't' | 'f' => // Boolean
+          JsonDeserializer[Boolean].decode(buf, p)
+        case 'n' => // Null
+          val (lit, next) = JsonDeserializer.readLiteral(buf, p)
+          if lit == "null" then (null, next) // Scala's null for JSON null
+          else throw new RuntimeException(s"Invalid null literal: $lit at $p")
+        case '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' |
+            '9' => // Number
+          // For numbers, BigDecimal is the most general and safe choice for Any
+          JsonDeserializer[scala.math.BigDecimal].decode(buf, p)
+        case _ =>
+          throw new RuntimeException(
+            s"Unexpected character for Any type: '${firstChar.toChar}' at $p"
+          )
+
+  /** Deserializer for `Map[String, Any]`. Parses a JSON object into a Scala
+    * Map.
+    */
+  given JsonDeserializer[Map[String, Any]] with
+    def decode(buf: Array[Byte], pos0: Int): (Map[String, Any], Int) =
+      var pos = JsonDeserializer.skipWhitespace(buf, pos0)
+      pos = JsonDeserializer.readOpenBrace(buf, pos)
+      pos = JsonDeserializer.skipWhitespace(buf, pos)
+
+      val result = scala.collection.mutable.Map.empty[String, Any]
+      var done = false
+
+      while !done do
+        pos = JsonDeserializer.skipWhitespace(buf, pos)
+        if pos >= buf.length then throw new RuntimeException("Unexpected EOF")
+        if buf(pos) == '}'.toByte then
+          pos = JsonDeserializer.readCloseBrace(buf, pos)
+          done = true
+        else
+          // Read key
+          val (key, posAfterKey) = JsonDeserializer.readString(buf, pos)
+          pos = JsonDeserializer.skipWhitespace(buf, posAfterKey)
+          pos = JsonDeserializer.readColon(buf, pos)
+          pos = JsonDeserializer.skipWhitespace(buf, pos)
+
+          // Decode value using JsonDeserializer[Any]
+          val (value, newPos) = JsonDeserializer[Any].decode(buf, pos)
+          result += (key -> value)
+          pos = JsonDeserializer.skipWhitespace(buf, newPos)
+
+          // Consume optional comma
+          pos = JsonDeserializer.skipWhitespace(buf, pos)
+          if pos < buf.length && buf(pos) == ','.toByte then
+            pos = JsonDeserializer.readComma(buf, pos)
+            pos = JsonDeserializer.skipWhitespace(buf, pos)
+          else if pos < buf.length && buf(pos) == '}'.toByte then
+            // Next iteration will handle the closing brace
+            ()
+          else
+            throw new RuntimeException(
+              s"Unexpected token after value in map: '${buf(pos).toChar}' at $pos"
+            )
+      (result.toMap, pos)
+
+  // --- End of new additions ---
 
 @main
 def test(): Unit =

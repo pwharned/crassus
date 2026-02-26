@@ -45,8 +45,8 @@ type OptionalField[A] = A match
 
 
 type UpdatedField[A] = A match
-  case PrimaryKey[t] => Option[PrimaryKey[t]]
-  case GeneratedPrimaryKey[t] => Option[GeneratedPrimaryKey[t]]
+  case PrimaryKey[t] => PrimaryKey[t]
+  case GeneratedPrimaryKey[t] => GeneratedPrimaryKey[t]
   case Nullable[t] => Option[t]
   case Default[t] => Option[t]
   case _ => Option[A]

@@ -6,4 +6,9 @@ trait SqlDialect {
   def insertReturning[T <: Product](raw: String): String
   def updateReturning(raw: String): String
   def deleteReturning(raw: String): String
+  def limitAndOffset(
+      raw: String,
+      limit: Option[Int],
+      offset: Option[Int]
+  ): String
 }
